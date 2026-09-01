@@ -1,4 +1,7 @@
-import { createHttpHandler } from "@cubicecho/graphql-mcp";
+import type { ServerResponse } from "node:http";
+import type { McpHttpHandler, McpHttpRequest } from "@cubicecho/graphql-mcp";
+import { connectServer, createServerFactory } from "@cubicecho/graphql-mcp";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import express from "express";
 // The version a client is told it is talking to; without it the wrapper library reports its own.
 // Default import, not a named one: Node's own JSON modules only export a default, and the
@@ -6,6 +9,7 @@ import express from "express";
 import pkg from "../package.json" with { type: "json" };
 import { requireAuth } from "./auth.ts";
 import { schema } from "./graphql/schema.ts";
+import { registerPrompts } from "./mcp-prompts.ts";
 
 /**
  * The tools an outside client is handed, and nothing else.
@@ -222,11 +226,9 @@ const WRITE_HINTS: Record<string, { destructiveHint?: boolean; idempotentHint?: 
  * project for the migration and get it started" — which is the shortest path from this being a
  * board someone fills in to being somewhere work is handed off.
  *
- * Stateless: each request builds its own server and answers as JSON, so nothing is pinned to a
- * process and a client can reconnect whenever it likes. Sessions would buy server-initiated
- * messages over an open stream; nothing here sends any.
+ * The descriptors are built once here; each request gets a server of its own from the factory.
  */
-export const mcpHandler = createHttpHandler({
+const makeServer = createServerFactory({
   schema,
   name: "kanban-server",
   version: pkg.version,
@@ -242,6 +244,43 @@ export const mcpHandler = createHttpHandler({
       : descriptor.description,
     ...(WRITE_HINTS[descriptor.name] ? { annotations: WRITE_HINTS[descriptor.name] } : {}),
   }),
+});
+
+/**
+ * Stateless MCP over HTTP: a fresh server and transport per request, answered as JSON. Nothing
+ * is pinned to a process and a client can reconnect whenever it likes. Sessions would buy
+ * server-initiated messages over an open stream; nothing here sends any.
+ *
+ * This is `createHttpHandler`'s stateless path written out, and it is written out for one
+ * reason: the prompts have to be registered on the `McpServer` the factory mints, before it
+ * connects, and the driver hands that server to nobody. Owning these lines costs nothing —
+ * `createServerFactory` and `connectServer` are the driver's own and are used unchanged, and
+ * everything they do for a stateless request (the shared `tools/list` render, the argument
+ * guard that answers a bad call before the SDK's validator does) is installed by the factory
+ * rather than by the handler. cubicecho/graphql-mcp#20 asks for prompts to be an option beside
+ * `tools`, and this goes back to one call when it is.
+ */
+async function handleMcp(req: McpHttpRequest, res: ServerResponse): Promise<void> {
+  const server = makeServer();
+  registerPrompts(server);
+
+  const transport = new StreamableHTTPServerTransport({
+    sessionIdGenerator: undefined,
+    enableJsonResponse: true,
+  });
+  res.on("close", () => {
+    void transport.close();
+    void server.close();
+  });
+
+  await connectServer(server, transport);
+  await transport.handleRequest(req, res, req.body);
+}
+
+export const mcpHandler: McpHttpHandler = Object.assign(handleMcp, {
+  // Nothing outlives a request here, so there is nothing to shut down. It stays because the
+  // process shutdown calls it, and because turning sessions on would give it work to do.
+  close: async () => {},
 });
 
 /**
