@@ -84,6 +84,7 @@ test("offers the board tools, and only those", async () => {
     "move_card",
     "projects",
     "refine_task",
+    "retry_card",
     "run_card",
     "run_events",
     "runs",
@@ -242,6 +243,7 @@ test("marks only the tools that actually destroy something", async () => {
     "delete_task_single",
     "move_card",
     "refine_task",
+    "retry_card",
     "run_card",
     "stop_card",
     "stop_task",
@@ -254,6 +256,7 @@ test("marks only the tools that actually destroy something", async () => {
     "delete_card_single",
     "delete_task_single",
     "move_card",
+    "retry_card",
     "stop_card",
     "stop_task",
   ]);

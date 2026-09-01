@@ -4747,6 +4747,11 @@ type Mutation {
   moveCard(cardId: String!, laneId: String!, position: Int): Card!
 
   """
+  Puts a card back in play where it stands: clears its error and returns it to `idle`, which is the status a lane's agent will pick up. This is the way back for a card a reviewer rejected — those stay `error` on purpose, so the board waits for a person rather than looping — and for one interrupted by a restart. It does not run anything itself; `runCard` does that, and `autoRun` does it unasked. Refused while an agent is working the card.
+  """
+  retryCard(cardId: String!): Card!
+
+  """
   Replaces the set of MCP servers an agent may reach, and answers with it. Written as a set rather than a row at a time because that is how it is decided — an agent's tools are the whole of what it can do, and half-applied is a different agent.
   """
   setAgentServers(agentId: String!, serverIds: [String!]!): [String!]!

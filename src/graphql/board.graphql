@@ -48,6 +48,14 @@ mutation RunCard($cardId: String!) {
   }
 }
 
+mutation RetryCard($cardId: String!) {
+  retryCard(cardId: $cardId) {
+    id
+    status
+    error
+  }
+}
+
 mutation StopCard($cardId: String!) {
   stopCard(cardId: $cardId)
 }

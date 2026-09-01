@@ -110,8 +110,9 @@ put, or it landed where no agent runs.
 
 **A card a reviewer rejected stays `error`.** Review sends it back to Doing, but `error` is a
 status the worker will not pick up, so a rejected card waits for a person rather than looping
-between two agents at whatever a token costs. Moving it — on the board, or with `moveCard` —
-returns it to `idle`, and that is how a failed card is retried.
+between two agents at whatever a token costs. `retryCard` — the **Retry** button on the card —
+clears the error and returns it to `idle` where it stands, and that is how a failed card is put
+back in play. Moving it does the same thing, since a moved card comes back to `idle` too.
 
 The review verdict is a property of the output, not of the run: a reviewer that answers `FAIL`
 has still run fine, so the run is `ok` and it is the card that failed. An answer that is neither
@@ -246,14 +247,14 @@ somewhere work is handed off. In dev it is on the server's own port (`:8788`); v
 claude mcp add --transport http kanban http://localhost:8788/mcp
 ```
 
-Twenty-one tools, chosen in `server/mcp-endpoint.ts` rather than projected from the whole schema:
+Twenty-two tools, chosen in `server/mcp-endpoint.ts` rather than projected from the whole schema:
 
 - **read** — `projects`, `lanes`, `cards`, `tasks`, `runs`, `agents`, `run_events`
 - **projects** — `create_project`, `update_project_single`
 - **tasks** — `submit_task`, `create_task`, `refine_task`, `accept_task`, `decompose_task`,
   `delete_task_single`
-- **cards** — `update_card_single`, `delete_card_single`, `move_card`, `run_card`, `stop_card`,
-  `stop_task`
+- **cards** — `update_card_single`, `delete_card_single`, `move_card`, `retry_card`, `run_card`,
+  `stop_card`, `stop_task`
 
 `submit_task` is the one to reach for: describe what you want and it is written down, broken into
 cards, and put on the board in a single call.
