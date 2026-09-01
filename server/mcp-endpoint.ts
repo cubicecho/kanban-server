@@ -37,6 +37,7 @@ const TOOLS = [
   "Mutation.acceptTask",
   "Mutation.decomposeTask",
   "Mutation.deleteTaskSingle",
+  "Mutation.createCard",
   "Mutation.updateCardSingle",
   "Mutation.deleteCardSingle",
   "Mutation.moveCard",
@@ -111,6 +112,15 @@ const HINTS: Record<string, string> = {
   delete_task_single:
     "Deletes one task and its conversation. The cards it produced are left where they are: " +
     "they are the work, and the task was only how it was asked for.",
+  create_card:
+    "Puts one piece of work on a board directly, without a task to decompose — the thing to " +
+    "reach for when you already know what the card is and breaking it up would only be " +
+    "ceremony. Needs a `projectId` and a `laneId`: there is no intake defaulting here, so read " +
+    "`lanes` and pick one, which for work nobody should start yet is the lane with `intake` " +
+    "set. `acceptance` is what a review agent will judge it on, and is worth writing even " +
+    "when the body says it in passing — a criterion buried in a paragraph is one that gets " +
+    "skipped. A card written this way carries no `taskId`, which is the honest record of " +
+    "where it came from.",
   update_card_single:
     "Edits one card — its title, body or acceptance criteria. Use `move_card` to put it in a " +
     "different lane; setting `laneId` here skips the renumbering and leaves the board in an " +
