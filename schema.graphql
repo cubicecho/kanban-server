@@ -4344,6 +4344,21 @@ type Query {
     """At most this many entries, oldest first. Default 200."""
     limit: Int
   ): [RunEvent!]!
+
+  """
+  What a project has cost in tokens, over a window, added up from its runs. With a `taskId` it is that one task instead: its refinement, its decomposition, and every run of every card it turned into. Read `from` before quoting the number — it says how far back the runs behind it actually go.
+  """
+  spend(
+    projectId: String!
+
+    """
+    Narrows the total to one task of that project. Omit for the whole board.
+    """
+    taskId: String
+
+    """How far back to count. Default 30. Zero counts every run still kept."""
+    days: Int
+  ): Spend!
 }
 
 """Columns of Agent that a query can be made distinct on"""
@@ -4586,6 +4601,30 @@ type RunEvent {
   """Tool name, where there is one."""
   name: String!
   ok: Boolean
+}
+
+"""
+What has been spent on a project, or on one task in it, added up from the run rows themselves rather than from a counter — a counter would keep climbing after retention deleted the runs behind it.
+"""
+type Spend {
+  """How many runs went into this total."""
+  runs: Int!
+  promptTokens: Int!
+  completionTokens: Int!
+  totalTokens: Int!
+
+  """The window that was asked for. Zero means every run still kept."""
+  days: Int!
+
+  """
+  The oldest run in the total. This, not `days`, is what the number actually covers: if retention has swept older runs away, it is later than the window asked for. Null when nothing was counted.
+  """
+  from: DateTime
+
+  """
+  How long runs are kept, from settings. Zero means forever, and then the total is the whole history.
+  """
+  retentionDays: Int!
 }
 
 type Mutation {

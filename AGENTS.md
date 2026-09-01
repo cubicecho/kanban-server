@@ -110,7 +110,7 @@ polls rather than waking on writes, because the things that make a card runnable
 writes — a dependency finishing, an agent switched back on, a run stopped.
 
 **Hand-written GraphQL fields go in `server/graphql/`**, beside the generated entities:
-`models`, `mcpStatus`, `runEvents` on the query side; `refineTask`, `acceptTask`,
+`models`, `mcpStatus`, `runEvents`, `spend` on the query side; `refineTask`, `acceptTask`,
 `decomposeTask`, `submitTask`, `runCard`, `stopCard`, `stopTask`, `moveCard`, `retryCard`,
 `setCardDeps`, `setAgentServers`,
 `testMcpServer`, `reconnectMcp`, `setApiKey`, `setAgentApiKey` on the mutation side. Give every
@@ -126,7 +126,7 @@ belongs in a hook, not in a route handler.
 tests hold that line.
 
 **The `/mcp` surface is curated, not the whole schema.** `server/mcp-endpoint.ts` lists the
-twenty-four tools an outside client gets. Nothing that empties a table in one call, nothing that
+twenty-five tools an outside client gets. Nothing that empties a table in one call, nothing that
 reads or writes the API key, and no editing of agents or MCP servers — a visiting client can
 see which agents exist, because a lane points at one, but which model runs where and on whose
 key is the operator's business. A new tool goes in that list deliberately,
@@ -162,6 +162,10 @@ worth keeping goes in the run row.
 that started them all know the subject, not the run; `ActiveRuns` — `runs` filtered to
 `status: running` for the project — is the join, and `RunStream` takes it from there. The board
 and the refinement chat both go through it, so a run is watchable where it is happening.
+
+**Totals are read, never counted.** `spend` sums the run rows on every call, and reports the
+oldest run it counted. A stored counter would keep climbing after `runRetentionDays` deleted the
+runs behind it, and a total that cannot be checked against the rows is worse than none.
 
 **Frontend:** shadcn primitives in `src/components/ui/` with no app logic; routes in
 `src/routes/`; `@/` maps to `src/`. Every query goes through `request()` in `src/lib/gql.ts`

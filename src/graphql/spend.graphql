@@ -1,0 +1,11 @@
+query Spend($projectId: String!, $taskId: String, $days: Int) {
+  spend(projectId: $projectId, taskId: $taskId, days: $days) {
+    runs
+    promptTokens
+    completionTokens
+    totalTokens
+    days
+    from
+    retentionDays
+  }
+}
