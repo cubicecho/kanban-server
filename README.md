@@ -121,6 +121,29 @@ counts as a pass. A mumbling reviewer must not be able to wedge a board.
 A card whose dependencies have not finished is skipped by the worker rather than run out of
 order. Asking for it by hand marks it `blocked` and says on the card what it is waiting on.
 
+## Moving a card
+
+Cards drag, by the grip on their left, and they also move with the arrows on the card. Both land
+on the same `moveCard`, which puts the card in a lane at a position and renumbers that lane so
+the board stays in the order it looks like — and brings the card back to `idle` with its error
+cleared, which is why dragging a failed card is a retry.
+
+The grip is a handle rather than the whole card being draggable, and that is about the keyboard
+as much as the mouse: a card carries seven buttons, and a drag listener on the card itself would
+take the space bar off every one of them. On the handle it is tab to reach, space to lift, arrows
+to move, space to drop, escape to think better of it. The lane arrows stay because "two lanes to
+the right" is one keystroke on an arrow and a dozen on a drag.
+
+A drop is applied to the query cache before the server has answered, using the same arithmetic
+the server does (`src/lib/board-order.ts`), because a card that jumps back for a moment reads as
+broken. `tests/board-order.test.ts` drags cards against the real mutation and asserts the two
+orders are the same one. A refusal — a card an agent picked up between the drop and the request —
+puts the board back as it was. The board's own three-second poll stops while a card is in the air:
+a lane that renumbers itself under the cursor is a card dropped where nobody aimed.
+
+A card an agent is working does not drag at all. The server refuses to move it, so the board does
+not offer to.
+
 ## Saving a board
 
 The four lanes are a starting point, not the shape most projects end up with, and redrawing the

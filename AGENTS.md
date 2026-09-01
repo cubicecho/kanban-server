@@ -95,6 +95,14 @@ caps how many run at once. That is the whole of the automation — there is no w
 and the shape of the pipeline is the shape of the board someone drew. A lane with no agent is a
 resting place, which is what a backlog and a done pile are.
 
+**The optimistic board and the server agree by construction.** A drop rewrites the board cache
+before the request goes out, and `src/lib/board-order.ts` holds the two pure functions that
+decide where a card lands and how its lane renumbers — the same arithmetic `moveCard` does.
+`tests/board-order.test.ts` runs the real mutation and compares, because the failure mode of a
+disagreement is a card that moves twice: once where it was dropped, once when the refetch lands.
+Dragging is by a handle, not the whole card: a card carries seven buttons, and a keyboard drag
+listener on the card would take the space bar off all of them.
+
 **A board template stores indexes, not ids.** `saveBoardTemplate` snapshots a project's lanes
 into `board_templates.lanes`, turning `onSuccessLaneId`/`onFailureLaneId` into positions in the
 template's own list — a lane id belongs to one project and means nothing in another. Applying
