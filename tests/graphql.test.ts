@@ -158,6 +158,75 @@ test("retryCard puts a rejected card back in play where it stands", async () => 
   expect(await fails(`mutation { retryCard(cardId: "nope") { id } }`)).toMatch(/no card with id/);
 });
 
+test("setCardDeps writes an ordering as a set, and refuses one that closes a loop", async () => {
+  const project = await newProject("ordering");
+  const other = await newProject("elsewhere");
+  const [backlog] = await board(project.id);
+  const [elsewhere] = await board(other.id);
+
+  const make = async (title: string, laneId = backlog.id) =>
+    (
+      await run(`mutation Make($values: CreateCardInput!) { createCard(values: $values) { id } }`, {
+        values: { projectId: laneId === backlog.id ? project.id : other.id, laneId, title },
+      })
+    ).createCard as { id: string };
+
+  const migration = await make("write the migration");
+  const endpoint = await make("read it from the endpoint");
+  const page = await make("call it from the page");
+  const stranger = await make("another board's card", elsewhere.id);
+
+  const set = (cardId: string, dependsOn: string[]) =>
+    run(
+      `mutation Set($cardId: String!, $dependsOn: [String!]!) { setCardDeps(cardId: $cardId, dependsOn: $dependsOn) }`,
+      {
+        cardId,
+        dependsOn,
+      },
+    );
+  const setFails = (cardId: string, dependsOn: string[]) =>
+    fails(
+      `mutation Set($cardId: String!, $dependsOn: [String!]!) { setCardDeps(cardId: $cardId, dependsOn: $dependsOn) }`,
+      {
+        cardId,
+        dependsOn,
+      },
+    );
+
+  expect(await set(endpoint.id, [migration.id])).toEqual({ setCardDeps: [migration.id] });
+  expect(await set(page.id, [endpoint.id, migration.id])).toEqual({
+    setCardDeps: [endpoint.id, migration.id],
+  });
+
+  // A whole set, not an append: writing one id leaves one edge, whatever was there before.
+  expect(await set(page.id, [endpoint.id])).toEqual({ setCardDeps: [endpoint.id] });
+  const { cards } = await run(
+    `query Deps($id: String!) { cards(where: { id: { eq: $id } }) { deps { dependsOnCardId } } }`,
+    { id: page.id },
+  );
+  expect(cards[0].deps.map((dep: { dependsOnCardId: string }) => dep.dependsOnCardId)).toEqual([
+    endpoint.id,
+  ]);
+
+  // The three refusals, and each says which card is the problem.
+  expect(await setFails(migration.id, [migration.id])).toMatch(/cannot wait on itself/);
+  expect(await setFails(migration.id, [stranger.id])).toMatch(/Not cards on this board/);
+  const loop = await setFails(migration.id, [page.id]);
+  expect(loop).toMatch(/cycle/i);
+  expect(loop).toContain("write the migration");
+  expect(loop).toContain("call it from the page");
+
+  // A refusal writes nothing: the ordering that was there is the ordering that is there.
+  const after = await run(
+    `query Deps($id: String!) { cards(where: { id: { eq: $id } }) { deps { dependsOnCardId } } }`,
+    { id: migration.id },
+  );
+  expect(after.cards[0].deps).toEqual([]);
+
+  // And an empty list is how a card is told it waits on nothing.
+  expect(await set(page.id, [])).toEqual({ setCardDeps: [] });
+});
+
 test("the API never hands back a stored key", async () => {
   expect(await run(`mutation { setApiKey(apiKey: "sk-secret") }`)).toEqual({ setApiKey: true });
   // The write goes through; the column is not in the schema at all, so nothing can read it back

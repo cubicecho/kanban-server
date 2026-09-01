@@ -89,6 +89,7 @@ test("offers the board tools, and only those", async () => {
     "run_card",
     "run_events",
     "runs",
+    "set_card_deps",
     "stop_card",
     "stop_task",
     "submit_task",
@@ -262,6 +263,7 @@ test("marks only the tools that actually destroy something", async () => {
   expect(flagged("destructiveHint")).toEqual([
     "delete_card_single",
     "delete_task_single",
+    "set_card_deps",
     "stop_card",
     "stop_task",
     "update_card_single",
@@ -283,6 +285,7 @@ test("marks only the tools that actually destroy something", async () => {
     "refine_task",
     "retry_card",
     "run_card",
+    "set_card_deps",
     "stop_card",
     "stop_task",
     "submit_task",
@@ -295,6 +298,7 @@ test("marks only the tools that actually destroy something", async () => {
     "delete_task_single",
     "move_card",
     "retry_card",
+    "set_card_deps",
     "stop_card",
     "stop_task",
   ]);
