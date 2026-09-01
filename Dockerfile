@@ -55,6 +55,6 @@ EXPOSE 8788
 # postgres the process can no longer reach counts as unhealthy. Uses node,
 # already here, rather than adding curl to a slim base.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||8788)+'/graphql',{method:'POST',headers:{'content-type':'application/json'},body:'{\"query\":\"{projects{id}}\"}'}).then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||8788)+'/graphql',{method:'POST',headers:{'content-type':'application/json',...(process.env.KANBAN_SERVER_TOKEN?{authorization:'Bearer '+process.env.KANBAN_SERVER_TOKEN}:{})},body:'{\"query\":\"{projects{id}}\"}'}).then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
 
 CMD ["node", "server/index.ts"]

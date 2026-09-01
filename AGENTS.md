@@ -163,6 +163,12 @@ that started them all know the subject, not the run; `ActiveRuns` — `runs` fil
 `status: running` for the project — is the join, and `RunStream` takes it from there. The board
 and the refinement chat both go through it, so a run is watchable where it is happening.
 
+**Authentication is optional and off by default.** `KANBAN_SERVER_TOKEN` unset is the server as
+it always was; set, `server/auth.ts` puts `requireAuth` in front of `/graphql` and `/mcp`. Agents
+send a bearer header; the browser trades the token for an `httpOnly` `SameSite=Strict` cookie at
+`/api/auth`, because an `EventSource` cannot send headers and the run stream is one. Compare
+tokens with `tokenMatches` — hashed, then `timingSafeEqual` — and never say more in a 401.
+
 **Totals are read, never counted.** `spend` sums the run rows on every call, and reports the
 oldest run it counted. A stored counter would keep climbing after `runRetentionDays` deleted the
 runs behind it, and a total that cannot be checked against the rows is worse than none.
