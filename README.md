@@ -431,6 +431,25 @@ docker compose -f docker-compose.pg.yml up --build
 
 Nothing in the image changes between the two — see **Postgres** below.
 
+To run what a release published rather than building it, `docker-compose.example.yml` is the same
+service with `image:` where the others have `build:`. It and `.env.example` are the whole of what
+a server needs — no clone:
+
+```sh
+curl -O https://raw.githubusercontent.com/cubicecho/kanban-server/main/docker-compose.example.yml
+curl -o .env https://raw.githubusercontent.com/cubicecho/kanban-server/main/.env.example
+docker compose -f docker-compose.example.yml up -d
+```
+
+It runs `latest`, so the file is right whenever it is read; for a deployment worth caring about,
+pin the version in it, because `latest` moves under a running server on the next `--pull always`
+and an upgrade should be something someone decided to do. While the GHCR package is private a
+pull wants `docker login ghcr.io` with a token that has `read:packages`.
+
+`.env` is where compose looks for `TZ`, `OPENAI_API_KEY`, `KANBAN_SERVER_TOKEN` and
+`POSTGRES_PASSWORD`; all four have a line in `.env.example`, and all four have a default, so an
+empty one is a working server.
+
 `OPENAI_API_KEY` is optional and only a fallback: an agent takes its key from its own row, then
 from the settings row the UI saves, and only then from the environment. `KANBAN_SERVER_TOKEN` is
 the other one worth setting here — see **Locking it**; the container's healthcheck sends it too.

@@ -1,0 +1,60 @@
+# Running a released image, without a clone and without a build:
+#
+#   curl -O https://raw.githubusercontent.com/cubicecho/kanban-server/main/docker-compose.example.yml
+#   curl -o .env https://raw.githubusercontent.com/cubicecho/kanban-server/main/.env.example
+#   docker compose -f docker-compose.example.yml up -d
+#
+# These two files are the whole of it. `docker-compose.yml` beside them builds the image from
+# source instead, which is what a developer wants and what CI checks; this one runs what the
+# release published, which is what a server wants.
+#
+# Every release pushes `latest` and the version to ghcr.io/cubicecho/kanban-server, and to Docker
+# Hub as well when that release had credentials for it. While the GHCR package is private, a pull
+# wants a GitHub token with `read:packages` first:
+#
+#   echo "$GITHUB_TOKEN" | docker login ghcr.io -u <your-github-username> --password-stdin
+services:
+  kanban-server:
+    # `latest` so this file is right whenever it is read. For a deployment you care about,
+    # pin the version instead — every release publishes one, they are listed at
+    # github.com/cubicecho/kanban-server/releases — because `latest` moves under a running
+    # server on the next `docker compose up -d --pull always`, and an upgrade should be a thing
+    # somebody decided to do.
+    image: ghcr.io/cubicecho/kanban-server:latest
+    restart: unless-stopped
+    ports:
+      # The board, /graphql and /mcp are all on this one port. Nothing is authenticated unless
+      # KANBAN_SERVER_TOKEN is set, so on a machine with a public IP either set it or bind this
+      # to the loopback — "127.0.0.1:8788:8788" — and reach it through something that has a
+      # login of its own.
+      - "8788:8788"
+    volumes:
+      # The embedded postgres (PGlite) keeps its data here, so the boards survive an upgrade.
+      # With DATABASE_URL set below this holds nothing that matters.
+      - ./data:/data
+    environment:
+      TZ: ${TZ:-UTC}
+      # Optional: agents take their key from their own row, then from the settings row the UI
+      # saves, and only then from here. This is the fallback for a server nobody has configured.
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      # Optional, and the one worth setting on anything reachable. Empty leaves the server open
+      # to whatever can reach the port; set it and /graphql and /mcp both want it as a bearer
+      # token, and the web app asks for it once. `openssl rand -hex 32`.
+      KANBAN_SERVER_TOKEN: ${KANBAN_SERVER_TOKEN:-}
+      # A postgres of your own, if you have one — the server creates its schema on first boot
+      # either way, and nothing else changes. Left unset it runs postgres itself, in-process,
+      # against the volume above. For a postgres container alongside this one, see
+      # docker-compose.pg.yml in the repository.
+      DATABASE_URL: ${DATABASE_URL:-}
+    healthcheck:
+      # A GraphQL query rather than a TCP probe: it round-trips to the database, so a postgres
+      # the process can no longer reach counts as unhealthy.
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:8788/graphql',{method:'POST',headers:{'content-type':'application/json',...(process.env.KANBAN_SERVER_TOKEN?{authorization:'Bearer '+process.env.KANBAN_SERVER_TOKEN}:{})},body:'{\"query\":\"{projects{id}}\"}'}).then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s

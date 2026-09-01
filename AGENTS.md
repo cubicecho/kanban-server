@@ -227,6 +227,11 @@ query keys it affected.
 - `.github/workflows/ci.yml` — biome, codegen drift, typecheck, vitest, build; plus a job that
   builds the Docker image, boots it and waits for it to answer a GraphQL query, and one that
   brings up `docker-compose.pg.yml` and round-trips a project through a real postgres
+- **Three compose files, and only two of them are built here.** `docker-compose.yml` and
+  `docker-compose.pg.yml` build this checkout and are what CI runs; `docker-compose.example.yml`
+  names the published image and is what somebody copies onto a server, so nothing here would
+  catch a typo in it — the docker job runs `docker compose config` over all three for that
+  reason. A change to one of them is usually a change to all three
 - `.github/workflows/release.yml` — after CI passes on `main`, semantic-release cuts the
   release and one build pushes `latest` and the version to `ghcr.io/<owner>/<repo>` and
   `<user>/kanban-server` on Docker Hub. GHCR uses the built-in `GITHUB_TOKEN` and needs no

@@ -26,3 +26,4 @@ Dockerfile
 .dockerignore
 docker-compose.yml
 docker-compose.pg.yml
+docker-compose.example.yml
