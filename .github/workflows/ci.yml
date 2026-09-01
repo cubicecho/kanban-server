@@ -66,6 +66,17 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      # The example is the one compose file nothing else here runs: it names a
+      # published image rather than building this checkout, so a typo in it is
+      # only ever found by whoever copied it onto a server. `config` resolves
+      # the interpolation and the schema, which is what there is to get wrong.
+      - name: The compose files parse, the example included
+        run: |
+          for file in docker-compose.yml docker-compose.pg.yml docker-compose.example.yml; do
+            docker compose -f "$file" config > /dev/null
+            echo "$file ok"
+          done
+
       # The image runs the server's TypeScript through Node's type stripping
       # rather than tsx. That either works or the container dies on boot, and
       # nothing else in CI covers it.
