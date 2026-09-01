@@ -6,7 +6,8 @@ import { migrate as migrateNode } from "drizzle-orm/node-postgres/migrator";
 import { drizzle as drizzlePglite, type PgliteDatabase } from "drizzle-orm/pglite";
 import { migrate as migratePglite } from "drizzle-orm/pglite/migrator";
 import pg from "pg";
-import { DATA_DIR, DATABASE_URL } from "../paths.ts";
+import { errorMessage } from "../../shared/errors.ts";
+import { CREATE_DATABASE, DATA_DIR, DATABASE_URL } from "../paths.ts";
 import { relations } from "./schema.ts";
 
 /**
@@ -144,3 +145,106 @@ export const runMigrations = (migrationsFolder: string): Promise<unknown> =>
   pool
     ? migrateNode(db, { migrationsFolder })
     : migratePglite(db as unknown as PgliteDatabase<typeof relations>, { migrationsFolder });
+
+/**
+ * The databases to ask for a connection when the one we want does not exist yet. `postgres` is
+ * the conventional maintenance database and is there on almost everything; `template1` has to
+ * exist, because postgres copies it to make every other database, so it is the fallback for a
+ * server that dropped `postgres` or never had it.
+ */
+const MAINTENANCE_DATABASES = ["postgres", "template1"];
+
+/** A name as a quoted identifier. `CREATE DATABASE` takes no bind parameters. */
+export const quoteIdent = (name: string): string => `"${name.replaceAll('"', '""')}"`;
+
+/**
+ * The database a URL names, and the same URL pointed at each maintenance database in turn.
+ *
+ * Rewriting the parsed URL rather than building a new one carries the credentials, the port and
+ * anything in the query string — `?sslmode=require` — across untouched. Split out and pure
+ * because it is the part worth testing without a postgres to hand.
+ */
+export function adminTargets(databaseUrl: string): { name: string; urls: string[] } {
+  const url = new URL(databaseUrl);
+  return {
+    // Empty when the URL names no database, in which case libpq is falling back to the role
+    // name and there is nothing we were actually asked to create.
+    name: decodeURIComponent(url.pathname.slice(1)),
+    urls: MAINTENANCE_DATABASES.map((name) => {
+      const admin = new URL(url);
+      admin.pathname = `/${name}`;
+      return admin.href;
+    }),
+  };
+}
+
+/** Creates `name` on the server those URLs point at, on the first one that answers. */
+async function createDatabase(name: string, urls: string[]): Promise<void> {
+  const byHand = `CREATE DATABASE ${quoteIdent(name)};`;
+  const refused: string[] = [];
+
+  for (const connectionString of urls) {
+    const admin = new pg.Client({ connectionString });
+    // A client with no `error` listener throws on one, and this one lives for a single
+    // statement: a connection dropped under it should end the attempt, not the process.
+    admin.on("error", () => {});
+
+    try {
+      await admin.connect();
+    } catch (error) {
+      refused.push(errorMessage(error));
+      continue;
+    }
+
+    try {
+      await admin.query(`create database ${quoteIdent(name)}`);
+    } catch (error) {
+      const code = (error as { code?: string }).code;
+      if (code === "42501") {
+        throw new Error(
+          `The database ${name} does not exist and this role may not create one. Run ${byHand} ` +
+            "on that server by hand, or set KANBAN_SERVER_CREATE_DATABASE=0 to stop asking.",
+        );
+      }
+      // 42P04, duplicate_database: another server booting against the same instance got there
+      // between our probe and this statement. That is the outcome we wanted, whoever reached it.
+      if (code !== "42P04") throw error;
+    } finally {
+      await admin.end();
+    }
+    return;
+  }
+
+  throw new Error(
+    `The database ${name} does not exist, and no maintenance database on that server would take ` +
+      `a connection to create it (${refused.join("; ")}). Run ${byHand} by hand, or set ` +
+      "KANBAN_SERVER_CREATE_DATABASE=0 to stop asking.",
+  );
+}
+
+/**
+ * Creates the database named in `DATABASE_URL` when the server has not got one, so that
+ * pointing at a shared postgres is the one variable it looks like rather than a variable and a
+ * `CREATE DATABASE` somebody has to run first. A no-op on PGlite, which makes its own.
+ *
+ * The check is a query on the pool rather than a look through `pg_database`, because it is the
+ * connection the migrations were about to open anyway: a database that is already there costs
+ * nothing, and — the point of doing it this way round — needs no rights on the maintenance
+ * database at all. Only a missing one goes looking for one.
+ */
+export async function ensureDatabase(): Promise<void> {
+  if (!pool) return;
+
+  try {
+    await pool.query("select 1");
+  } catch (error) {
+    // 3D000 is `invalid_catalog_name`: the server answered and has no such database. Anything
+    // else — a refused connection, a rejected password — is not a missing database and is not
+    // ours to paper over.
+    if ((error as { code?: string }).code !== "3D000" || !CREATE_DATABASE) throw error;
+
+    const { name, urls } = adminTargets(DATABASE_URL);
+    if (!name) throw error;
+    await createDatabase(name, urls);
+  }
+}

@@ -41,10 +41,11 @@ services:
       # to whatever can reach the port; set it and /graphql and /mcp both want it as a bearer
       # token, and the web app asks for it once. `openssl rand -hex 32`.
       KANBAN_SERVER_TOKEN: ${KANBAN_SERVER_TOKEN:-}
-      # A postgres of your own, if you have one — the server creates its schema on first boot
-      # either way, and nothing else changes. Left unset it runs postgres itself, in-process,
-      # against the volume above. For a postgres container alongside this one, see
-      # docker-compose.pg.yml in the repository.
+      # A postgres of your own, if you have one — the server creates the database this names
+      # and then its schema, so a shared instance only has to exist and let this role in.
+      # Nothing else changes. Left unset it runs postgres itself, in-process, against the
+      # volume above. For a postgres container alongside this one, see docker-compose.pg.yml
+      # in the repository.
       DATABASE_URL: ${DATABASE_URL:-}
     healthcheck:
       # A GraphQL query rather than a TCP probe: it round-trips to the database, so a postgres
