@@ -25,8 +25,8 @@ project, type what you want into the box on the home page, and press **Make task
 The database is postgres, and with nothing configured it is an embedded one — PGlite, running
 in the server's own process against `data/`. Nothing to install, nothing to start, and the
 tables are created on first boot; see **Postgres**. Copy `.env.example` to `.env` if you want
-to move the port, point at a postgres server, or supply the API key from the environment
-instead of the UI.
+to move the port, point at a postgres server, lock the server behind a token, or supply the API
+key from the environment instead of the UI.
 
 ## The model
 
@@ -327,8 +327,35 @@ keep alive and a client can reconnect whenever it likes. The endpoint is mounted
 not just `POST`, so the `GET` a client uses to offer a notification stream and the `DELETE` it
 uses to end a session are answered by the transport in JSON-RPC rather than by Express's 404 page.
 
-No CORS headers, deliberately: this server has no authentication, so anyone who can reach the port
-can drive it, and there is no reason to also let a web page from another origin do so.
+No CORS headers, deliberately: the browser reaches this from its own origin, and there is no
+reason to let a page from another one drive the board.
+
+## Locking it
+
+`KANBAN_SERVER_TOKEN` is empty by default, and then there is no authentication at all: anyone who
+can reach the port can drive the board, read every run's output, and — through `/mcp` — spend the
+operator's API key. That is the right shape for something on a laptop, and the wrong shape for
+anything with a public IP.
+
+Set it and both `/graphql` and `/mcp` want `Authorization: Bearer <it>`:
+
+```sh
+KANBAN_SERVER_TOKEN=$(openssl rand -hex 32) npm run dev
+```
+
+```sh
+claude mcp add --transport http --header "Authorization: Bearer $KANBAN_SERVER_TOKEN" \
+  kanban http://localhost:8788/mcp
+```
+
+The web app asks for the token once and posts it to `/api/auth`, which hands back an `httpOnly`
+cookie — nothing on the page can read it afterwards, and the browser attaches it to the run
+stream, which an `EventSource` could not do with a header. The cookie is `SameSite=Strict`, so
+another site's page cannot borrow it. Log out by deleting it: `DELETE /api/auth`.
+
+One shared token, not accounts: this is a tool one person points at their own board, and what is
+worth locking is not who you are but the key the agents spend. A wrong token is compared in
+constant time and refused with a bare `401` that says nothing about what is here.
 
 ## Retention
 
@@ -357,7 +384,8 @@ docker compose -f docker-compose.pg.yml up --build
 Nothing in the image changes between the two — see **Postgres** below.
 
 `OPENAI_API_KEY` is optional and only a fallback: an agent takes its key from its own row, then
-from the settings row the UI saves, and only then from the environment.
+from the settings row the UI saves, and only then from the environment. `KANBAN_SERVER_TOKEN` is
+the other one worth setting here — see **Locking it**; the container's healthcheck sends it too.
 
 The image builds the client with the dev dependencies and then throws them away, and the runtime
 stage has no `tsx` in it — Node runs the server's TypeScript by stripping the types. That is the

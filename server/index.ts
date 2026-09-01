@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import express from "express";
 import { createYoga } from "graphql-yoga";
+import { authRequired, mountAuth, requireAuth } from "./auth.ts";
 import { ensureSchema } from "./db/migrate.ts";
 import { schema } from "./graphql/schema.ts";
 import { mcpHandler, mountMcp } from "./mcp-endpoint.ts";
@@ -23,8 +24,13 @@ if (process.env.NODE_ENV !== "production") {
 
 const app = express();
 
+// The login routes come before the lock, since asking whether a token is wanted cannot itself
+// need one. Everything else the browser loads is the static SPA, which is a login form until
+// the API answers.
+mountAuth(app);
+
 const yoga = createYoga({ schema, graphqlEndpoint: "/graphql" });
-app.use(yoga.graphqlEndpoint, yoga);
+app.use(yoga.graphqlEndpoint, requireAuth, yoga);
 
 // The same schema, offered to other clients as MCP tools, beside GraphQL rather than
 // replacing it. What it exposes and why is in `mcp-endpoint.ts`.
@@ -47,6 +53,7 @@ app.use(
 const server = app.listen(PORT, () => {
   console.log(`[kanban-server] http://localhost:${PORT}/graphql`);
   console.log(`[kanban-server] mcp: http://localhost:${PORT}/mcp`);
+  if (authRequired()) console.log("[kanban-server] auth: bearer token required");
 });
 
 await mcp.sync();

@@ -36,6 +36,9 @@ export default defineConfig({
       // Anchored, but the query string has to be allowed through: a subscription arrives as
       // `GET /graphql?query=…` over SSE, and `^/graphql$` would not match it.
       "^/graphql(\\?|$)": { target: "http://localhost:8788", changeOrigin: true },
+      // And the login routes, which is how the browser gets the cookie that the subscription
+      // then carries — an `EventSource` cannot send a header.
+      "^/api/": { target: "http://localhost:8788", changeOrigin: true },
     },
   },
 });

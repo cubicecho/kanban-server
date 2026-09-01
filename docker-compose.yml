@@ -21,12 +21,16 @@ services:
       # row the UI saves, and only then from here. This is the fallback for a
       # server that has never been configured.
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      # Optional. Empty leaves the server open to anything that can reach the
+      # port; set it and /graphql and /mcp both want it as a bearer token, and
+      # the web app asks for it once. `openssl rand -hex 32`.
+      KANBAN_SERVER_TOKEN: ${KANBAN_SERVER_TOKEN:-}
     healthcheck:
       test:
         - CMD
         - node
         - -e
-        - "fetch('http://127.0.0.1:8788/graphql',{method:'POST',headers:{'content-type':'application/json'},body:'{\"query\":\"{projects{id}}\"}'}).then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+        - "fetch('http://127.0.0.1:8788/graphql',{method:'POST',headers:{'content-type':'application/json',...(process.env.KANBAN_SERVER_TOKEN?{authorization:'Bearer '+process.env.KANBAN_SERVER_TOKEN}:{})},body:'{\"query\":\"{projects{id}}\"}'}).then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
       interval: 30s
       timeout: 5s
       retries: 3

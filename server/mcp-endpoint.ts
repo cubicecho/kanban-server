@@ -4,6 +4,7 @@ import express from "express";
 // Default import, not a named one: Node's own JSON modules only export a default, and the
 // container runs this file through Node rather than tsx.
 import pkg from "../package.json" with { type: "json" };
+import { requireAuth } from "./auth.ts";
 import { schema } from "./graphql/schema.ts";
 
 /**
@@ -229,5 +230,5 @@ export const mcpHandler = createHttpHandler({
  * alone, the other two met Express's 404 page instead, which reads as "wrong URL".
  */
 export function mountMcp(app: express.Application, route = "/mcp") {
-  app.all(route, express.json(), mcpHandler);
+  app.all(route, requireAuth, express.json(), mcpHandler);
 }
