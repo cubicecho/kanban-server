@@ -1395,6 +1395,75 @@ type RunGroupKeys {
   totalTokens: Int
 }
 
+type BoardTemplate {
+  id: String!
+  name: String!
+  description: String!
+  lanes: JSON!
+  createdAt: DateTime!
+
+  """
+  Opaque cursor of this row's position in the query's ordering. Pass it as `after` to resume from here. Only set on rows returned by a list query.
+  """
+  cursor: String
+}
+
+type BoardTemplateAggregate {
+  count: Int!
+  min: BoardTemplateMinAggregate
+  max: BoardTemplateMaxAggregate
+  countNonNull: BoardTemplateCountNonNullAggregate
+  countDistinct: BoardTemplateCountDistinctAggregate
+}
+
+type BoardTemplateMinAggregate {
+  id: String
+  name: String
+  description: String
+  createdAt: DateTime
+}
+
+type BoardTemplateMaxAggregate {
+  id: String
+  name: String
+  description: String
+  createdAt: DateTime
+}
+
+type BoardTemplateCountNonNullAggregate {
+  id: Int!
+  name: Int!
+  description: Int!
+  lanes: Int!
+  createdAt: Int!
+}
+
+type BoardTemplateCountDistinctAggregate {
+  id: Int!
+  name: Int!
+  description: Int!
+  createdAt: Int!
+}
+
+type BoardTemplateGroupBy {
+  group: BoardTemplateGroupKeys!
+  count: Int!
+  min: BoardTemplateMinAggregate
+  max: BoardTemplateMaxAggregate
+  countNonNull: BoardTemplateCountNonNullAggregate
+  countDistinct: BoardTemplateCountDistinctAggregate
+}
+
+"""
+The grouped column values of one BoardTemplate group. A column the query did not group by is null.
+"""
+type BoardTemplateGroupKeys {
+  id: String
+  name: String
+  description: String
+  createdAt: DateTime
+}
+
 type Setting {
   id: String!
   baseUrl: String!
@@ -3815,6 +3884,54 @@ input RunCountDistinctHaving {
   totalTokens: AggregateNumberFilter
 }
 
+input BoardTemplateFilters {
+  id: StringFilter
+  name: StringFilter
+  description: StringFilter
+  lanes: JSONFilter
+  createdAt: DateTimeFilter
+
+  """At least one branch matches; ANDed with any sibling fields"""
+  OR: [BoardTemplateFilters!]
+
+  """Every branch matches"""
+  AND: [BoardTemplateFilters!]
+
+  """Negates the nested filters"""
+  NOT: BoardTemplateFilters
+}
+
+input BoardTemplateOrderBy {
+  id: InnerOrder
+  name: InnerOrder
+  description: InnerOrder
+  lanes: InnerOrder
+  createdAt: InnerOrder
+}
+
+"""Filters BoardTemplate groups by their aggregated values"""
+input BoardTemplateHaving {
+  """Filters groups by how many rows they contain"""
+  count: AggregateNumberFilter
+  countNonNull: BoardTemplateCountNonNullHaving
+  countDistinct: BoardTemplateCountDistinctHaving
+}
+
+input BoardTemplateCountNonNullHaving {
+  id: AggregateNumberFilter
+  name: AggregateNumberFilter
+  description: AggregateNumberFilter
+  lanes: AggregateNumberFilter
+  createdAt: AggregateNumberFilter
+}
+
+input BoardTemplateCountDistinctHaving {
+  id: AggregateNumberFilter
+  name: AggregateNumberFilter
+  description: AggregateNumberFilter
+  createdAt: AggregateNumberFilter
+}
+
 input UpdateSettingInput {
   id: String
   baseUrl: String
@@ -4295,6 +4412,32 @@ type Query {
     """Filters the groups after they are aggregated."""
     having: RunHaving
   ): [RunGroupBy!]!
+  boardTemplates(
+    offset: Int
+    limit: Int
+    orderBy: BoardTemplateOrderBy
+    where: BoardTemplateFilters
+
+    """
+    Keyset pagination: only return rows strictly after this cursor (a row's `cursor` field from a previous page, under the same orderBy).
+    """
+    after: String
+    distinct: [BoardTemplateDistinctColumn!]
+  ): [BoardTemplate!]!
+  boardTemplate(offset: Int, orderBy: BoardTemplateOrderBy, where: BoardTemplateFilters): BoardTemplate
+  boardTemplatesAggregate(where: BoardTemplateFilters): BoardTemplateAggregate!
+  boardTemplatesGroupBy(
+    """
+    Columns to group by. One result row per distinct combination of their values.
+    """
+    groupBy: [BoardTemplateGroupByColumn!]!
+
+    """Filters the rows before they are grouped."""
+    where: BoardTemplateFilters
+
+    """Filters the groups after they are aggregated."""
+    having: BoardTemplateHaving
+  ): [BoardTemplateGroupBy!]!
   settings(
     offset: Int
     limit: Int
@@ -4535,6 +4678,23 @@ enum RunGroupByColumn {
   totalTokens
 }
 
+"""Columns of BoardTemplate that a query can be made distinct on"""
+enum BoardTemplateDistinctColumn {
+  id
+  name
+  description
+  lanes
+  createdAt
+}
+
+"""Columns of BoardTemplate that a query can group by"""
+enum BoardTemplateGroupByColumn {
+  id
+  name
+  description
+  createdAt
+}
+
 """Columns of Setting that a query can be made distinct on"""
 enum SettingDistinctColumn {
   id
@@ -4729,6 +4889,8 @@ type Mutation {
   deleteCardDepSingle(where: CardDepFilters!): CardDep
   deleteRun(where: RunFilters): [Run!]!
   deleteRunSingle(where: RunFilters!): Run
+  deleteBoardTemplate(where: BoardTemplateFilters): [BoardTemplate!]!
+  deleteBoardTemplateSingle(where: BoardTemplateFilters!): BoardTemplate
   updateSetting(set: UpdateSettingInput!, where: SettingFilters): [Setting!]!
 
   """
@@ -4794,6 +4956,16 @@ type Mutation {
   Replaces what a card waits on, and answers with it. A card with unfinished dependencies is skipped rather than run out of order, so this is how a decomposition that got the order wrong is corrected. Written as a set rather than a row at a time, because half an ordering is not an ordering. Every id has to be a card on the same board, and a cycle is refused — cards that wait on each other would never run, and nothing downstream would say why.
   """
   setCardDeps(cardId: String!, dependsOn: [String!]!): [String!]!
+
+  """
+  Keeps a project's board — its lanes, their agents, their WIP limits and the arrows between them — under a name, so the next project can start with it instead of it being drawn again. Saving under a name that already exists replaces it. The cards are not part of it: a template is the shape of a board, not its contents.
+  """
+  saveBoardTemplate(projectId: String!, name: String!, description: String): BoardTemplate!
+
+  """
+  Redraws a project's board from a saved template, and answers with the lanes it wrote. Refused once the board has cards on it: replacing lanes takes their cards with them, so this is for a project that has not started rather than a way to rearrange one that has.
+  """
+  applyBoardTemplate(projectId: String!, templateId: String!): [Lane!]!
 
   """
   Replaces the set of MCP servers an agent may reach, and answers with it. Written as a set rather than a row at a time because that is how it is decided — an agent's tools are the whole of what it can do, and half-applied is a different agent.

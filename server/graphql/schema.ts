@@ -18,12 +18,14 @@ import { db } from "../db/client.ts";
 import {
   agentServers,
   agents,
+  boardTemplates,
   cardDeps,
   cards,
   lanes,
   type Project,
   runs,
   settings,
+  type TemplateLane,
   tasks,
 } from "../db/schema.ts";
 import { fold, history, type RunEvent, watch } from "../runner/events.ts";
@@ -54,9 +56,11 @@ const { entities } = buildSchema(db, {
   mapColumnType: (column) => (column.columnType === "PgTimestamp" ? GraphQLDateTime : undefined),
   features: {
     // The run history is written by the runner, never by a client: a hand-made row would claim
-    // an agent did something it did not. Settings is a singleton the migration creates.
-    insert: (table) => table !== "runs" && table !== "settings",
-    update: (table) => table !== "runs",
+    // an agent did something it did not. Settings is a singleton the migration creates. A
+    // board template is a document whose arrows have to line up with its own lanes, so it is
+    // written by `saveBoardTemplate` from a board that already works, never by hand.
+    insert: (table) => table !== "runs" && table !== "settings" && table !== "boardTemplates",
+    update: (table) => table !== "runs" && table !== "boardTemplates",
     delete: (table) => table !== "settings",
   },
   exclude: {
@@ -386,6 +390,48 @@ async function spendOver(projectId: string, taskId: string | null | undefined, d
     days,
     retentionDays: runRetentionDays,
   };
+}
+
+/** Whatever `db.transaction` hands its callback — the same API as `db`, inside the transaction. */
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/**
+ * Draws a saved board onto a project, in one transaction.
+ *
+ * The lanes go in first and the arrows second, because a template's arrows are indexes into
+ * its own list and half of them point at lanes that do not exist yet — the same two steps
+ * `seedLanes` takes, for the same reason. An `agentId` naming an agent this server no longer
+ * has resolves to none rather than failing: a template is a shape, and the agents are whoever
+ * happens to be here.
+ */
+async function drawTemplate(tx: Tx, projectId: string, plan: TemplateLane[]) {
+  const known = new Set((await tx.select({ id: agents.id }).from(agents)).map((row) => row.id));
+  const written = await tx
+    .insert(lanes)
+    .values(
+      plan.map((lane, index) => ({
+        projectId,
+        name: lane.name,
+        position: index,
+        intake: lane.intake,
+        agentId: lane.agentId && known.has(lane.agentId) ? lane.agentId : null,
+        wipLimit: lane.wipLimit,
+      })),
+    )
+    .returning();
+
+  const at = (index: number | null) =>
+    index === null || index < 0 || index >= written.length ? null : written[index].id;
+  for (const [index, lane] of plan.entries()) {
+    const onSuccessLaneId = at(lane.onSuccess);
+    const onFailureLaneId = at(lane.onFailure);
+    if (!onSuccessLaneId && !onFailureLaneId) continue;
+    await tx
+      .update(lanes)
+      .set({ onSuccessLaneId, onFailureLaneId })
+      .where(eq(lanes.id, written[index].id));
+  }
+  return written;
 }
 
 const taskOrThrow = async (taskId: string) => {
@@ -747,6 +793,99 @@ export const schema = new GraphQLSchema({
             }
           });
           return wanted;
+        },
+      },
+      saveBoardTemplate: {
+        type: new GraphQLNonNull(generatedType("BoardTemplate")),
+        description:
+          "Keeps a project's board — its lanes, their agents, their WIP limits and the arrows " +
+          "between them — under a name, so the next project can start with it instead of it " +
+          "being drawn again. Saving under a name that already exists replaces it. The cards " +
+          "are not part of it: a template is the shape of a board, not its contents.",
+        args: {
+          projectId: { type: new GraphQLNonNull(GraphQLString) },
+          name: { type: new GraphQLNonNull(GraphQLString) },
+          description: { type: GraphQLString },
+        },
+        resolve: async (
+          _source,
+          args: { projectId: string; name: string; description?: string | null },
+        ) => {
+          const name = args.name.trim();
+          if (!name) {
+            throw new GraphQLError("A template needs a name to be found by later.", {
+              extensions: { code: "BAD_NAME" },
+            });
+          }
+          const drawn = await db
+            .select()
+            .from(lanes)
+            .where(eq(lanes.projectId, args.projectId))
+            .orderBy(asc(lanes.position));
+          if (!drawn.length) {
+            throw new GraphQLError("That project has no lanes to save.", {
+              extensions: { code: "NOT_FOUND" },
+            });
+          }
+          // Ids become indexes here, which is what makes the saved board portable.
+          const index = new Map(drawn.map((lane, position) => [lane.id, position]));
+          const plan: TemplateLane[] = drawn.map((lane, position) => ({
+            name: lane.name,
+            position,
+            intake: lane.intake,
+            agentId: lane.agentId,
+            wipLimit: lane.wipLimit,
+            onSuccess: index.get(lane.onSuccessLaneId ?? "") ?? null,
+            onFailure: index.get(lane.onFailureLaneId ?? "") ?? null,
+          }));
+
+          const values = { name, description: args.description ?? "", lanes: plan };
+          const [saved] = await db
+            .insert(boardTemplates)
+            .values(values)
+            .onConflictDoUpdate({ target: boardTemplates.name, set: values })
+            .returning();
+          return saved;
+        },
+      },
+      applyBoardTemplate: {
+        type: new GraphQLNonNull(new GraphQLList(new GraphQLNonNull(generatedType("Lane")))),
+        description:
+          "Redraws a project's board from a saved template, and answers with the lanes it " +
+          "wrote. Refused once the board has cards on it: replacing lanes takes their cards " +
+          "with them, so this is for a project that has not started rather than a way to " +
+          "rearrange one that has.",
+        args: {
+          projectId: { type: new GraphQLNonNull(GraphQLString) },
+          templateId: { type: new GraphQLNonNull(GraphQLString) },
+        },
+        resolve: async (_source, args: { projectId: string; templateId: string }) => {
+          const [template] = await db
+            .select()
+            .from(boardTemplates)
+            .where(eq(boardTemplates.id, args.templateId))
+            .limit(1);
+          if (!template) {
+            throw new GraphQLError(`There is no template with id ${args.templateId}.`, {
+              extensions: { code: "NOT_FOUND" },
+            });
+          }
+          const held = await db
+            .select({ id: cards.id })
+            .from(cards)
+            .where(eq(cards.projectId, args.projectId))
+            .limit(1);
+          if (held.length) {
+            throw new GraphQLError(
+              "That board has cards on it. Applying a template replaces its lanes, and a " +
+                "lane takes its cards with it.",
+              { extensions: { code: "HAS_CARDS" } },
+            );
+          }
+          return db.transaction(async (tx) => {
+            await tx.delete(lanes).where(eq(lanes.projectId, args.projectId));
+            return drawTemplate(tx, args.projectId, template.lanes);
+          });
         },
       },
       setAgentServers: {

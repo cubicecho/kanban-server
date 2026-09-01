@@ -121,6 +121,29 @@ counts as a pass. A mumbling reviewer must not be able to wedge a board.
 A card whose dependencies have not finished is skipped by the worker rather than run out of
 order. Asking for it by hand marks it `blocked` and says on the card what it is waiting on.
 
+## Saving a board
+
+The four lanes are a starting point, not the shape most projects end up with, and redrawing the
+same five-lane board by hand for every new project is the kind of work a tool should not ask for.
+`saveBoardTemplate` keeps a project's lanes — their names, their agents, their WIP limits and the
+arrows between them — under a name, and `applyBoardTemplate` draws them onto another project.
+**Save as template** on the board and the **Board** picker in the new-project dialog are the two
+ends of it.
+
+The cards are not part of a template. A template is the shape of a board, not its contents.
+
+Two things are worth knowing about how it is stored. The arrows are saved as **indexes into the
+template's own lane list**, not lane ids, which is what makes a saved board portable — a lane id
+belongs to one project and means nothing in another. And an `agentId` naming an agent this server
+no longer has resolves to **no agent** rather than failing to apply: a template is a shape, and
+the agents are whoever happens to be here. A lane that comes back without an agent is a resting
+place, so a redrawn board stops rather than doing the wrong work.
+
+Applying one is refused on a board that already has cards, with `HAS_CARDS`. Replacing lanes
+deletes them, and a lane takes its cards with it — so this is for a project that has not started,
+not a way to rearrange one that has. Saving under a name that is already taken replaces that
+template, which is how one gets corrected.
+
 ## Automation
 
 `autoRun` on a project is what lets the worker start things by itself. Off — the default — the
@@ -264,14 +287,16 @@ somewhere work is handed off. In dev it is on the server's own port (`:8788`); v
 claude mcp add --transport http kanban http://localhost:8788/mcp
 ```
 
-Twenty-five tools, chosen in `server/mcp-endpoint.ts` rather than projected from the whole schema:
+Twenty-eight tools, chosen in `server/mcp-endpoint.ts` rather than projected from the whole schema:
 
-- **read** — `projects`, `lanes`, `cards`, `tasks`, `runs`, `agents`, `run_events`, `spend`
+- **read** — `projects`, `lanes`, `cards`, `tasks`, `runs`, `agents`, `run_events`, `spend`,
+  `board_templates`
 - **projects** — `create_project`, `update_project_single`
 - **tasks** — `submit_task`, `create_task`, `refine_task`, `accept_task`, `decompose_task`,
   `delete_task_single`
 - **cards** — `create_card`, `update_card_single`, `delete_card_single`, `set_card_deps`,
   `move_card`, `retry_card`, `run_card`, `stop_card`, `stop_task`
+- **boards** — `save_board_template`, `apply_board_template`
 
 `submit_task` is the one to reach for: describe what you want and it is written down, broken into
 cards, and put on the board in a single call. `create_card` is the other way round — one piece of

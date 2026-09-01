@@ -95,6 +95,15 @@ caps how many run at once. That is the whole of the automation — there is no w
 and the shape of the pipeline is the shape of the board someone drew. A lane with no agent is a
 resting place, which is what a backlog and a done pile are.
 
+**A board template stores indexes, not ids.** `saveBoardTemplate` snapshots a project's lanes
+into `board_templates.lanes`, turning `onSuccessLaneId`/`onFailureLaneId` into positions in the
+template's own list — a lane id belongs to one project and means nothing in another. Applying
+one writes the lanes first and the arrows second, in a single transaction, which is the same
+two steps `seedLanes` takes and for the same reason. An `agentId` that no longer exists
+resolves to none rather than failing: a template is a shape, and the agents are whoever happens
+to be on this server. Applying is refused on a board with cards, because deleting a lane takes
+its cards with it.
+
 **`done` means nothing further will happen.** A card that passes into a lane that has an agent
 of its own is not finished — it is waiting for that lane's turn — so it goes back to `idle`,
 because `readyCards` only picks up `idle`. `done` is for a card that stayed put, or landed
@@ -126,7 +135,7 @@ belongs in a hook, not in a route handler.
 tests hold that line.
 
 **The `/mcp` surface is curated, not the whole schema.** `server/mcp-endpoint.ts` lists the
-twenty-five tools an outside client gets. Nothing that empties a table in one call, nothing that
+twenty-eight tools an outside client gets. Nothing that empties a table in one call, nothing that
 reads or writes the API key, and no editing of agents or MCP servers — a visiting client can
 see which agents exist, because a lane points at one, but which model runs where and on whose
 key is the operator's business. A new tool goes in that list deliberately,

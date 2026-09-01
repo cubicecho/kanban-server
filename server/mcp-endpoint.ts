@@ -31,6 +31,7 @@ const TOOLS = [
   "Query.runEvents",
   "Query.agents",
   "Query.spend",
+  "Query.boardTemplates",
   "Mutation.createProject",
   "Mutation.updateProjectSingle",
   "Mutation.submitTask",
@@ -48,6 +49,8 @@ const TOOLS = [
   "Mutation.runCard",
   "Mutation.stopCard",
   "Mutation.stopTask",
+  "Mutation.saveBoardTemplate",
+  "Mutation.applyBoardTemplate",
 ];
 
 /**
@@ -90,6 +93,10 @@ const HINTS: Record<string, string> = {
     "instead — its refinement, its decomposition and every run of every card it became. `from` " +
     "is the oldest run counted: quote that rather than `days`, because runs older than the " +
     "retention setting are gone and cannot be in the total.",
+  board_templates:
+    "Boards that have been kept under a name, to start the next project with. `lanes` is the " +
+    "shape itself — the columns, their agents, their WIP limits and the arrows between them, " +
+    "written as indexes into the same list so it can be drawn onto any project.",
   create_project:
     "Adds a board. It comes with four lanes — Backlog, Doing, Review, Done — already wired to " +
     "this server's execute and review agents, so it is ready for work as soon as it exists. " +
@@ -154,6 +161,15 @@ const HINTS: Record<string, string> = {
     "on by itself afterwards, to whichever lane its own said to send it.",
   stop_card: "Calls off whatever is running on a card. Answers `false` if nothing was.",
   stop_task: "Calls off a refinement or a decomposition. Answers `false` if nothing was.",
+  save_board_template:
+    "Keeps a project's lanes under a name so another project can start with them. The cards " +
+    "are not part of it. A name that is already taken is replaced, which is how a template is " +
+    "corrected — there is no second copy under the same name.",
+  apply_board_template:
+    "Redraws a project's board from a saved template, and answers with the lanes it wrote. " +
+    "Only on a board with no cards on it: lanes are replaced, and a lane takes its cards with " +
+    "it. A template naming an agent this server does not have leaves that lane without one, " +
+    "so read `lanes` back before expecting it to work cards.",
 };
 
 /**
@@ -192,6 +208,11 @@ const WRITE_HINTS: Record<string, { destructiveHint?: boolean; idempotentHint?: 
   set_card_deps: { destructiveHint: true, idempotentHint: true },
   stop_card: { idempotentHint: true },
   stop_task: { idempotentHint: true },
+  // Both replace rather than add, and both land the same way twice: saving the same board
+  // under the same name overwrites one template with its equal, and drawing a template onto a
+  // board that has none of its own cards gets there whether it runs once or twice.
+  save_board_template: { destructiveHint: true, idempotentHint: true },
+  apply_board_template: { destructiveHint: true, idempotentHint: true },
 };
 
 /**
