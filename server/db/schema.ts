@@ -362,6 +362,40 @@ export const runs = pgTable(
   ],
 );
 
+/**
+ * One lane of a saved board: everything that makes a lane a station, without the board.
+ *
+ * The arrows are indexes into the list they belong to rather than ids, because a template has
+ * no lanes — the ids do not exist until it is applied, and resolving them is the applying.
+ */
+export interface TemplateLane {
+  name: string;
+  position: number;
+  intake: boolean;
+  /** By id, so a template keeps the agents it was drawn with. Missing ones resolve to none. */
+  agentId: string | null;
+  wipLimit: number;
+  /** Index into the same list, or null for "leave the card where it is". */
+  onSuccess: number | null;
+  onFailure: number | null;
+}
+
+/**
+ * A board somebody drew, kept so the next project can start with it.
+ *
+ * Stored as a document rather than as rows, because a template is not a board: nothing lands on
+ * it, nothing runs on it, and it outlives every project made from it. Copying it into real
+ * lanes is `applyBoardTemplate`, in one transaction — the arrows are indexes here and have to
+ * become ids there.
+ */
+export const boardTemplates = pgTable("board_templates", {
+  id: id(),
+  name: text().notNull().unique(),
+  description: text().notNull().default(""),
+  lanes: jsonb().$type<TemplateLane[]>().notNull(),
+  createdAt: createdAt(),
+});
+
 /** One row, `id: "default"`. A table rather than a file so it comes free over GraphQL. */
 export const settings = pgTable("settings", {
   id: text().primaryKey().default("default"),
@@ -400,6 +434,7 @@ export const schema = {
   cards,
   cardDeps,
   runs,
+  boardTemplates,
   settings,
 };
 
@@ -471,4 +506,5 @@ export type Message = typeof messages.$inferSelect;
 export type Card = typeof cards.$inferSelect;
 export type CardDep = typeof cardDeps.$inferSelect;
 export type Run = typeof runs.$inferSelect;
+export type BoardTemplate = typeof boardTemplates.$inferSelect;
 export type Settings = typeof settings.$inferSelect;

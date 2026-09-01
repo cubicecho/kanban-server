@@ -638,6 +638,132 @@ export type AggregateNumberFilter = {
   ne?: InputMaybe<Scalars['Float']['input']>;
 };
 
+export type BoardTemplate = {
+  createdAt: Scalars['DateTime']['output'];
+  /** Opaque cursor of this row's position in the query's ordering. Pass it as `after` to resume from here. Only set on rows returned by a list query. */
+  cursor?: Maybe<Scalars['String']['output']>;
+  description: Scalars['String']['output'];
+  id: Scalars['String']['output'];
+  lanes: Scalars['JSON']['output'];
+  name: Scalars['String']['output'];
+};
+
+export type BoardTemplateAggregate = {
+  count: Scalars['Int']['output'];
+  countDistinct?: Maybe<BoardTemplateCountDistinctAggregate>;
+  countNonNull?: Maybe<BoardTemplateCountNonNullAggregate>;
+  max?: Maybe<BoardTemplateMaxAggregate>;
+  min?: Maybe<BoardTemplateMinAggregate>;
+};
+
+export type BoardTemplateCountDistinctAggregate = {
+  createdAt: Scalars['Int']['output'];
+  description: Scalars['Int']['output'];
+  id: Scalars['Int']['output'];
+  name: Scalars['Int']['output'];
+};
+
+export type BoardTemplateCountDistinctHaving = {
+  createdAt?: InputMaybe<AggregateNumberFilter>;
+  description?: InputMaybe<AggregateNumberFilter>;
+  id?: InputMaybe<AggregateNumberFilter>;
+  name?: InputMaybe<AggregateNumberFilter>;
+};
+
+export type BoardTemplateCountNonNullAggregate = {
+  createdAt: Scalars['Int']['output'];
+  description: Scalars['Int']['output'];
+  id: Scalars['Int']['output'];
+  lanes: Scalars['Int']['output'];
+  name: Scalars['Int']['output'];
+};
+
+export type BoardTemplateCountNonNullHaving = {
+  createdAt?: InputMaybe<AggregateNumberFilter>;
+  description?: InputMaybe<AggregateNumberFilter>;
+  id?: InputMaybe<AggregateNumberFilter>;
+  lanes?: InputMaybe<AggregateNumberFilter>;
+  name?: InputMaybe<AggregateNumberFilter>;
+};
+
+/** Columns of BoardTemplate that a query can be made distinct on */
+export enum BoardTemplateDistinctColumn {
+  CreatedAt = 'createdAt',
+  Description = 'description',
+  Id = 'id',
+  Lanes = 'lanes',
+  Name = 'name'
+}
+
+export type BoardTemplateFilters = {
+  /** Every branch matches */
+  AND?: InputMaybe<Array<BoardTemplateFilters>>;
+  /** Negates the nested filters */
+  NOT?: InputMaybe<BoardTemplateFilters>;
+  /** At least one branch matches; ANDed with any sibling fields */
+  OR?: InputMaybe<Array<BoardTemplateFilters>>;
+  createdAt?: InputMaybe<DateTimeFilter>;
+  description?: InputMaybe<StringFilter>;
+  id?: InputMaybe<StringFilter>;
+  lanes?: InputMaybe<JsonFilter>;
+  name?: InputMaybe<StringFilter>;
+};
+
+export type BoardTemplateGroupBy = {
+  count: Scalars['Int']['output'];
+  countDistinct?: Maybe<BoardTemplateCountDistinctAggregate>;
+  countNonNull?: Maybe<BoardTemplateCountNonNullAggregate>;
+  group: BoardTemplateGroupKeys;
+  max?: Maybe<BoardTemplateMaxAggregate>;
+  min?: Maybe<BoardTemplateMinAggregate>;
+};
+
+/** Columns of BoardTemplate that a query can group by */
+export enum BoardTemplateGroupByColumn {
+  CreatedAt = 'createdAt',
+  Description = 'description',
+  Id = 'id',
+  Name = 'name'
+}
+
+/** The grouped column values of one BoardTemplate group. A column the query did not group by is null. */
+export type BoardTemplateGroupKeys = {
+  createdAt?: Maybe<Scalars['DateTime']['output']>;
+  description?: Maybe<Scalars['String']['output']>;
+  id?: Maybe<Scalars['String']['output']>;
+  name?: Maybe<Scalars['String']['output']>;
+};
+
+/** Filters BoardTemplate groups by their aggregated values */
+export type BoardTemplateHaving = {
+  /** Filters groups by how many rows they contain */
+  count?: InputMaybe<AggregateNumberFilter>;
+  countDistinct?: InputMaybe<BoardTemplateCountDistinctHaving>;
+  countNonNull?: InputMaybe<BoardTemplateCountNonNullHaving>;
+};
+
+export type BoardTemplateMaxAggregate = {
+  createdAt?: Maybe<Scalars['DateTime']['output']>;
+  description?: Maybe<Scalars['String']['output']>;
+  id?: Maybe<Scalars['String']['output']>;
+  name?: Maybe<Scalars['String']['output']>;
+};
+
+export type BoardTemplateMinAggregate = {
+  createdAt?: Maybe<Scalars['DateTime']['output']>;
+  description?: Maybe<Scalars['String']['output']>;
+  id?: Maybe<Scalars['String']['output']>;
+  name?: Maybe<Scalars['String']['output']>;
+};
+
+export type BoardTemplateOrderBy = {
+  createdAt?: InputMaybe<InnerOrder>;
+  description?: InputMaybe<InnerOrder>;
+  id?: InputMaybe<InnerOrder>;
+  lanes?: InputMaybe<InnerOrder>;
+  name?: InputMaybe<InnerOrder>;
+};
+
 export type BooleanFilter = {
   /** Every branch matches */
   AND?: InputMaybe<Array<BooleanFilter>>;
@@ -2244,6 +2370,8 @@ export type MessagesRoleEnumFilter = {
 export type Mutation = {
   /** Marks a refined task ready for the decomposer, without running it. `decomposeTask` is the next step, and is what actually produces cards. */
   acceptTask: Task;
+  /** Redraws a project's board from a saved template, and answers with the lanes it wrote. Refused once the board has cards on it: replacing lanes takes their cards with them, so this is for a project that has not started rather than a way to rearrange one that has. */
+  applyBoardTemplate: Array<Lane>;
   createAgent: Agent;
   createAgentServer: AgentServer;
   createAgentServers: Array<AgentServer>;
@@ -2268,6 +2396,8 @@ export type Mutation = {
   deleteAgentServer: Array<AgentServer>;
   deleteAgentServerSingle?: Maybe<AgentServer>;
   deleteAgentSingle?: Maybe<Agent>;
+  deleteBoardTemplate: Array<BoardTemplate>;
+  deleteBoardTemplateSingle?: Maybe<BoardTemplate>;
   deleteCard: Array<Card>;
   deleteCardDep: Array<CardDep>;
   deleteCardDepSingle?: Maybe<CardDep>;
@@ -2294,6 +2424,8 @@ export type Mutation = {
   retryCard: Card;
   /** Works one card now, with its lane's agent unless `agentId` names another, and resolves with the finished run — a long call for a long card. Read `runEvents` meanwhile to watch it, or `stopCard` to call it off. The card moves on afterwards exactly as it would have under `autoRun`, following its lane's success and failure arrows. Refused for a card waiting on unfinished dependencies. */
   runCard: Run;
+  /** Keeps a project's board — its lanes, their agents, their WIP limits and the arrows between them — under a name, so the next project can start with it instead of it being drawn again. Saving under a name that already exists replaces it. The cards are not part of it: a template is the shape of a board, not its contents. */
+  saveBoardTemplate: BoardTemplate;
   /** Writes one agent's own API key, for an agent pointed at an endpoint of its own. Write-only, like the shared one. Send an empty string to clear it — an agent with no key of its own borrows the shared one only while it is also on the shared endpoint. */
   setAgentApiKey: Scalars['Boolean']['output'];
   /** Replaces the set of MCP servers an agent may reach, and answers with it. Written as a set rather than a row at a time because that is how it is decided — an agent's tools are the whole of what it can do, and half-applied is a different agent. */
@@ -2355,6 +2487,12 @@ export type Mutation = {
 
 export type MutationAcceptTaskArgs = {
   taskId: Scalars['String']['input'];
+};
+
+
+export type MutationApplyBoardTemplateArgs = {
+  projectId: Scalars['String']['input'];
+  templateId: Scalars['String']['input'];
 };
 
 
@@ -2473,6 +2611,16 @@ export type MutationDeleteAgentSingleArgs = {
 };
 
 
+export type MutationDeleteBoardTemplateArgs = {
+  where?: InputMaybe<BoardTemplateFilters>;
+};
+
+
+export type MutationDeleteBoardTemplateSingleArgs = {
+  where: BoardTemplateFilters;
+};
+
+
 export type MutationDeleteCardArgs = {
   where?: InputMaybe<CardFilters>;
 };
@@ -2574,6 +2722,13 @@ export type MutationRetryCardArgs = {
 export type MutationRunCardArgs = {
   agentId?: InputMaybe<Scalars['String']['input']>;
   cardId: Scalars['String']['input'];
+};
+
+
+export type MutationSaveBoardTemplateArgs = {
+  description?: InputMaybe<Scalars['String']['input']>;
+  name: Scalars['String']['input'];
+  projectId: Scalars['String']['input'];
 };
 
 
@@ -3084,6 +3239,10 @@ export type Query = {
   agents: Array<Agent>;
   agentsAggregate: AgentAggregate;
   agentsGroupBy: Array<AgentGroupBy>;
+  boardTemplate?: Maybe<BoardTemplate>;
+  boardTemplates: Array<BoardTemplate>;
+  boardTemplatesAggregate: BoardTemplateAggregate;
+  boardTemplatesGroupBy: Array<BoardTemplateGroupBy>;
   card?: Maybe<Card>;
   cardDep?: Maybe<CardDep>;
   cardDeps: Array<CardDep>;
@@ -3186,6 +3345,35 @@ export type QueryAgentsGroupByArgs = {
   groupBy: Array<AgentGroupByColumn>;
   having?: InputMaybe<AgentHaving>;
   where?: InputMaybe<AgentFilters>;
+};
+
+
+export type QueryBoardTemplateArgs = {
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  orderBy?: InputMaybe<BoardTemplateOrderBy>;
+  where?: InputMaybe<BoardTemplateFilters>;
+};
+
+
+export type QueryBoardTemplatesArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  distinct?: InputMaybe<Array<BoardTemplateDistinctColumn>>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
+  orderBy?: InputMaybe<BoardTemplateOrderBy>;
+  where?: InputMaybe<BoardTemplateFilters>;
+};
+
+
+export type QueryBoardTemplatesAggregateArgs = {
+  where?: InputMaybe<BoardTemplateFilters>;
+};
+
+
+export type QueryBoardTemplatesGroupByArgs = {
+  groupBy: Array<BoardTemplateGroupByColumn>;
+  having?: InputMaybe<BoardTemplateHaving>;
+  where?: InputMaybe<BoardTemplateFilters>;
 };
 
 
@@ -5148,6 +5336,35 @@ export type StopTaskMutationVariables = Exact<{
 
 export type StopTaskMutation = { stopTask: boolean };
 
+export type BoardTemplatesQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type BoardTemplatesQuery = { boardTemplates: Array<{ id: string, name: string, description: string, lanes: unknown, createdAt: string }> };
+
+export type SaveBoardTemplateMutationVariables = Exact<{
+  projectId: Scalars['String']['input'];
+  name: Scalars['String']['input'];
+  description?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+
+export type SaveBoardTemplateMutation = { saveBoardTemplate: { id: string, name: string } };
+
+export type ApplyBoardTemplateMutationVariables = Exact<{
+  projectId: Scalars['String']['input'];
+  templateId: Scalars['String']['input'];
+}>;
+
+
+export type ApplyBoardTemplateMutation = { applyBoardTemplate: Array<{ id: string, name: string, position: number }> };
+
+export type DeleteBoardTemplateMutationVariables = Exact<{
+  id: Scalars['String']['input'];
+}>;
+
+
+export type DeleteBoardTemplateMutation = { deleteBoardTemplateSingle?: { id: string } | null };
+
 
 export const AgentsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"Agents"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"agents"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"orderBy"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"name"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"direction"},"value":{"kind":"EnumValue","value":"asc"}},{"kind":"ObjectField","name":{"kind":"Name","value":"priority"},"value":{"kind":"IntValue","value":"1"}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"role"}},{"kind":"Field","name":{"kind":"Name","value":"enabled"}},{"kind":"Field","name":{"kind":"Name","value":"baseUrl"}},{"kind":"Field","name":{"kind":"Name","value":"model"}},{"kind":"Field","name":{"kind":"Name","value":"systemPrompt"}},{"kind":"Field","name":{"kind":"Name","value":"maxTokens"}},{"kind":"Field","name":{"kind":"Name","value":"temperature"}},{"kind":"Field","name":{"kind":"Name","value":"maxToolIterations"}},{"kind":"Field","name":{"kind":"Name","value":"toolDiscovery"}},{"kind":"Field","name":{"kind":"Name","value":"requestTimeoutSeconds"}},{"kind":"Field","name":{"kind":"Name","value":"maxRetries"}},{"kind":"Field","name":{"kind":"Name","value":"servers"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"serverId"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"mcpServers"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"orderBy"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"slug"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"direction"},"value":{"kind":"EnumValue","value":"asc"}},{"kind":"ObjectField","name":{"kind":"Name","value":"priority"},"value":{"kind":"IntValue","value":"1"}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"slug"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"enabled"}}]}}]}}]} as unknown as DocumentNode<AgentsQuery, AgentsQueryVariables>;
 export const AgentModelsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"AgentModels"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"agentId"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"models"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"agentId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"agentId"}}}]}]}}]} as unknown as DocumentNode<AgentModelsQuery, AgentModelsQueryVariables>;
@@ -5194,3 +5411,7 @@ export const DecomposeTaskDocument = {"kind":"Document","definitions":[{"kind":"
 export const SubmitTaskDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SubmitTask"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"projectId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"title"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"brief"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"submitTask"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"projectId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"projectId"}}},{"kind":"Argument","name":{"kind":"Name","value":"title"},"value":{"kind":"Variable","name":{"kind":"Name","value":"title"}}},{"kind":"Argument","name":{"kind":"Name","value":"brief"},"value":{"kind":"Variable","name":{"kind":"Name","value":"brief"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"error"}}]}}]}}]} as unknown as DocumentNode<SubmitTaskMutation, SubmitTaskMutationVariables>;
 export const DeleteTaskDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"DeleteTask"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deleteTaskSingle"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"id"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<DeleteTaskMutation, DeleteTaskMutationVariables>;
 export const StopTaskDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"StopTask"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"taskId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"stopTask"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"taskId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"taskId"}}}]}]}}]} as unknown as DocumentNode<StopTaskMutation, StopTaskMutationVariables>;
+export const BoardTemplatesDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"BoardTemplates"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"boardTemplates"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"orderBy"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"name"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"direction"},"value":{"kind":"EnumValue","value":"asc"}},{"kind":"ObjectField","name":{"kind":"Name","value":"priority"},"value":{"kind":"IntValue","value":"1"}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"lanes"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}}]}}]} as unknown as DocumentNode<BoardTemplatesQuery, BoardTemplatesQueryVariables>;
+export const SaveBoardTemplateDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SaveBoardTemplate"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"projectId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"name"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"description"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"saveBoardTemplate"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"projectId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"projectId"}}},{"kind":"Argument","name":{"kind":"Name","value":"name"},"value":{"kind":"Variable","name":{"kind":"Name","value":"name"}}},{"kind":"Argument","name":{"kind":"Name","value":"description"},"value":{"kind":"Variable","name":{"kind":"Name","value":"description"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}}]} as unknown as DocumentNode<SaveBoardTemplateMutation, SaveBoardTemplateMutationVariables>;
+export const ApplyBoardTemplateDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"ApplyBoardTemplate"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"projectId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"templateId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"applyBoardTemplate"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"projectId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"projectId"}}},{"kind":"Argument","name":{"kind":"Name","value":"templateId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"templateId"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"position"}}]}}]}}]} as unknown as DocumentNode<ApplyBoardTemplateMutation, ApplyBoardTemplateMutationVariables>;
+export const DeleteBoardTemplateDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"DeleteBoardTemplate"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deleteBoardTemplateSingle"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"id"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<DeleteBoardTemplateMutation, DeleteBoardTemplateMutationVariables>;

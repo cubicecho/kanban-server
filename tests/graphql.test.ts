@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { eq } from "drizzle-orm";
 import { type GraphQLSchema, graphql } from "graphql";
 import { afterAll, beforeAll, expect, test } from "vitest";
 
@@ -58,6 +59,7 @@ const board = async (projectId: string) => {
     name: string;
     position: number;
     intake: boolean;
+    wipLimit: number;
     onSuccessLaneId: string | null;
     onFailureLaneId: string | null;
     agentId: string | null;
@@ -348,4 +350,161 @@ test("spend adds up the runs behind it, and says how far back they go", async ()
     { projectId: empty.id },
   );
   expect(nothing).toEqual({ runs: 0, totalTokens: 0, from: null });
+});
+
+test("a board saved under a name is drawn onto the next project the same shape", async () => {
+  const source = await newProject("the one worth keeping");
+  const drawn = await board(source.id);
+
+  // A shape worth saving is one somebody changed: a fifth lane, a cap, and an arrow home.
+  const [, doing, , done] = drawn;
+  await run(
+    `mutation Widen($id: String!) {
+       updateLaneSingle(where: { id: { eq: $id } }, set: { wipLimit: 3 }) { id }
+     }`,
+    { id: doing.id },
+  );
+  const [parked] = await db
+    .insert(tables.lanes)
+    .values({
+      projectId: source.id,
+      name: "Parked",
+      position: 4,
+      onSuccessLaneId: done.id,
+      // An agent that will not be here when the template is drawn again.
+      agentId: null,
+    })
+    .returning();
+
+  const { saveBoardTemplate } = await run(
+    `mutation Save($projectId: String!) {
+       saveBoardTemplate(projectId: $projectId, name: "five lanes", description: "with a parking bay") {
+         id name description
+       }
+     }`,
+    { projectId: source.id },
+  );
+  expect(saveBoardTemplate).toMatchObject({
+    name: "five lanes",
+    description: "with a parking bay",
+  });
+
+  const target = await newProject("the next one");
+  const { applyBoardTemplate } = await run(
+    `mutation Apply($projectId: String!, $templateId: String!) {
+       applyBoardTemplate(projectId: $projectId, templateId: $templateId) { id name position }
+     }`,
+    { projectId: target.id, templateId: saveBoardTemplate.id },
+  );
+  expect(applyBoardTemplate.map((lane: { name: string }) => lane.name)).toEqual([
+    "Backlog",
+    "Doing",
+    "Review",
+    "Done",
+    "Parked",
+  ]);
+
+  // The arrows are the point: saved as indexes, they come back pointing at the new lanes.
+  const redrawn = await board(target.id);
+  const [newBacklog, newDoing, newReview, newDone, newParked] = redrawn;
+  expect(newDoing.onSuccessLaneId).toBe(newReview.id);
+  expect(newReview.onFailureLaneId).toBe(newDoing.id);
+  expect(newParked.onSuccessLaneId).toBe(newDone.id);
+  expect(newDone.onSuccessLaneId).toBeNull();
+  expect(newBacklog.intake).toBe(true);
+  expect(newDoing.wipLimit).toBe(3);
+  // Nothing of the board it came from: different project, different lanes.
+  expect(redrawn.map((lane) => lane.id)).not.toContain(parked.id);
+
+  // Saving again under the same name corrects the template rather than making a second one.
+  const { saveBoardTemplate: again } = await run(
+    `mutation Save($projectId: String!) {
+       saveBoardTemplate(projectId: $projectId, name: "five lanes", description: "") { id }
+     }`,
+    { projectId: target.id },
+  );
+  expect(again.id).toBe(saveBoardTemplate.id);
+  const { boardTemplates } = await run(
+    `query Templates { boardTemplates(where: { name: { eq: "five lanes" } }) { id } }`,
+  );
+  expect(boardTemplates).toHaveLength(1);
+});
+
+test("a template names its agents by id, and forgets the ones this server no longer has", async () => {
+  const [agent] = await db
+    .insert(tables.agents)
+    .values({ name: "a passing executor", role: "execute", model: "none", baseUrl: "http://x" })
+    .returning();
+
+  const source = await newProject("staffed");
+  const [, doing] = await board(source.id);
+  await db.update(tables.lanes).set({ agentId: agent.id }).where(eq(tables.lanes.id, doing.id));
+
+  const { saveBoardTemplate } = await run(
+    `mutation Save($projectId: String!) {
+       saveBoardTemplate(projectId: $projectId, name: "staffed board") { id }
+     }`,
+    { projectId: source.id },
+  );
+
+  // Kept while the agent exists: a template drawn onto a live server should still work cards.
+  const kept = await newProject("same server");
+  await run(
+    `mutation Apply($projectId: String!, $templateId: String!) {
+       applyBoardTemplate(projectId: $projectId, templateId: $templateId) { id }
+     }`,
+    { projectId: kept.id, templateId: saveBoardTemplate.id },
+  );
+  expect((await board(kept.id))[1].agentId).toBe(agent.id);
+
+  // Gone, and the lane comes back without one rather than the whole template failing.
+  await db.delete(tables.agents).where(eq(tables.agents.id, agent.id));
+  const after = await newProject("agent since removed");
+  await run(
+    `mutation Apply($projectId: String!, $templateId: String!) {
+       applyBoardTemplate(projectId: $projectId, templateId: $templateId) { id }
+     }`,
+    { projectId: after.id, templateId: saveBoardTemplate.id },
+  );
+  const lanes = await board(after.id);
+  expect(lanes).toHaveLength(4);
+  expect(lanes[1].agentId).toBeNull();
+});
+
+test("a template is refused on a board with cards, because lanes take their cards with them", async () => {
+  const source = await newProject("the template's home");
+  const { saveBoardTemplate } = await run(
+    `mutation Save($projectId: String!) {
+       saveBoardTemplate(projectId: $projectId, name: "plain four") { id }
+     }`,
+    { projectId: source.id },
+  );
+
+  const started = await newProject("already going");
+  const [backlog] = await board(started.id);
+  await db
+    .insert(tables.cards)
+    .values({ projectId: started.id, laneId: backlog.id, title: "work in hand" });
+
+  const message = await fails(
+    `mutation Apply($projectId: String!, $templateId: String!) {
+       applyBoardTemplate(projectId: $projectId, templateId: $templateId) { id }
+     }`,
+    { projectId: started.id, templateId: saveBoardTemplate.id },
+  );
+  expect(message).toMatch(/cards on it/i);
+  // And the board it refused is untouched, not half-redrawn.
+  expect(await board(started.id)).toHaveLength(4);
+
+  // A project with no lanes at all has no shape to save.
+  const bare = await newProject("about to be stripped");
+  await db.delete(tables.lanes).where(eq(tables.lanes.projectId, bare.id));
+  expect(
+    await fails(
+      `mutation Save($projectId: String!) {
+         saveBoardTemplate(projectId: $projectId, name: "nothing at all") { id }
+       }`,
+      { projectId: bare.id },
+    ),
+  ).toMatch(/no lanes/i);
 });

@@ -74,6 +74,8 @@ test("offers the board tools, and only those", async () => {
   expect(names).toEqual([
     "accept_task",
     "agents",
+    "apply_board_template",
+    "board_templates",
     "cards",
     "create_card",
     "create_project",
@@ -89,6 +91,7 @@ test("offers the board tools, and only those", async () => {
     "run_card",
     "run_events",
     "runs",
+    "save_board_template",
     "set_card_deps",
     "spend",
     "stop_card",
@@ -258,12 +261,15 @@ test("marks only the tools that actually destroy something", async () => {
       .map((tool) => tool.name)
       .sort();
 
-  // The updates rewrite a row, the deletes are the real thing, and stopping a run throws away
-  // what it had done. Starting an agent is none of those — a client that gates on this hint
-  // should be spending the operator's attention on the deletes.
+  // The updates rewrite a row, the deletes are the real thing, stopping a run throws away what
+  // it had done, and the two template calls each replace something that was there — a board's
+  // lanes, or a template of the same name. Starting an agent is none of those: a client that
+  // gates on this hint should be spending the operator's attention on the deletes.
   expect(flagged("destructiveHint")).toEqual([
+    "apply_board_template",
     "delete_card_single",
     "delete_task_single",
+    "save_board_template",
     "set_card_deps",
     "stop_card",
     "stop_task",
@@ -276,6 +282,7 @@ test("marks only the tools that actually destroy something", async () => {
   // twice makes two sets of cards, and refining it twice is two turns, so neither is among them.
   const writes = new Set([
     "accept_task",
+    "apply_board_template",
     "create_card",
     "create_project",
     "create_task",
@@ -286,6 +293,7 @@ test("marks only the tools that actually destroy something", async () => {
     "refine_task",
     "retry_card",
     "run_card",
+    "save_board_template",
     "set_card_deps",
     "stop_card",
     "stop_task",
@@ -295,10 +303,12 @@ test("marks only the tools that actually destroy something", async () => {
   ]);
   expect(flagged("idempotentHint").filter((name) => writes.has(name))).toEqual([
     "accept_task",
+    "apply_board_template",
     "delete_card_single",
     "delete_task_single",
     "move_card",
     "retry_card",
+    "save_board_template",
     "set_card_deps",
     "stop_card",
     "stop_task",
@@ -306,6 +316,7 @@ test("marks only the tools that actually destroy something", async () => {
   // And every read is marked as one, which is what lets a client re-ask without asking anyone.
   expect(flagged("idempotentHint").filter((name) => !writes.has(name))).toEqual([
     "agents",
+    "board_templates",
     "cards",
     "lanes",
     "projects",
@@ -329,4 +340,6 @@ test("says what a card is, for a client that has only ever seen a task", async (
   expect(described("create_card")).toMatch(/laneId/);
   // A total is only as old as the runs behind it, and retention deletes runs.
   expect(described("spend")).toMatch(/oldest run/i);
+  // Applying one wipes lanes, and a lane takes its cards with it.
+  expect(described("apply_board_template")).toMatch(/no cards/i);
 });

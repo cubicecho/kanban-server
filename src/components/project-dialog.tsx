@@ -23,6 +23,8 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import {
   AgentsDocument,
+  ApplyBoardTemplateDocument,
+  BoardTemplatesDocument,
   CreateProjectDocument,
   type ProjectsQuery,
   UpdateProjectDocument,
@@ -34,6 +36,8 @@ type Project = ProjectsQuery["projects"][number];
 
 // Radix refuses an empty item value, so "whichever one is enabled" carries a sentinel.
 const ANY = "__any__";
+// And the same for "the four lanes every project already gets".
+const SEEDED = "__seeded__";
 
 interface Draft {
   name: string;
@@ -58,6 +62,8 @@ const toDraft = (project?: Project | null): Draft => ({
  *
  * A new one arrives with four lanes already wired to this server's execute and review agents —
  * that happens on the server, so a project made over MCP is the same board as one made here.
+ * A template is drawn over those four afterwards rather than instead of them: the project
+ * exists either way, and a template that will not apply costs its board and not the project.
  */
 export function ProjectDialog({
   project,
@@ -70,9 +76,19 @@ export function ProjectDialog({
   const [draft, setDraft] = useState<Draft>(() => toDraft(project));
   const set = (patch: Partial<Draft>) => setDraft((current) => ({ ...current, ...patch }));
 
+  const [templateId, setTemplateId] = useState(SEEDED);
+
   const agents = useQuery({ queryKey: ["agents"], queryFn: () => request(AgentsDocument) });
   const byRole = (role: string) =>
     (agents.data?.agents ?? []).filter((agent) => agent.role === role);
+
+  // Only offered on a new project: applying one to a board that has cards is refused, and by
+  // the time a project is being edited it usually has.
+  const templates = useQuery({
+    queryKey: ["board-templates"],
+    queryFn: () => request(BoardTemplatesDocument),
+    enabled: !project,
+  });
 
   const save = useMutation({
     mutationFn: async () => {
@@ -89,6 +105,12 @@ export function ProjectDialog({
       const created = await request(CreateProjectDocument, { values });
       // Made from here, it is the one you meant to work in.
       selectProject(created.createProject.id);
+      if (templateId !== SEEDED) {
+        await request(ApplyBoardTemplateDocument, {
+          projectId: created.createProject.id,
+          templateId,
+        });
+      }
       return created;
     },
     onSuccess: () => {
@@ -139,6 +161,31 @@ export function ProjectDialog({
               placeholder="The stack, the conventions, where things live — whatever every agent working this project needs to know before its own prompt."
             />
           </div>
+
+          {project ? null : (
+            <div className="flex flex-col gap-2">
+              <Label>Board</Label>
+              <Select value={templateId} onValueChange={setTemplateId}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={SEEDED}>Backlog, Doing, Review, Done</SelectItem>
+                  {(templates.data?.boardTemplates ?? []).map((template) => (
+                    <SelectItem key={template.id} value={template.id}>
+                      {template.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {templateId === SEEDED
+                  ? "The default four, wired to whichever agents this server has."
+                  : ((templates.data?.boardTemplates ?? []).find((one) => one.id === templateId)
+                      ?.description ?? "A board saved from another project.")}
+              </p>
+            </div>
+          )}
 
           <div className="flex items-center justify-between gap-4 rounded-md border p-3">
             <div>

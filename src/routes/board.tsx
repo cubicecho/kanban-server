@@ -7,6 +7,7 @@ import {
   Plus,
   Radio,
   RotateCcw,
+  Save,
   Settings2,
   Square,
   Trash2,
@@ -17,6 +18,7 @@ import { Page } from "@/components/app-shell";
 import { CardDialog } from "@/components/card-dialog";
 import { LaneDialog } from "@/components/lane-dialog";
 import { RunStream } from "@/components/run-stream";
+import { SaveTemplateDialog } from "@/components/save-template-dialog";
 import { Spend } from "@/components/spend";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -61,6 +63,7 @@ export function BoardRoute() {
   const queryClient = useQueryClient();
   const [editingCard, setEditingCard] = useState<{ card?: BoardCard; laneId: string } | null>(null);
   const [editingLane, setEditingLane] = useState<{ lane?: Lane } | null>(null);
+  const [savingTemplate, setSavingTemplate] = useState(false);
   const [watching, setWatching] = useState<string | null>(null);
 
   const projects = useQuery({ queryKey: ["projects"], queryFn: () => request(ProjectsDocument) });
@@ -167,6 +170,10 @@ export function BoardRoute() {
           {/* Beside the project's own controls, because turning `autoRun` on is the decision
               this number is about. */}
           <Spend projectId={projectId} />
+          <Button variant="outline" onClick={() => setSavingTemplate(true)}>
+            <Save className="size-4" />
+            Save as template
+          </Button>
           <Button variant="outline" onClick={() => setEditingLane({})}>
             <Plus className="size-4" />
             Lane
@@ -382,6 +389,10 @@ export function BoardRoute() {
           projectId={projectId}
           onClose={() => setEditingLane(null)}
         />
+      ) : null}
+
+      {savingTemplate ? (
+        <SaveTemplateDialog projectId={projectId} onClose={() => setSavingTemplate(false)} />
       ) : null}
     </Page>
   );
