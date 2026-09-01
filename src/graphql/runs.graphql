@@ -1,0 +1,44 @@
+query Runs($projectId: String) {
+  runs(
+    limit: 100
+    where: { projectId: { eq: $projectId } }
+    orderBy: { startedAt: { direction: desc, priority: 1 } }
+  ) {
+    id
+    kind
+    status
+    startedAt
+    finishedAt
+    output
+    error
+    toolCalls
+    totalTokens
+    cardId
+    taskId
+    agent {
+      name
+    }
+    card {
+      title
+    }
+    task {
+      title
+    }
+  }
+}
+
+mutation DeleteRun($id: String!) {
+  deleteRunSingle(where: { id: { eq: $id } }) {
+    id
+  }
+}
+
+subscription RunEvents($runId: String!) {
+  runEvents(runId: $runId) {
+    seq
+    kind
+    text
+    name
+    ok
+  }
+}

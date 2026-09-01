@@ -1,0 +1,124 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A second push to a branch makes the first run's answer worthless.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '26'
+          cache: npm
+
+      - run: npm ci
+
+      # Formatting, lint, and import order in one pass. `ci` differs from
+      # `npm run lint` only in never writing fixes.
+      - name: Lint
+        run: npx biome ci .
+
+      # `schema.graphql` and `src/gql/graphql.ts` are generated from the Drizzle
+      # tables and committed, so a column added without a `npm run codegen` puts
+      # the repo's types behind its API and nothing else notices. Regenerating
+      # and diffing is the only thing that does. Runs before the typecheck so
+      # drift is reported as drift rather than as a puzzling type error.
+      - name: The committed schema and types are current
+        run: |
+          npm run codegen
+          git diff --exit-code -- schema.graphql src/gql/graphql.ts \
+            || { echo '::error::run `npm run codegen` and commit the result'; exit 1; }
+
+      # `npm run build` typechecks too, but a type error and a bundler error
+      # deserve to fail on different lines.
+      - name: Typecheck
+        run: npm run typecheck
+
+      # Vitest against an in-memory PGlite per suite; no services needed.
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+  # The image is only pushed from main, so without this a broken Dockerfile
+  # would first be noticed by a release. Builds, does not push.
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: false
+          load: true
+          tags: kanban-server:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # The image runs the server's TypeScript through Node's type stripping
+      # rather than tsx. That either works or the container dies on boot, and
+      # nothing else in CI covers it.
+      - name: The container boots and answers
+        run: |
+          docker run -d --name kanban-server-ci -p 8788:8788 kanban-server:ci
+          for _ in $(seq 1 30); do
+            if curl -fsS -X POST localhost:8788/graphql \
+              -H 'content-type: application/json' \
+              -d '{"query":"{ projects { id } }"}' > /dev/null; then
+              echo 'server answered'
+              exit 0
+            fi
+            sleep 1
+          done
+          echo '::error::the container never answered on :8788'
+          docker logs kanban-server-ci
+          exit 1
+
+  # The tests run on PGlite, which is postgres but not a postgres *server*: it
+  # says nothing about the node-postgres driver, the connection URL, or a boot
+  # that has to wait for a database in another container. The compose file is
+  # how that deployment is meant to be run, so CI runs that rather than a rig
+  # of its own.
+  postgres:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+
+      # `--wait` holds until both healthchecks pass, and the server's own is a
+      # GraphQL query — so reaching the next step already means postgres
+      # answered one.
+      - name: Boot the stack
+        run: docker compose -f docker-compose.pg.yml up -d --build --wait
+
+      # A write and a read back, over the driver that only this job exercises.
+      # Creating a project seeds its four lanes in the same transaction, so the
+      # second query also proves the `onWrite` hook ran against real postgres.
+      - name: A project and its board round-trip through postgres
+        run: |
+          gql() {
+            curl -fsS -X POST localhost:8788/graphql \
+              -H 'content-type: application/json' -d "{\"query\": $1}"
+          }
+          gql '"mutation { createProject(values: { name: \"ci\" }) { id } }"'
+          gql '"{ projects { name autoRun createdAt } }"' | tee projects.json
+          gql '"{ lanes { name intake } }"' | tee lanes.json
+          grep -q '"name":"ci"' projects.json
+          grep -q '"autoRun":false' projects.json
+          grep -q '"name":"Backlog","intake":true' lanes.json
+          grep -q '"name":"Done"' lanes.json
+
+      - name: Logs, if it did not
+        if: failure()
+        run: docker compose -f docker-compose.pg.yml logs

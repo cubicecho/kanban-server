@@ -1,0 +1,89 @@
+query Board($projectId: String!) {
+  lanes(
+    where: { projectId: { eq: $projectId } }
+    orderBy: { position: { direction: asc, priority: 1 } }
+  ) {
+    id
+    name
+    position
+    intake
+    agentId
+    onSuccessLaneId
+    onFailureLaneId
+    wipLimit
+  }
+  cards(
+    limit: 500
+    where: { projectId: { eq: $projectId } }
+    orderBy: { position: { direction: asc, priority: 1 } }
+  ) {
+    id
+    laneId
+    taskId
+    title
+    body
+    acceptance
+    position
+    status
+    result
+    error
+    updatedAt
+  }
+}
+
+mutation MoveCard($cardId: String!, $laneId: String!, $position: Int) {
+  moveCard(cardId: $cardId, laneId: $laneId, position: $position) {
+    id
+    laneId
+    position
+    status
+  }
+}
+
+mutation RunCard($cardId: String!) {
+  runCard(cardId: $cardId) {
+    id
+    status
+    error
+  }
+}
+
+mutation StopCard($cardId: String!) {
+  stopCard(cardId: $cardId)
+}
+
+mutation CreateCard($values: CreateCardInput!) {
+  createCard(values: $values) {
+    id
+  }
+}
+
+mutation UpdateCard($id: String!, $set: UpdateCardInput!) {
+  updateCardSingle(where: { id: { eq: $id } }, set: $set) {
+    id
+  }
+}
+
+mutation DeleteCard($id: String!) {
+  deleteCardSingle(where: { id: { eq: $id } }) {
+    id
+  }
+}
+
+mutation CreateLane($values: CreateLaneInput!) {
+  createLane(values: $values) {
+    id
+  }
+}
+
+mutation UpdateLane($id: String!, $set: UpdateLaneInput!) {
+  updateLaneSingle(where: { id: { eq: $id } }, set: $set) {
+    id
+  }
+}
+
+mutation DeleteLane($id: String!) {
+  deleteLaneSingle(where: { id: { eq: $id } }) {
+    id
+  }
+}

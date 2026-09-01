@@ -1,0 +1,62 @@
+# The same server as docker-compose.yml, against a postgres of its own rather than the
+# embedded one it runs in-process:
+#
+#   docker compose -f docker-compose.pg.yml up --build
+#
+# Nothing in the image changes. `DATABASE_URL` is the whole switch — set, the server connects
+# to that server instead, and creates its schema on first boot either way.
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: kanban
+      POSTGRES_DB: kanban
+      # Fine as it stands: the port below is not published, so only the app's container can
+      # reach this. Set POSTGRES_PASSWORD in a .env beside this file before exposing it.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-kanban}
+    volumes:
+      # A named volume, not a bind mount: postgres owns this directory's layout and
+      # permissions. `docker compose down` keeps it; `down -v` is what throws the boards away.
+      - pgdata:/var/lib/postgresql/data
+    # Uncomment to reach the database from the host, e.g. for psql or drizzle studio.
+    # ports:
+    #   - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kanban -d kanban"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  kanban-server:
+    build: .
+    image: kanban-server
+    restart: unless-stopped
+    ports:
+      - "8788:8788"
+    depends_on:
+      # The server creates its tables on boot, so it has to start second. `service_healthy`,
+      # not `service_started`: postgres accepts connections some seconds after the container
+      # does, and a restart loop is a poor substitute for waiting.
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://kanban:${POSTGRES_PASSWORD:-kanban}@db:5432/kanban
+      TZ: ${TZ:-UTC}
+      # Optional: agents take their key from their own row, then from the settings row the UI
+      # saves, and only then from here.
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:8788/graphql',{method:'POST',headers:{'content-type':'application/json'},body:'{\"query\":\"{projects{id}}\"}'}).then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  pgdata:

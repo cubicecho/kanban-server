@@ -1,0 +1,73 @@
+query Tasks($projectId: String!) {
+  tasks(
+    where: { projectId: { eq: $projectId } }
+    orderBy: { createdAt: { direction: desc, priority: 1 } }
+  ) {
+    id
+    title
+    brief
+    status
+    error
+    createdAt
+    messages(orderBy: { createdAt: { direction: asc, priority: 1 } }) {
+      id
+      role
+      content
+    }
+    cards {
+      id
+      title
+      status
+    }
+  }
+}
+
+mutation CreateTask($values: CreateTaskInput!) {
+  createTask(values: $values) {
+    id
+    title
+    brief
+    status
+  }
+}
+
+mutation RefineTask($taskId: String!, $message: String!) {
+  refineTask(taskId: $taskId, message: $message) {
+    id
+    status
+    error
+  }
+}
+
+mutation AcceptTask($taskId: String!) {
+  acceptTask(taskId: $taskId) {
+    id
+    status
+  }
+}
+
+mutation DecomposeTask($taskId: String!) {
+  decomposeTask(taskId: $taskId) {
+    id
+    status
+    error
+  }
+}
+
+mutation SubmitTask($projectId: String!, $title: String!, $brief: String!) {
+  submitTask(projectId: $projectId, title: $title, brief: $brief) {
+    id
+    status
+    error
+  }
+}
+
+mutation DeleteTask($id: String!) {
+  deleteTaskSingle(where: { id: { eq: $id } }) {
+    id
+  }
+}
+
+mutation StopTask($taskId: String!) {
+  stopTask(taskId: $taskId)
+}

@@ -1,0 +1,8 @@
+node_modules
+dist
+# The embedded postgres and anything else written at runtime. Re-created on demand.
+data
+.env
+*.local
+# Claude Code's own scratch space — worktrees, session state. Not part of the app.
+.claude

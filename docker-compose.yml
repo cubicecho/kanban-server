@@ -1,0 +1,33 @@
+# The server on its own, storing everything in the embedded postgres under ./data:
+#
+#   docker compose up --build
+#
+# For a postgres server of its own, see docker-compose.pg.yml.
+services:
+  kanban-server:
+    build: .
+    image: kanban-server
+    restart: unless-stopped
+    ports:
+      - "8788:8788"
+    volumes:
+      # The embedded postgres (PGlite) keeps its data here, so the boards survive
+      # a rebuild. Point DATABASE_URL at a real postgres instead and this holds
+      # nothing that matters — see docker-compose.pg.yml.
+      - ./data:/data
+    environment:
+      TZ: ${TZ:-UTC}
+      # Optional: agents take their key from their own row, then from the settings
+      # row the UI saves, and only then from here. This is the fallback for a
+      # server that has never been configured.
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:8788/graphql',{method:'POST',headers:{'content-type':'application/json'},body:'{\"query\":\"{projects{id}}\"}'}).then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s

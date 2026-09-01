@@ -1,0 +1,56 @@
+query Agents {
+  agents(orderBy: { name: { direction: asc, priority: 1 } }) {
+    id
+    name
+    role
+    enabled
+    baseUrl
+    model
+    systemPrompt
+    maxTokens
+    temperature
+    maxToolIterations
+    toolDiscovery
+    requestTimeoutSeconds
+    maxRetries
+    servers {
+      serverId
+    }
+  }
+  mcpServers(orderBy: { slug: { direction: asc, priority: 1 } }) {
+    id
+    slug
+    label
+    enabled
+  }
+}
+
+query AgentModels($agentId: String) {
+  models(agentId: $agentId)
+}
+
+mutation CreateAgent($values: CreateAgentInput!) {
+  createAgent(values: $values) {
+    id
+  }
+}
+
+mutation UpdateAgent($id: String!, $set: UpdateAgentInput!) {
+  updateAgentSingle(where: { id: { eq: $id } }, set: $set) {
+    id
+  }
+}
+
+mutation DeleteAgent($id: String!) {
+  deleteAgentSingle(where: { id: { eq: $id } }) {
+    id
+  }
+}
+
+mutation SetAgentServers($agentId: String!, $serverIds: [String!]!) {
+  setAgentServers(agentId: $agentId, serverIds: $serverIds)
+}
+
+mutation SetAgentApiKey($agentId: String!, $apiKey: String!) {
+  setAgentApiKey(agentId: $agentId, apiKey: $apiKey)
+}

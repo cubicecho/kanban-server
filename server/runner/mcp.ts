@@ -1,0 +1,291 @@
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import type OpenAI from "openai";
+import { errorMessage } from "../../shared/errors.ts";
+import { db } from "../db/client.ts";
+import { type McpServerRow, mcpServers } from "../db/schema.ts";
+
+const SEPARATOR = "__";
+
+export type McpStatus = "disabled" | "connecting" | "ready" | "error";
+
+/** What it takes to reach a server — the connection half of a row, without its identity. */
+export type McpConnection = Pick<
+  McpServerRow,
+  "transport" | "command" | "args" | "env" | "url" | "headers"
+>;
+
+function createTransport(config: McpConnection) {
+  if (config.transport === "stdio") {
+    if (!config.command) throw new Error("a stdio server needs a command");
+    return new StdioClientTransport({
+      command: config.command,
+      args: config.args ?? [],
+      // The child inherits our environment: an MCP server usually needs PATH to find itself.
+      env: { ...(process.env as Record<string, string>), ...(config.env ?? {}) },
+    });
+  }
+  if (!config.url) throw new Error("an http server needs a url");
+  return new StreamableHTTPClientTransport(new URL(config.url), {
+    requestInit: { headers: config.headers ?? {} },
+  });
+}
+
+export interface McpProbe {
+  ok: boolean;
+  error: string;
+  tools: { name: string; description: string }[];
+}
+
+/**
+ * Connects to a config that may not be saved yet, lists its tools, and hangs up.
+ *
+ * This is what the "Test connection" button calls: a config is easy to get subtly wrong, and
+ * finding out at 3am when the task runs is too late. The client is disposable — the pool keeps
+ * the long-lived ones.
+ */
+export async function probe(config: McpConnection): Promise<McpProbe> {
+  const client = new Client({ name: "kanban-server-probe", version: "0.1.0" });
+  try {
+    await client.connect(createTransport(config));
+    const { tools } = await client.listTools();
+    return {
+      ok: true,
+      error: "",
+      tools: tools.map((tool) => ({ name: tool.name, description: tool.description ?? "" })),
+    };
+  } catch (error) {
+    return { ok: false, error: errorMessage(error), tools: [] };
+  } finally {
+    await client.close().catch(() => {});
+  }
+}
+
+/** One server's tools, without their JSON schemas — the cheap half of a tool definition. */
+export interface CatalogServer {
+  id: string;
+  label: string;
+  tools: { name: string; description: string }[];
+}
+
+export interface McpServerState {
+  id: string;
+  slug: string;
+  label: string;
+  status: McpStatus;
+  error: string;
+  tools: { name: string; description: string }[];
+}
+
+/**
+ * One tool of one connected server, in every shape anything asks for it.
+ *
+ * The OpenAI definition is built once here rather than per request: the agent loop rebuilds its
+ * tool array on every iteration of every step, and the schema behind it cannot change without
+ * the connection being torn down and made again.
+ */
+interface PooledTool {
+  /** As the server named it — what `state()` reports and what a call is sent back under. */
+  name: string;
+  description: string;
+  /** `<slug>__<name>`: what the model sees, and what it calls. */
+  qualified: string;
+  definition: OpenAI.ChatCompletionTool;
+}
+
+interface Entry {
+  config: McpServerRow;
+  client?: Client;
+  status: McpStatus;
+  error?: string;
+  tools: PooledTool[];
+}
+
+/**
+ * One MCP client per configured server, exposing their tools to the agent loop as
+ * `<slug>__<tool name>`.
+ *
+ * Connections are long-lived and shared across runs: a stdio server is a child process, and
+ * spawning one per task run would cost more than the run. `sync()` reconciles the pool with
+ * the `mcp_servers` table and is called on boot and after every write to it.
+ */
+class McpPool {
+  private entries = new Map<string, Entry>();
+  /** Qualified name -> the client that answers it. Only ever holds callable tools. */
+  private index = new Map<string, { client: Client; tool: PooledTool; serverId: string }>();
+
+  async sync(configs?: McpServerRow[]) {
+    const wanted = configs ?? (await db.select().from(mcpServers));
+    for (const [id, entry] of this.entries) {
+      if (!wanted.some((config) => config.id === id)) {
+        await this.close(entry);
+        this.entries.delete(id);
+      }
+    }
+    await Promise.all(
+      wanted.map(async (config) => {
+        const existing = this.entries.get(config.id);
+        // Reconnecting an unchanged server would restart its child process for nothing.
+        if (existing && JSON.stringify(existing.config) === JSON.stringify(config)) return;
+        if (existing) await this.close(existing);
+        await this.connect(config);
+      }),
+    );
+    this.reindex();
+  }
+
+  /** Rebuilt whenever the pool changes, so `call` resolves a name without scanning for it. */
+  private reindex() {
+    this.index.clear();
+    for (const entry of this.entries.values()) {
+      const { client } = entry;
+      if (entry.status !== "ready" || !client) continue;
+      for (const tool of entry.tools) {
+        this.index.set(tool.qualified, { client, tool, serverId: entry.config.id });
+      }
+    }
+  }
+
+  private async connect(config: McpServerRow) {
+    const entry: Entry = { config, status: config.enabled ? "connecting" : "disabled", tools: [] };
+    this.entries.set(config.id, entry);
+    if (!config.enabled) return;
+
+    try {
+      const client = new Client({ name: "kanban-server", version: "0.1.0" });
+      await client.connect(createTransport(config));
+      const { tools } = await client.listTools();
+
+      const label = config.label || config.slug;
+      entry.client = client;
+      entry.status = "ready";
+      entry.tools = tools.map((tool) => {
+        const qualified = McpPool.qualify(config.slug, tool.name);
+        const description = tool.description ?? "";
+        return {
+          name: tool.name,
+          description,
+          qualified,
+          definition: {
+            type: "function",
+            function: {
+              name: qualified,
+              description: `[${label}] ${description}`.trim(),
+              parameters: (tool.inputSchema ?? { type: "object" }) as Record<string, unknown>,
+            },
+          },
+        };
+      });
+      console.log(`[mcp] ${config.slug}: ${entry.tools.length} tool(s)`);
+    } catch (error) {
+      entry.status = "error";
+      entry.error = errorMessage(error);
+      console.error(`[mcp] ${config.slug}: ${entry.error}`);
+    }
+  }
+
+  private async close(entry: Entry) {
+    try {
+      await entry.client?.close();
+    } catch {
+      // a server that died on its own is already closed
+    }
+    entry.client = undefined;
+  }
+
+  /** The one place a tool's wire name is built, so `call` and `tools` agree. */
+  private static qualify(slug: string, tool: string) {
+    return `${slug}${SEPARATOR}${tool}`.slice(0, 64);
+  }
+
+  /**
+   * Tool definitions for one agent's model.
+   *
+   * `serverIds` is what that agent is allowed to see — the pool is shared between agents but
+   * what each is shown is not, so every read is scoped. An agent with no servers linked gets
+   * nothing, which is what a refiner wants. `names` narrows it further, which is how on-demand
+   * loading sends a handful of schemas instead of every one.
+   */
+  tools(serverIds: string[], names?: string[]): OpenAI.ChatCompletionTool[] {
+    const allowed = new Set(serverIds);
+    const wanted = names ? names.map((name) => this.index.get(name)) : [...this.index.values()];
+    return wanted
+      .filter((found) => found !== undefined)
+      .filter((found) => allowed.has(found.serverId))
+      .map((found) => found.tool.definition);
+  }
+
+  /** Names and descriptions only — what the model browses before loading any schemas. */
+  catalog(serverIds: string[]): CatalogServer[] {
+    const allowed = new Set(serverIds);
+    const catalog: CatalogServer[] = [];
+    for (const entry of this.entries.values()) {
+      if (entry.status !== "ready" || !entry.tools.length) continue;
+      if (!allowed.has(entry.config.id)) continue;
+      catalog.push({
+        id: entry.config.id,
+        label: entry.config.label || entry.config.slug,
+        tools: entry.tools.map((tool) => ({
+          name: tool.qualified,
+          description: tool.description,
+        })),
+      });
+    }
+    return catalog;
+  }
+
+  /**
+   * Runs one tool call and returns text for a tool message.
+   *
+   * `serverIds` is the calling agent's own list, checked again here rather than trusted from
+   * the definitions it was given: a model that has seen a tool name once will call it again
+   * from memory, and an agent must not reach a server it was not linked to however it learned
+   * the name.
+   */
+  async call(serverIds: string[], qualifiedName: string, input: unknown): Promise<string> {
+    // Resolved by the whole qualified name rather than by splitting it: `qualify` truncates at
+    // 64 characters, and the split of a truncated name names a tool its server never had.
+    const found = this.index.get(qualifiedName);
+    if (!found || !serverIds.includes(found.serverId)) {
+      throw new Error(
+        `no MCP server available to this agent offers a tool called "${qualifiedName}"`,
+      );
+    }
+
+    const result = await found.client.callTool({
+      name: found.tool.name,
+      arguments: (input ?? {}) as Record<string, unknown>,
+    });
+
+    const content = Array.isArray(result.content) ? result.content : [];
+    const text = content
+      .map((block: { type?: string; text?: string }) =>
+        block.type === "text" ? block.text : `[${block.type ?? "unknown"} content]`,
+      )
+      .join("\n")
+      .trim();
+
+    if (result.isError) throw new Error(text || "tool call failed");
+    return text || "(no output)";
+  }
+
+  state(): McpServerState[] {
+    return [...this.entries.values()].map((entry) => ({
+      id: entry.config.id,
+      slug: entry.config.slug,
+      label: entry.config.label,
+      status: entry.status,
+      error: entry.error ?? "",
+      tools: entry.tools.map(({ name, description }) => ({ name, description })),
+    }));
+  }
+
+  async shutdown() {
+    await Promise.all([...this.entries.values()].map((entry) => this.close(entry)));
+    this.entries.clear();
+    this.index.clear();
+  }
+}
+
+export const mcp = new McpPool();
