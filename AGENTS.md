@@ -126,7 +126,7 @@ belongs in a hook, not in a route handler.
 tests hold that line.
 
 **The `/mcp` surface is curated, not the whole schema.** `server/mcp-endpoint.ts` lists the
-twenty-two tools an outside client gets. Nothing that empties a table in one call, nothing that
+twenty-three tools an outside client gets. Nothing that empties a table in one call, nothing that
 reads or writes the API key, and no editing of agents or MCP servers — a visiting client can
 see which agents exist, because a lane points at one, but which model runs where and on whose
 key is the operator's business. A new tool goes in that list deliberately,

@@ -75,6 +75,7 @@ test("offers the board tools, and only those", async () => {
     "accept_task",
     "agents",
     "cards",
+    "create_card",
     "create_project",
     "create_task",
     "decompose_task",
@@ -158,6 +159,42 @@ test("makes a project, hands it a task, and reads the board back", async () => {
   expect(await call("tasks", { where: { projectId: { eq: projectId } } })).toEqual({ tasks: [] });
 });
 
+test("puts a single card on a board, with no task behind it", async () => {
+  const created = (await call("create_project", { values: { name: "by hand" } })) as {
+    createProject: { id: string };
+  };
+  const projectId = created.createProject.id;
+  const board = (await call("lanes", { where: { projectId: { eq: projectId } } })) as {
+    lanes: { id: string; name: string; intake: boolean }[];
+  };
+  const backlog = board.lanes.find((lane) => lane.intake);
+  if (!backlog) throw new Error("the seeded board has no intake lane");
+
+  const card = (await call("create_card", {
+    values: {
+      projectId,
+      laneId: backlog.id,
+      title: "rotate the signing key",
+      acceptance: "the old key is revoked and nothing 401s",
+    },
+  })) as { createCard: { id: string; status: string; laneId: string } };
+  expect(card.createCard).toMatchObject({ laneId: backlog.id, status: "idle" });
+
+  // No task behind it, and that is the record: this is work someone knew the shape of, not
+  // work a decomposer produced.
+  const listed = (await call("cards", { where: { projectId: { eq: projectId } } })) as {
+    cards: { title: string; taskId: string | null; acceptance: string }[];
+  };
+  expect(listed.cards).toHaveLength(1);
+  expect(listed.cards[0].taskId).toBeNull();
+  expect(listed.cards[0].acceptance).toBe("the old key is revoked and nothing 401s");
+
+  // The lane is not optional, and the failure says so rather than inventing one.
+  const missing = await raw("create_card", { values: { projectId, title: "nowhere" } });
+  expect(missing.isError).toBe(true);
+  expect(missing.text).toMatch(/laneId/i);
+});
+
 test("hands a run's progress to a client that polls for it", async () => {
   events.reset();
   events.emit("run-mcp", { kind: "notice", text: 'working "write it"' });
@@ -236,6 +273,7 @@ test("marks only the tools that actually destroy something", async () => {
   // twice makes two sets of cards, and refining it twice is two turns, so neither is among them.
   const writes = new Set([
     "accept_task",
+    "create_card",
     "create_project",
     "create_task",
     "decompose_task",
@@ -281,4 +319,6 @@ test("says what a card is, for a client that has only ever seen a task", async (
   expect(described("cards")).toMatch(/units of work/i);
   expect(described("tasks")).toMatch(/decomposed/i);
   expect(described("submit_task")).toMatch(/brief/i);
+  // A client that has only ever made tasks needs telling that this one lands nowhere by itself.
+  expect(described("create_card")).toMatch(/laneId/);
 });
