@@ -99,7 +99,7 @@ resting place, which is what a backlog and a done pile are.
 of its own is not finished — it is waiting for that lane's turn — so it goes back to `idle`,
 because `readyCards` only picks up `idle`. `done` is for a card that stayed put, or landed
 where no agent runs. A card a reviewer rejected stays `error`, so the Doing↔Review loop cannot
-spin on its own.
+spin on its own; `retryCard` is the way back, and clears the error where the card stands.
 
 **A review verdict is a property of the output, not of the run.** A reviewer that answers
 `FAIL` has still run fine, so the run is `ok` and the card is what fails. Ambiguity counts as a
@@ -111,7 +111,8 @@ writes — a dependency finishing, an agent switched back on, a run stopped.
 
 **Hand-written GraphQL fields go in `server/graphql/`**, beside the generated entities:
 `models`, `mcpStatus`, `runEvents` on the query side; `refineTask`, `acceptTask`,
-`decomposeTask`, `submitTask`, `runCard`, `stopCard`, `stopTask`, `moveCard`, `setAgentServers`,
+`decomposeTask`, `submitTask`, `runCard`, `stopCard`, `stopTask`, `moveCard`, `retryCard`,
+`setAgentServers`,
 `testMcpServer`, `reconnectMcp`, `setApiKey`, `setAgentApiKey` on the mutation side. Give every
 one of them a `description` — it is what an agent on `/mcp` reads to decide whether to call it.
 
@@ -125,7 +126,7 @@ belongs in a hook, not in a route handler.
 tests hold that line.
 
 **The `/mcp` surface is curated, not the whole schema.** `server/mcp-endpoint.ts` lists the
-twenty-one tools an outside client gets. Nothing that empties a table in one call, nothing that
+twenty-two tools an outside client gets. Nothing that empties a table in one call, nothing that
 reads or writes the API key, and no editing of agents or MCP servers — a visiting client can
 see which agents exist, because a lane points at one, but which model runs where and on whose
 key is the operator's business. A new tool goes in that list deliberately,

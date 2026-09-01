@@ -495,6 +495,35 @@ export const schema = new GraphQLSchema({
           return moved;
         },
       },
+      retryCard: {
+        type: new GraphQLNonNull(generatedType("Card")),
+        description:
+          "Puts a card back in play where it stands: clears its error and returns it to " +
+          "`idle`, which is the status a lane's agent will pick up. This is the way back for " +
+          "a card a reviewer rejected — those stay `error` on purpose, so the board waits for " +
+          "a person rather than looping — and for one interrupted by a restart. It does not " +
+          "run anything itself; `runCard` does that, and `autoRun` does it unasked. Refused " +
+          "while an agent is working the card.",
+        args: { cardId: { type: new GraphQLNonNull(GraphQLString) } },
+        resolve: async (_source, args: { cardId: string }) => {
+          if (isRunning(args.cardId)) {
+            throw new GraphQLError("An agent is working this card already.", {
+              extensions: { code: "RUN_IN_FLIGHT" },
+            });
+          }
+          const [card] = await db
+            .update(cards)
+            .set({ status: "idle", error: "" })
+            .where(eq(cards.id, args.cardId))
+            .returning();
+          if (!card) {
+            throw new GraphQLError(`There is no card with id ${args.cardId}.`, {
+              extensions: { code: "NOT_FOUND" },
+            });
+          }
+          return card;
+        },
+      },
       setAgentServers: {
         type: new GraphQLNonNull(new GraphQLList(new GraphQLNonNull(GraphQLString))),
         description:

@@ -5,6 +5,7 @@ import {
   Pencil,
   Play,
   Plus,
+  RotateCcw,
   Settings2,
   Square,
   Trash2,
@@ -25,6 +26,7 @@ import {
   DeleteLaneDocument,
   MoveCardDocument,
   ProjectsDocument,
+  RetryCardDocument,
   RunCardDocument,
   StopCardDocument,
 } from "@/gql/graphql";
@@ -95,6 +97,15 @@ export function BoardRoute() {
       if (result.stopCard) toast.success("Stopping…");
       refresh();
     },
+    onError,
+  });
+
+  // A card a reviewer rejected sits in `error` on purpose, and nothing but a person gets it
+  // out. Moving it does too, which is why this exists: the move that retries a card in Doing is
+  // a move to the lane it is already in, and nobody finds that.
+  const retry = useMutation({
+    mutationFn: (cardId: string) => request(RetryCardDocument, { cardId }),
+    onSuccess: refresh,
     onError,
   });
 
@@ -227,6 +238,17 @@ export function BoardRoute() {
                       >
                         <ChevronRight className="size-4" />
                       </Button>
+                      {card.status === "error" ? (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Clear the error and put it back in play"
+                          disabled={retry.isPending}
+                          onClick={() => retry.mutate(card.id)}
+                        >
+                          <RotateCcw className="size-4" />
+                        </Button>
+                      ) : null}
                       {card.status === "running" ? (
                         <Button
                           variant="ghost"

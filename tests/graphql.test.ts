@@ -127,6 +127,37 @@ test("moveCard renumbers the lane it lands in and puts the card back to idle", a
   expect([first.id, second.id]).toContain(cards[0].id);
 });
 
+test("retryCard puts a rejected card back in play where it stands", async () => {
+  const project = await newProject("retrying");
+  const [, doing] = await board(project.id);
+
+  const { createCard } = await run(
+    `mutation Make($values: CreateCardInput!) { createCard(values: $values) { id } }`,
+    { values: { projectId: project.id, laneId: doing.id, title: "rejected", position: 0 } },
+  );
+  // What a reviewer's FAIL leaves behind: back in Doing, holding the reason, and in a status
+  // the worker will not pick up.
+  await run(
+    `mutation Fail($id: String!) {
+       updateCardSingle(where: { id: { eq: $id } }, set: { status: error, error: "no test" }) { id }
+     }`,
+    { id: createCard.id },
+  );
+
+  const { retryCard } = await run(
+    `mutation Retry($cardId: String!) { retryCard(cardId: $cardId) { id laneId status error } }`,
+    { cardId: createCard.id },
+  );
+  expect(retryCard).toMatchObject({
+    id: createCard.id,
+    laneId: doing.id,
+    status: "idle",
+    error: "",
+  });
+
+  expect(await fails(`mutation { retryCard(cardId: "nope") { id } }`)).toMatch(/no card with id/);
+});
+
 test("the API never hands back a stored key", async () => {
   expect(await run(`mutation { setApiKey(apiKey: "sk-secret") }`)).toEqual({ setApiKey: true });
   // The write goes through; the column is not in the schema at all, so nothing can read it back

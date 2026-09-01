@@ -40,6 +40,7 @@ const TOOLS = [
   "Mutation.updateCardSingle",
   "Mutation.deleteCardSingle",
   "Mutation.moveCard",
+  "Mutation.retryCard",
   "Mutation.runCard",
   "Mutation.stopCard",
   "Mutation.stopTask",
@@ -120,6 +121,10 @@ const HINTS: Record<string, string> = {
     "Puts a card in a lane, at a position. This is how work is redirected by hand — and how a " +
     "failed card is retried, since a moved card comes back to `idle` and a lane with an agent " +
     "will pick it up again.",
+  retry_card:
+    "Puts a failed card back in play where it stands, without running it. A card a reviewer " +
+    "rejected keeps its `error` status so the board waits for a person, and this is what " +
+    "clears it — after which its lane's agent will pick it up again.",
   run_card:
     "Works one card now with its lane's agent, answering when the run finishes. The card moves " +
     "on by itself afterwards, to whichever lane its own said to send it.",
@@ -141,8 +146,8 @@ const HINTS: Record<string, string> = {
  *
  * The four that run an agent destroy nothing: each adds a run and waits for it. None is
  * idempotent — decomposing a task twice makes two sets of cards, and refining it twice is two
- * turns of a conversation — so the default is overridden in one direction only. `accept_task`
- * and `move_card` do the same thing twice running, and neither discards anything.
+ * turns of a conversation — so the default is overridden in one direction only. `accept_task`,
+ * `move_card` and `retry_card` do the same thing twice running, and none discards anything.
  *
  * `stop_card` keeps the destructive mark. Aborting a run discards it: the run is finished as
  * `stopped` with no output, so whatever the agent had done by then is gone and cannot be
@@ -156,6 +161,7 @@ const WRITE_HINTS: Record<string, { destructiveHint?: boolean; idempotentHint?: 
   run_card: { destructiveHint: false },
   accept_task: { destructiveHint: false, idempotentHint: true },
   move_card: { destructiveHint: false, idempotentHint: true },
+  retry_card: { destructiveHint: false, idempotentHint: true },
   stop_card: { idempotentHint: true },
   stop_task: { idempotentHint: true },
 };
