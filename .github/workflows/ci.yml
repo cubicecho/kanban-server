@@ -66,10 +66,11 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # The example is the one compose file nothing else here runs: it names a
-      # published image rather than building this checkout, so a typo in it is
-      # only ever found by whoever copied it onto a server. `config` resolves
-      # the interpolation and the schema, which is what there is to get wrong.
+      # None of the three is brought up here — a postgres service is slower than
+      # what it would prove, and the example names a published image rather than
+      # building this checkout, so a typo in it is otherwise only ever found by
+      # whoever copied it onto a server. `config` resolves the interpolation and
+      # the schema, which is what there is to get wrong.
       - name: The compose files parse, the example included
         run: |
           for file in docker-compose.yml docker-compose.pg.yml docker-compose.example.yml; do
@@ -95,41 +96,3 @@ jobs:
           echo '::error::the container never answered on :8788'
           docker logs kanban-server-ci
           exit 1
-
-  # The tests run on PGlite, which is postgres but not a postgres *server*: it
-  # says nothing about the node-postgres driver, the connection URL, or a boot
-  # that has to wait for a database in another container. The compose file is
-  # how that deployment is meant to be run, so CI runs that rather than a rig
-  # of its own.
-  postgres:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: docker/setup-buildx-action@v4
-
-      # `--wait` holds until both healthchecks pass, and the server's own is a
-      # GraphQL query — so reaching the next step already means postgres
-      # answered one.
-      - name: Boot the stack
-        run: docker compose -f docker-compose.pg.yml up -d --build --wait
-
-      # A write and a read back, over the driver that only this job exercises.
-      # Creating a project seeds its four lanes in the same transaction, so the
-      # second query also proves the `onWrite` hook ran against real postgres.
-      - name: A project and its board round-trip through postgres
-        run: |
-          gql() {
-            curl -fsS -X POST localhost:8788/graphql \
-              -H 'content-type: application/json' -d "{\"query\": $1}"
-          }
-          gql '"mutation { createProject(values: { name: \"ci\" }) { id } }"'
-          gql '"{ projects { name autoRun createdAt } }"' | tee projects.json
-          gql '"{ lanes { name intake } }"' | tee lanes.json
-          grep -q '"name":"ci"' projects.json
-          grep -q '"autoRun":false' projects.json
-          grep -q '"name":"Backlog","intake":true' lanes.json
-          grep -q '"name":"Done"' lanes.json
-
-      - name: Logs, if it did not
-        if: failure()
-        run: docker compose -f docker-compose.pg.yml logs

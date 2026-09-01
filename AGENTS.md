@@ -77,6 +77,14 @@ nothing hand-writes DDL. Never edit a migration that has shipped; generate anoth
 `pg` pool or a PGlite instance, and hands out one `db` under one set of types. Nothing above
 `server/db/` should branch on it.
 
+It also creates the database when the server it reaches has not got one, so a shared postgres is
+one variable rather than a variable and a `CREATE DATABASE` run by hand. `ensureDatabase` is the
+first thing `ensureSchema` does and is a no-op on PGlite, which is how `migrate.ts` stays out of
+the branch. The trigger is a `3D000` off the pool's first query — the connection the migrations
+wanted anyway — so the happy path needs no rights on `postgres` or `template1` at all; a racing
+peer's `42P04` counts as success, and a role without `CREATEDB` gets the statement to run rather
+than a driver stack. `KANBAN_SERVER_CREATE_DATABASE=0` in `paths.ts` turns it off.
+
 It also claims the data directory, because PGlite does not: two processes on one directory both
 open it and then stop seeing each other's writes. A pid in `<store>.lock` refuses the second
 one, takes over a lock whose holder is gone, and does nothing at all for a `postgres://` URL or
@@ -225,13 +233,13 @@ query keys it affected.
 ## CI / release
 
 - `.github/workflows/ci.yml` — biome, codegen drift, typecheck, vitest, build; plus a job that
-  builds the Docker image, boots it and waits for it to answer a GraphQL query, and one that
-  brings up `docker-compose.pg.yml` and round-trips a project through a real postgres
-- **Three compose files, and only two of them are built here.** `docker-compose.yml` and
-  `docker-compose.pg.yml` build this checkout and are what CI runs; `docker-compose.example.yml`
-  names the published image and is what somebody copies onto a server, so nothing here would
-  catch a typo in it — the docker job runs `docker compose config` over all three for that
-  reason. A change to one of them is usually a change to all three
+  builds the Docker image, boots it and waits for it to answer a GraphQL query. Nothing here
+  starts a postgres server: the suites run on PGlite, and CI is kept to what is fast
+- **Three compose files, and none of them is run end to end here.** `docker-compose.yml` and
+  `docker-compose.pg.yml` build this checkout; `docker-compose.example.yml` names the published
+  image and is what somebody copies onto a server. CI runs `docker compose config` over all
+  three — the interpolation and the schema are what there is to get wrong — and boots the built
+  image on its own. A change to one of them is usually a change to all three
 - `.github/workflows/release.yml` — after CI passes on `main`, semantic-release cuts the
   release and one build pushes `latest` and the version to `ghcr.io/<owner>/<repo>` and
   `<user>/kanban-server` on Docker Hub. GHCR uses the built-in `GITHUB_TOKEN` and needs no

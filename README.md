@@ -518,8 +518,19 @@ DATABASE_URL=postgres://kanban:kanban@localhost:5432/kanban npm start
 
 That variable is the whole switch, and `server/db/client.ts` is the only place in the server that
 acts on it — everything above `server/db/` is written against one `db` and one set of tables. The
-schema is created on first boot either way, so an empty database is all a postgres server has to
-arrive with; `docker-compose.pg.yml` is the same image against a `postgres:17` service.
+schema is created on first boot either way, and so is the database it lives in: an empty *server*
+is all a postgres has to arrive with, which is what makes a shared instance one variable rather
+than a variable and a `CREATE DATABASE` somebody has to run first. `docker-compose.pg.yml` is the
+same image against a `postgres:17` service.
+
+Finding the database missing is what triggers it, so the check costs one query on the connection
+the migrations were about to open and needs no rights on the maintenance database at all; only a
+missing one goes looking for `postgres` or `template1` to create it from. A role without
+`CREATEDB` gets an error naming the statement to run by hand rather than a driver stack, and two
+servers booting at once are safe — whichever loses the race takes the other's database. Set
+`KANBAN_SERVER_CREATE_DATABASE=0` where that is the DBA's business, and a missing database is
+reported instead. Note this is the server's own boot: `npm run db:migrate` is drizzle-kit and
+still wants a database that exists.
 
 The schema comes from the migrations committed in `drizzle/`, which `server/db/migrate.ts` applies
 on boot against either database. Changing `server/db/schema.ts` means running `npm run db:generate`
