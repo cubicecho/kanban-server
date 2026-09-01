@@ -159,6 +159,19 @@ with a `HINTS` entry if the generated description does not say enough. The drive
 it filters, so the `include` list names GraphQL fields in camelCase while `HINTS` — and the
 client — sees the snake_case tool name: `Mutation.createProject` is the tool `create_project`.
 
+**Prompts are the room a `HINTS` line has not got.** `server/mcp-prompts.ts` holds four —
+`kanban_guide`, the orientation an agent should read before its first call, and three jobs of work
+(`start_project`, `submit_work`, `triage_board`) written as instructions naming the tools in the
+order they actually go. They are why `mcp-endpoint.ts` writes out `createHttpHandler`'s stateless
+path instead of calling it: nothing in graphql-mcp hands a caller the `McpServer` a request is
+served by, and a prompt must be registered on it before `connectServer`, because the SDK declares
+`capabilities.prompts` on the first registration and refuses to declare one after a transport is
+attached. `createServerFactory` and `connectServer` are used unchanged, so the shared `tools/list`
+render and the argument guard are untouched. cubicecho/graphql-mcp#20 is the ask upstream; when it
+lands this goes back to one call. A prompt taking no arguments is registered with no `argsSchema`
+rather than an empty one — a client with nothing to send omits `params.arguments`, and an empty
+object schema refuses `undefined`.
+
 **The tool listing has a size test, and it is not incidental.** The generated relation filters
 recurse between tables, and written out as JSON Schema rather than named as SDL they would make
 the listing enormous — more than a model will read, and it arrives before any call. graphql-mcp

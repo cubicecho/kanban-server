@@ -335,6 +335,26 @@ Several tools carry a `HINTS` line beyond their generated description, because a
 from a table describes itself only as "the `cards` query" and a visiting agent has no other way to
 learn that a task is not a card, or that what moves a card along is the lane it is in.
 
+Four **prompts** come with them, because a `HINTS` line is a line and the model behind this board
+wants a page. `kanban_guide` takes no arguments and is the orientation — the five nouns, why a lane
+with an agent is the only thing that makes work move, what each card status actually means, and the
+three ways work gets onto a board. The other three are jobs of work: `start_project` stands a board
+up and gets the first cards onto it, `submit_work` turns a request in somebody's own words into
+work on a board that already exists, and `triage_board` reads a board's lanes, cards and runs and
+says what is stuck and what to do about each one. A client that renders prompts as slash commands
+gets them as `/kanban_guide` and friends; one that does not can fetch them like anything else.
+
+They live in `server/mcp-prompts.ts`, and having them is why `mcp-endpoint.ts` writes out
+`createHttpHandler`'s stateless path — a dozen lines of transport wiring — rather than calling it.
+Nothing in graphql-mcp hands a caller the `McpServer` a request is served by, and a prompt has to be
+registered on that server *before* it connects: the SDK declares `capabilities.prompts` as a side
+effect of the first registration and refuses to declare a capability once a transport is attached,
+so a server that registered late would answer `prompts/list` having told the client during
+`initialize` that it had none. `createServerFactory` and `connectServer` are still the driver's own,
+and the shared `tools/list` render and the argument guard are installed by the factory rather than
+by the handler, so nothing is lost by owning those lines. cubicecho/graphql-mcp#20 asks for a hook
+that would put it back to one call.
+
 `mutationHints: "byName"` reads the conventional `create`/`update`/`delete` prefixes off the field
 name, which settles most of the destructive/idempotent marks. The ones named after neither prefix
 arrive under the conservative default — destructive, not idempotent — and are corrected by hand:

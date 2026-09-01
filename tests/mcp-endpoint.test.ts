@@ -112,6 +112,57 @@ test("offers the board tools, and only those", async () => {
   expect(names).not.toContain("delete_project_single");
 });
 
+test("offers the prompts alongside the tools, and says so on the way in", async () => {
+  // The capability is the half that is easy to lose: registering a prompt after the transport
+  // is attached would still answer `prompts/list`, while `initialize` told the client there was
+  // nothing to list — and a client that believed `initialize` never asks.
+  expect(client.getServerCapabilities()?.prompts).toBeTruthy();
+
+  const { prompts } = await client.listPrompts();
+  expect(prompts.map((prompt) => prompt.name).sort()).toEqual([
+    "kanban_guide",
+    "start_project",
+    "submit_work",
+    "triage_board",
+  ]);
+
+  // Every prompt is meant to be findable without being fetched, and the arguments have to be
+  // advertised or a client cannot fill them in.
+  for (const prompt of prompts) {
+    expect(prompt.description, prompt.name).toBeTruthy();
+    for (const argument of prompt.arguments ?? []) {
+      expect(argument.description, `${prompt.name}.${argument.name}`).toBeTruthy();
+    }
+  }
+
+  const project = prompts.find((prompt) => prompt.name === "start_project");
+  expect(
+    project?.arguments?.map((argument) => [argument.name, argument.required === true]),
+  ).toEqual([
+    ["goal", true],
+    ["name", false],
+  ]);
+});
+
+test("renders a prompt, arguments and all", async () => {
+  const guide = await client.getPrompt({ name: "kanban_guide" });
+  const [message] = guide.messages;
+  expect(message.role).toBe("user");
+  const text = message.content.type === "text" ? message.content.text : "";
+
+  // The guide exists to say the things the generated tool descriptions structurally cannot.
+  expect(text).toContain("A task is not a card");
+  expect(text).toContain("submit_task");
+  expect(text).toContain("onSuccessLaneId");
+
+  const triage = await client.getPrompt({
+    name: "triage_board",
+    arguments: { project: "the migration" },
+  });
+  const rendered = triage.messages[0].content;
+  expect(rendered.type === "text" && rendered.text).toContain("the migration");
+});
+
 test("advertises tools small enough for a client to read", async () => {
   const { tools } = await client.listTools();
 
