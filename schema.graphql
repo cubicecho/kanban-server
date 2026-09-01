@@ -4752,6 +4752,11 @@ type Mutation {
   retryCard(cardId: String!): Card!
 
   """
+  Replaces what a card waits on, and answers with it. A card with unfinished dependencies is skipped rather than run out of order, so this is how a decomposition that got the order wrong is corrected. Written as a set rather than a row at a time, because half an ordering is not an ordering. Every id has to be a card on the same board, and a cycle is refused — cards that wait on each other would never run, and nothing downstream would say why.
+  """
+  setCardDeps(cardId: String!, dependsOn: [String!]!): [String!]!
+
+  """
   Replaces the set of MCP servers an agent may reach, and answers with it. Written as a set rather than a row at a time because that is how it is decided — an agent's tools are the whole of what it can do, and half-applied is a different agent.
   """
   setAgentServers(agentId: String!, serverIds: [String!]!): [String!]!

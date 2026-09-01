@@ -28,6 +28,9 @@ query Board($projectId: String!) {
     result
     error
     updatedAt
+    deps {
+      dependsOnCardId
+    }
   }
 }
 
@@ -46,6 +49,10 @@ mutation RunCard($cardId: String!) {
     status
     error
   }
+}
+
+mutation SetCardDeps($cardId: String!, $dependsOn: [String!]!) {
+  setCardDeps(cardId: $cardId, dependsOn: $dependsOn)
 }
 
 mutation RetryCard($cardId: String!) {

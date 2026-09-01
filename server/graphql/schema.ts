@@ -1,5 +1,5 @@
 import { buildSchema, GraphQLDateTime } from "@vantreeseba/drizzle-graphql";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import {
   GraphQLBoolean,
   GraphQLError,
@@ -15,7 +15,16 @@ import {
 import { GraphQLJSON } from "graphql-scalars";
 import { errorMessage } from "../../shared/errors.ts";
 import { db } from "../db/client.ts";
-import { agentServers, agents, cards, lanes, type Project, settings, tasks } from "../db/schema.ts";
+import {
+  agentServers,
+  agents,
+  cardDeps,
+  cards,
+  lanes,
+  type Project,
+  settings,
+  tasks,
+} from "../db/schema.ts";
 import { fold, history, type RunEvent, watch } from "../runner/events.ts";
 import { listModels } from "../runner/llm.ts";
 import { type McpConnection, mcp, probe } from "../runner/mcp.ts";
@@ -150,6 +159,55 @@ async function seedLanes(tx: typeof db, rows: Project[]) {
       .set({ onSuccessLaneId: done.id, onFailureLaneId: doing.id })
       .where(eq(lanes.id, review.id));
   }
+}
+
+/**
+ * Whether making `cardId` wait on `wanted` would close a loop — and the loop, if it would.
+ *
+ * One board's graph is small enough to read whole, and reading it whole is what lets the
+ * refusal name the cards involved instead of only saying no. Edges point from a card to what
+ * it waits on, so a path from the card back to itself is exactly a cycle; the card's own
+ * existing edges are left out, because `wanted` is about to replace them.
+ */
+async function wouldCycle(
+  cardId: string,
+  wanted: string[],
+  projectId: string,
+): Promise<string[] | null> {
+  const rows = await db
+    .select({ id: cards.id, title: cards.title })
+    .from(cards)
+    .where(eq(cards.projectId, projectId));
+  const titles = new Map(rows.map((row) => [row.id, row.title]));
+
+  const edges = new Map<string, string[]>([[cardId, wanted]]);
+  const links = await db
+    .select({ cardId: cardDeps.cardId, dependsOnCardId: cardDeps.dependsOnCardId })
+    .from(cardDeps)
+    .where(inArray(cardDeps.cardId, [...titles.keys()]));
+  for (const link of links) {
+    if (link.cardId === cardId) continue;
+    edges.set(link.cardId, [...(edges.get(link.cardId) ?? []), link.dependsOnCardId]);
+  }
+
+  const path: string[] = [];
+  const seen = new Set<string>();
+  const walk = (from: string): boolean => {
+    path.push(from);
+    for (const next of edges.get(from) ?? []) {
+      if (next === cardId) {
+        path.push(next);
+        return true;
+      }
+      if (seen.has(next)) continue;
+      seen.add(next);
+      if (walk(next)) return true;
+    }
+    path.pop();
+    return false;
+  };
+
+  return walk(cardId) ? path.map((id) => titles.get(id) ?? id) : null;
 }
 
 /**
@@ -522,6 +580,71 @@ export const schema = new GraphQLSchema({
             });
           }
           return card;
+        },
+      },
+      setCardDeps: {
+        type: new GraphQLNonNull(new GraphQLList(new GraphQLNonNull(GraphQLString))),
+        description:
+          "Replaces what a card waits on, and answers with it. A card with unfinished " +
+          "dependencies is skipped rather than run out of order, so this is how a " +
+          "decomposition that got the order wrong is corrected. Written as a set rather than " +
+          "a row at a time, because half an ordering is not an ordering. Every id has to be a " +
+          "card on the same board, and a cycle is refused — cards that wait on each other " +
+          "would never run, and nothing downstream would say why.",
+        args: {
+          cardId: { type: new GraphQLNonNull(GraphQLString) },
+          dependsOn: {
+            type: new GraphQLNonNull(new GraphQLList(new GraphQLNonNull(GraphQLString))),
+          },
+        },
+        resolve: async (_source, args: { cardId: string; dependsOn: string[] }) => {
+          const wanted = [...new Set(args.dependsOn)];
+          const [card] = await db.select().from(cards).where(eq(cards.id, args.cardId)).limit(1);
+          if (!card) {
+            throw new GraphQLError(`There is no card with id ${args.cardId}.`, {
+              extensions: { code: "NOT_FOUND" },
+            });
+          }
+          if (wanted.includes(card.id)) {
+            throw new GraphQLError("A card cannot wait on itself.", {
+              extensions: { code: "CYCLE" },
+            });
+          }
+
+          // Same board, and all of them: a dependency on a card from another project is a
+          // wait that nothing on this board will ever satisfy.
+          const found = wanted.length
+            ? await db
+                .select({ id: cards.id })
+                .from(cards)
+                .where(and(inArray(cards.id, wanted), eq(cards.projectId, card.projectId)))
+            : [];
+          const here = new Set(found.map((row) => row.id));
+          const strangers = wanted.filter((id) => !here.has(id));
+          if (strangers.length) {
+            throw new GraphQLError(
+              `Not cards on this board: ${strangers.join(", ")}. A card can only wait on one beside it.`,
+              { extensions: { code: "BAD_CARD" } },
+            );
+          }
+
+          const cycle = await wouldCycle(card.id, wanted, card.projectId);
+          if (cycle) {
+            throw new GraphQLError(
+              `That would make a cycle: ${cycle.join(" → ")}. Cards that wait on each other never run.`,
+              { extensions: { code: "CYCLE" } },
+            );
+          }
+
+          await db.transaction(async (tx) => {
+            await tx.delete(cardDeps).where(eq(cardDeps.cardId, card.id));
+            if (wanted.length) {
+              await tx
+                .insert(cardDeps)
+                .values(wanted.map((dependsOnCardId) => ({ cardId: card.id, dependsOnCardId })));
+            }
+          });
+          return wanted;
         },
       },
       setAgentServers: {

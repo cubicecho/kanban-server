@@ -247,18 +247,20 @@ somewhere work is handed off. In dev it is on the server's own port (`:8788`); v
 claude mcp add --transport http kanban http://localhost:8788/mcp
 ```
 
-Twenty-three tools, chosen in `server/mcp-endpoint.ts` rather than projected from the whole schema:
+Twenty-four tools, chosen in `server/mcp-endpoint.ts` rather than projected from the whole schema:
 
 - **read** — `projects`, `lanes`, `cards`, `tasks`, `runs`, `agents`, `run_events`
 - **projects** — `create_project`, `update_project_single`
 - **tasks** — `submit_task`, `create_task`, `refine_task`, `accept_task`, `decompose_task`,
   `delete_task_single`
-- **cards** — `create_card`, `update_card_single`, `delete_card_single`, `move_card`,
-  `retry_card`, `run_card`, `stop_card`, `stop_task`
+- **cards** — `create_card`, `update_card_single`, `delete_card_single`, `set_card_deps`,
+  `move_card`, `retry_card`, `run_card`, `stop_card`, `stop_task`
 
 `submit_task` is the one to reach for: describe what you want and it is written down, broken into
 cards, and put on the board in a single call. `create_card` is the other way round — one piece of
 work you already know the shape of, put straight into a lane you name, with no task behind it.
+`set_card_deps` writes the whole waiting list for a card at once, and refuses a list that would
+close a loop — naming the cards in it, since cards that wait on each other never run.
 
 Tool names are snake_case while the GraphQL fields they come from are camelCase: an MCP client
 reads a tool name as a name, and snake_case is the convention it meets everywhere else. The

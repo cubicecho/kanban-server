@@ -123,6 +123,7 @@ export function BoardRoute() {
 
   const lanes = board.data?.lanes ?? [];
   const cards = board.data?.cards ?? [];
+  const title = (cardId: string) => cards.find((card) => card.id === cardId)?.title ?? "";
 
   if (!projectId) {
     return (
@@ -217,6 +218,18 @@ export function BoardRoute() {
                       <p className="line-clamp-3 text-xs text-muted-foreground">{card.body}</p>
                     ) : null}
 
+                    {/* An ordering is only useful if it is visible before it bites: a card
+                        shows what it waits on whether or not it has been asked to run yet. */}
+                    {card.deps.length ? (
+                      <p className="text-xs text-muted-foreground">
+                        After{" "}
+                        {card.deps
+                          .map((dep) => title(dep.dependsOnCardId))
+                          .filter(Boolean)
+                          .join(", ")}
+                      </p>
+                    ) : null}
+
                     <div className="flex items-center gap-1">
                       <Button
                         variant="ghost"
@@ -308,6 +321,7 @@ export function BoardRoute() {
       {editingCard ? (
         <CardDialog
           card={editingCard.card}
+          cards={cards}
           projectId={projectId}
           laneId={editingCard.laneId}
           onClose={() => setEditingCard(null)}

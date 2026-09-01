@@ -40,6 +40,7 @@ const TOOLS = [
   "Mutation.createCard",
   "Mutation.updateCardSingle",
   "Mutation.deleteCardSingle",
+  "Mutation.setCardDeps",
   "Mutation.moveCard",
   "Mutation.retryCard",
   "Mutation.runCard",
@@ -127,6 +128,12 @@ const HINTS: Record<string, string> = {
     "order it does not look like.",
   delete_card_single:
     "Deletes one card. Refused while an agent is working it: stop it first with `stop_card`.",
+  set_card_deps:
+    "Replaces what a card waits on, as a whole set — the ids of other cards on the same board " +
+    "that must finish first. A card with an unfinished dependency is skipped rather than run " +
+    "out of order, so this is what puts a decomposition back in the right order. Pass an " +
+    "empty list to say a card waits on nothing. A cycle is refused, and the refusal names the " +
+    "cards in it.",
   move_card:
     "Puts a card in a lane, at a position. This is how work is redirected by hand — and how a " +
     "failed card is retried, since a moved card comes back to `idle` and a lane with an agent " +
@@ -172,6 +179,10 @@ const WRITE_HINTS: Record<string, { destructiveHint?: boolean; idempotentHint?: 
   accept_task: { destructiveHint: false, idempotentHint: true },
   move_card: { destructiveHint: false, idempotentHint: true },
   retry_card: { destructiveHint: false, idempotentHint: true },
+  // A set, not an append: writing the same one twice leaves the same ordering. It does replace
+  // what was there, which is the destructive half, and the convention cannot read that off a
+  // name that starts with `set`.
+  set_card_deps: { destructiveHint: true, idempotentHint: true },
   stop_card: { idempotentHint: true },
   stop_task: { idempotentHint: true },
 };
