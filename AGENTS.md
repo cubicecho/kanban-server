@@ -158,6 +158,11 @@ API. `server/runner/llm.ts` is the only place that resolution happens.
 minute after the run ends, folded so consecutive output tokens arrive as one entry. Anything
 worth keeping goes in the run row.
 
+**A run is watched by its id, and nothing on a page holds one.** A card, a task and the button
+that started them all know the subject, not the run; `ActiveRuns` — `runs` filtered to
+`status: running` for the project — is the join, and `RunStream` takes it from there. The board
+and the refinement chat both go through it, so a run is watchable where it is happening.
+
 **Frontend:** shadcn primitives in `src/components/ui/` with no app logic; routes in
 `src/routes/`; `@/` maps to `src/`. Every query goes through `request()` in `src/lib/gql.ts`
 with a typed document — no raw `fetch` in a component — and every mutation invalidates the
