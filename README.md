@@ -187,9 +187,14 @@ and the turn boundaries of the agent loop.
 
 Those events go to an in-memory bus (`server/runner/events.ts`) and out over a GraphQL
 subscription, `runEvents(runId:)`, which yoga serves as SSE — the browser reads it with its own
-`EventSource`, so the client needs no library for it. Expand a running run on the **Runs** page to
-watch. A watcher that joins halfway through is replayed the run so far, so opening it late reads
-the same as having watched from the start.
+`EventSource`, so the client needs no library for it. A watcher that joins halfway through is
+replayed the run so far, so opening it late reads the same as having watched from the start.
+
+Three places show it, all the same stream: expand a run on the **Runs** page, press the aerial
+button on a running card to watch it without leaving the board, and the refinement chat writes
+the agent's answer as it arrives rather than sitting on "Thinking…" until the turn is over. A
+card and a task each know they are being worked but not by which run, so the pages ask
+`runs(where: { status: { eq: running } })` for the name of the run to watch.
 
 It is debugging output, not the record: nothing is persisted, nothing survives a restart, and a
 finished run is forgotten a minute later. The row remains the lasting account of what happened.

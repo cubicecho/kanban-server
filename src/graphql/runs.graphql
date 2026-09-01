@@ -27,6 +27,22 @@ query Runs($projectId: String) {
   }
 }
 
+# Who is working right now, so a page can put a name to the run it wants to watch: a card on
+# the board, or the task being talked over on the home page. Both hold an id for the subject,
+# neither holds one for the run.
+query ActiveRuns($projectId: String!) {
+  runs(
+    limit: 50
+    where: { projectId: { eq: $projectId }, status: { eq: running } }
+    orderBy: { startedAt: { direction: desc, priority: 1 } }
+  ) {
+    id
+    kind
+    cardId
+    taskId
+  }
+}
+
 mutation DeleteRun($id: String!) {
   deleteRunSingle(where: { id: { eq: $id } }) {
     id

@@ -5,6 +5,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Page } from "@/components/app-shell";
 import { ProjectDialog } from "@/components/project-dialog";
+import { RunStream } from "@/components/run-stream";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -14,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import {
   AcceptTaskDocument,
+  ActiveRunsDocument,
   CreateTaskDocument,
   DecomposeTaskDocument,
   ProjectsDocument,
@@ -164,6 +166,19 @@ function TaskComposer({ project }: { project: Project }) {
   });
 
   const working = say.isPending || decompose.isPending || submit.isPending;
+  const talking = say.isPending || decompose.isPending;
+
+  // A refining model that takes twenty seconds to answer should not spend them saying nothing.
+  // The mutation only resolves at the end of the turn, so the run is found by the task it is
+  // about — the one id this page has while the turn is still going.
+  const watched = draftId ?? draft?.id;
+  const active = useQuery({
+    queryKey: ["active-runs", project.id],
+    queryFn: () => request(ActiveRunsDocument, { projectId: project.id }),
+    enabled: talking && Boolean(watched),
+    refetchInterval: 1000,
+  });
+  const liveRunId = active.data?.runs.find((run) => run.taskId === watched)?.id;
 
   return (
     <Tabs defaultValue="refine">
@@ -193,7 +208,15 @@ function TaskComposer({ project }: { project: Project }) {
               keep a brief of what you have settled on.
             </p>
           )}
-          {say.isPending ? <p className="text-sm text-muted-foreground">Thinking…</p> : null}
+          {/* Until the run is found — and if the stream cannot be opened at all — this is the
+              old blocking path: the answer still arrives when the mutation resolves. */}
+          {talking ? (
+            liveRunId ? (
+              <RunStream runId={liveRunId} />
+            ) : (
+              <p className="text-sm text-muted-foreground">Thinking…</p>
+            )
+          ) : null}
         </Card>
 
         <form

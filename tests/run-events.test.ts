@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { type ExecutionResult, parse, subscribe } from "graphql";
+import { type ExecutionResult, graphql, parse, subscribe } from "graphql";
 import { afterAll, beforeAll, beforeEach, expect, test } from "vitest";
 
 // Importing the schema builds it against the live tables, so give the database a home first.
@@ -10,12 +10,16 @@ process.env.KANBAN_SERVER_DATA_DIR = dir;
 
 let events: typeof import("../server/runner/events.ts");
 let schema: import("graphql").GraphQLSchema;
+let db: typeof import("../server/db/client.ts").db;
+let tables: typeof import("../server/db/schema.ts");
 
 beforeAll(async () => {
   const { ensureSchema } = await import("../server/db/migrate.ts");
   await ensureSchema();
   events = await import("../server/runner/events.ts");
   schema = (await import("../server/graphql/schema.ts")).schema;
+  db = (await import("../server/db/client.ts")).db;
+  tables = await import("../server/db/schema.ts");
 });
 
 beforeEach(() => events.reset());
@@ -105,4 +109,47 @@ test("consecutive tokens fold into one entry, and nothing else does", () => {
   // Each block carries the seq of its last event, so a client that asks for what came after
   // one block picks up exactly where it left off.
   expect(folded.map((event) => event.seq)).toEqual([2, 3, 5]);
+});
+
+test("a page can find the run working a card, which is the only name the stream has", async () => {
+  const [project] = await db.insert(tables.projects).values({ name: "watch" }).returning();
+  const [lane] = await db
+    .insert(tables.lanes)
+    .values({ projectId: project.id, name: "Doing" })
+    .returning();
+  const [card] = await db
+    .insert(tables.cards)
+    .values({
+      projectId: project.id,
+      laneId: lane.id,
+      title: "the one in flight",
+      status: "running",
+    })
+    .returning();
+  const [running] = await db
+    .insert(tables.runs)
+    .values({ projectId: project.id, cardId: card.id, kind: "card", status: "running" })
+    .returning();
+  // A finished run of the same card is not what anyone wants to watch.
+  await db
+    .insert(tables.runs)
+    .values({ projectId: project.id, cardId: card.id, kind: "card", status: "ok" });
+
+  // The query the board and the refinement chat both send: a card or a task knows it is being
+  // worked, but only this says by which run.
+  const result = await graphql({
+    schema,
+    source: `query {
+      runs(
+        limit: 50
+        where: { projectId: { eq: "${project.id}" }, status: { eq: running } }
+        orderBy: { startedAt: { direction: desc, priority: 1 } }
+      ) { id kind cardId taskId }
+    }`,
+  });
+
+  expect(result.errors).toBeUndefined();
+  expect(result.data?.runs).toEqual([
+    { id: running.id, kind: "card", cardId: card.id, taskId: null },
+  ]);
 });

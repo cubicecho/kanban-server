@@ -5,6 +5,7 @@ import {
   Pencil,
   Play,
   Plus,
+  Radio,
   RotateCcw,
   Settings2,
   Square,
@@ -15,10 +16,12 @@ import { toast } from "sonner";
 import { Page } from "@/components/app-shell";
 import { CardDialog } from "@/components/card-dialog";
 import { LaneDialog } from "@/components/lane-dialog";
+import { RunStream } from "@/components/run-stream";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
+  ActiveRunsDocument,
   AgentsDocument,
   BoardDocument,
   type BoardQuery,
@@ -57,6 +60,7 @@ export function BoardRoute() {
   const queryClient = useQueryClient();
   const [editingCard, setEditingCard] = useState<{ card?: BoardCard; laneId: string } | null>(null);
   const [editingLane, setEditingLane] = useState<{ lane?: Lane } | null>(null);
+  const [watching, setWatching] = useState<string | null>(null);
 
   const projects = useQuery({ queryKey: ["projects"], queryFn: () => request(ProjectsDocument) });
   const project = projects.data?.projects.find((row) => row.id === projectId);
@@ -68,11 +72,25 @@ export function BoardRoute() {
     // A card an agent is working changes without anyone here doing anything.
     refetchInterval: 3000,
   });
+  // A card knows it is running; it does not know which run is running it, and the stream is
+  // named by the run. This is the join, and it is only worth asking for while something is up.
+  const active = useQuery({
+    queryKey: ["active-runs", projectId],
+    queryFn: () => request(ActiveRunsDocument, { projectId }),
+    enabled: Boolean(projectId),
+    refetchInterval: () =>
+      board.data?.cards.some((card) => card.status === "running") ? 3000 : false,
+  });
+  const runFor = (cardId: string) => active.data?.runs.find((run) => run.cardId === cardId)?.id;
+
   const agents = useQuery({ queryKey: ["agents"], queryFn: () => request(AgentsDocument) });
   const agentName = (id?: string | null) =>
     agents.data?.agents.find((agent) => agent.id === id)?.name;
 
-  const refresh = () => queryClient.invalidateQueries({ queryKey: ["board", projectId] });
+  const refresh = () => {
+    queryClient.invalidateQueries({ queryKey: ["board", projectId] });
+    queryClient.invalidateQueries({ queryKey: ["active-runs", projectId] });
+  };
   const onError = (error: Error) => toast.error(error.message);
 
   const move = useMutation({
@@ -266,6 +284,16 @@ export function BoardRoute() {
                         <Button
                           variant="ghost"
                           size="icon"
+                          title={watching === card.id ? "Hide the run" : "Watch this run"}
+                          onClick={() => setWatching(watching === card.id ? null : card.id)}
+                        >
+                          <Radio className="size-4" />
+                        </Button>
+                      ) : null}
+                      {card.status === "running" ? (
+                        <Button
+                          variant="ghost"
+                          size="icon"
                           title="Stop the agent"
                           onClick={() => stop.mutate(card.id)}
                         >
@@ -304,6 +332,18 @@ export function BoardRoute() {
                         <Trash2 className="size-4" />
                       </Button>
                     </div>
+
+                    {/* The middle of the run, where the run is: what the agent is thinking and
+                        which tools it is reaching for, without leaving the board for the Runs
+                        page. The stream replays from the start, so opening it late costs
+                        nothing. */}
+                    {watching === card.id ? (
+                      runFor(card.id) ? (
+                        <RunStream runId={runFor(card.id) ?? ""} />
+                      ) : (
+                        <p className="text-xs text-muted-foreground">Looking for the run…</p>
+                      )
+                    ) : null}
                   </Card>
                 ))}
               </div>
