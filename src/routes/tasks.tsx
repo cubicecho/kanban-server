@@ -3,6 +3,7 @@ import { Sparkles, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Page } from "@/components/app-shell";
+import { Spend } from "@/components/spend";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -43,6 +44,7 @@ export function TasksRoute() {
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ["tasks", projectId] });
     queryClient.invalidateQueries({ queryKey: ["board", projectId] });
+    queryClient.invalidateQueries({ queryKey: ["spend"] });
   };
   const onError = (error: Error) => toast.error(error.message);
 
@@ -127,6 +129,9 @@ export function TasksRoute() {
                 <pre className="overflow-x-auto text-sm whitespace-pre-wrap">
                   {task.brief || "(no brief)"}
                 </pre>
+                {/* Beside the cards, because the cards are where the tokens went: a task's
+                    total is its refinement, its decomposition and every run of every card. */}
+                <Spend projectId={projectId} taskId={task.id} days={0} />
                 {task.cards.length ? (
                   <ul className="flex flex-col gap-1">
                     {task.cards.map((card) => (

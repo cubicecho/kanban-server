@@ -90,6 +90,7 @@ test("offers the board tools, and only those", async () => {
     "run_events",
     "runs",
     "set_card_deps",
+    "spend",
     "stop_card",
     "stop_task",
     "submit_task",
@@ -310,6 +311,7 @@ test("marks only the tools that actually destroy something", async () => {
     "projects",
     "run_events",
     "runs",
+    "spend",
     "tasks",
   ]);
 });
@@ -325,4 +327,6 @@ test("says what a card is, for a client that has only ever seen a task", async (
   expect(described("submit_task")).toMatch(/brief/i);
   // A client that has only ever made tasks needs telling that this one lands nowhere by itself.
   expect(described("create_card")).toMatch(/laneId/);
+  // A total is only as old as the runs behind it, and retention deletes runs.
+  expect(described("spend")).toMatch(/oldest run/i);
 });

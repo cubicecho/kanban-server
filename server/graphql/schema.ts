@@ -1,5 +1,5 @@
 import { buildSchema, GraphQLDateTime } from "@vantreeseba/drizzle-graphql";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, or, sql } from "drizzle-orm";
 import {
   GraphQLBoolean,
   GraphQLError,
@@ -22,11 +22,12 @@ import {
   cards,
   lanes,
   type Project,
+  runs,
   settings,
   tasks,
 } from "../db/schema.ts";
 import { fold, history, type RunEvent, watch } from "../runner/events.ts";
-import { listModels } from "../runner/llm.ts";
+import { listModels, loadSettings } from "../runner/llm.ts";
 import { type McpConnection, mcp, probe } from "../runner/mcp.ts";
 import {
   decomposeTask,
@@ -309,6 +310,84 @@ const RunEventType = new GraphQLObjectType({
   },
 });
 
+const SpendType = new GraphQLObjectType({
+  name: "Spend",
+  description:
+    "What has been spent on a project, or on one task in it, added up from the run rows " +
+    "themselves rather than from a counter — a counter would keep climbing after retention " +
+    "deleted the runs behind it.",
+  fields: {
+    runs: {
+      type: new GraphQLNonNull(GraphQLInt),
+      description: "How many runs went into this total.",
+    },
+    promptTokens: { type: new GraphQLNonNull(GraphQLInt) },
+    completionTokens: { type: new GraphQLNonNull(GraphQLInt) },
+    totalTokens: { type: new GraphQLNonNull(GraphQLInt) },
+    days: {
+      type: new GraphQLNonNull(GraphQLInt),
+      description: "The window that was asked for. Zero means every run still kept.",
+    },
+    from: {
+      type: GraphQLDateTime,
+      description:
+        "The oldest run in the total. This, not `days`, is what the number actually covers: " +
+        "if retention has swept older runs away, it is later than the window asked for. Null " +
+        "when nothing was counted.",
+    },
+    retentionDays: {
+      type: new GraphQLNonNull(GraphQLInt),
+      description:
+        "How long runs are kept, from settings. Zero means forever, and then the total is " +
+        "the whole history.",
+    },
+  },
+});
+
+/**
+ * Adds up the tokens on the runs that match, in one query.
+ *
+ * Read rather than remembered, because `runRetentionDays` deletes runs: a stored counter would
+ * go on reporting money spent on runs nobody can look at any more, and a total that cannot be
+ * checked against the rows behind it is worse than no total. `from` is what makes it honest —
+ * it says how far back the rows actually go.
+ */
+async function spendOver(projectId: string, taskId: string | null | undefined, days: number) {
+  const since = days > 0 ? new Date(Date.now() - days * 24 * 60 * 60 * 1000) : null;
+
+  // A task's spend is its own runs — the refinement, the decomposition — plus every run of
+  // every card it was broken into. The cards are what the money actually went on.
+  const cardIds = taskId
+    ? (await db.select({ id: cards.id }).from(cards).where(eq(cards.taskId, taskId))).map(
+        (row) => row.id,
+      )
+    : [];
+  const scope = taskId
+    ? or(eq(runs.taskId, taskId), cardIds.length ? inArray(runs.cardId, cardIds) : undefined)
+    : undefined;
+
+  const [totals] = await db
+    .select({
+      runs: sql<number>`count(*)::int`,
+      promptTokens: sql<number>`coalesce(sum(${runs.promptTokens}), 0)::int`,
+      completionTokens: sql<number>`coalesce(sum(${runs.completionTokens}), 0)::int`,
+      totalTokens: sql<number>`coalesce(sum(${runs.totalTokens}), 0)::int`,
+      from: sql<Date | null>`min(${runs.startedAt})`,
+    })
+    .from(runs)
+    .where(
+      and(eq(runs.projectId, projectId), since ? gte(runs.startedAt, since) : undefined, scope),
+    );
+
+  const { runRetentionDays } = await loadSettings();
+  return {
+    ...totals,
+    from: totals.from ? new Date(totals.from) : null,
+    days,
+    retentionDays: runRetentionDays,
+  };
+}
+
 const taskOrThrow = async (taskId: string) => {
   const [task] = await db.select().from(tasks).where(eq(tasks.id, taskId)).limit(1);
   if (!task) {
@@ -368,6 +447,29 @@ export const schema = new GraphQLSchema({
             0,
             args.limit ?? 200,
           ),
+      },
+      spend: {
+        type: new GraphQLNonNull(SpendType),
+        description:
+          "What a project has cost in tokens, over a window, added up from its runs. With a " +
+          "`taskId` it is that one task instead: its refinement, its decomposition, and every " +
+          "run of every card it turned into. Read `from` before quoting the number — it says " +
+          "how far back the runs behind it actually go.",
+        args: {
+          projectId: { type: new GraphQLNonNull(GraphQLString) },
+          taskId: {
+            type: GraphQLString,
+            description: "Narrows the total to one task of that project. Omit for the whole board.",
+          },
+          days: {
+            type: GraphQLInt,
+            description: "How far back to count. Default 30. Zero counts every run still kept.",
+          },
+        },
+        resolve: (
+          _source,
+          args: { projectId: string; taskId?: string | null; days?: number | null },
+        ) => spendOver(args.projectId, args.taskId, Math.max(0, args.days ?? 30)),
       },
     },
   }),

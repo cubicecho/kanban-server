@@ -17,6 +17,7 @@ import { Page } from "@/components/app-shell";
 import { CardDialog } from "@/components/card-dialog";
 import { LaneDialog } from "@/components/lane-dialog";
 import { RunStream } from "@/components/run-stream";
+import { Spend } from "@/components/spend";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -90,6 +91,7 @@ export function BoardRoute() {
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ["board", projectId] });
     queryClient.invalidateQueries({ queryKey: ["active-runs", projectId] });
+    queryClient.invalidateQueries({ queryKey: ["spend"] });
   };
   const onError = (error: Error) => toast.error(error.message);
 
@@ -161,10 +163,15 @@ export function BoardRoute() {
       }
       wide
       actions={
-        <Button variant="outline" onClick={() => setEditingLane({})}>
-          <Plus className="size-4" />
-          Lane
-        </Button>
+        <div className="flex items-center gap-3">
+          {/* Beside the project's own controls, because turning `autoRun` on is the decision
+              this number is about. */}
+          <Spend projectId={projectId} />
+          <Button variant="outline" onClick={() => setEditingLane({})}>
+            <Plus className="size-4" />
+            Lane
+          </Button>
+        </div>
       }
     >
       <div className="flex gap-4 overflow-x-auto pb-4">

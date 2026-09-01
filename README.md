@@ -199,6 +199,18 @@ card and a task each know they are being worked but not by which run, so the pag
 It is debugging output, not the record: nothing is persisted, nothing survives a restart, and a
 finished run is forgotten a minute later. The row remains the lasting account of what happened.
 
+## What it has cost
+
+`spend(projectId:)` adds up the tokens on a project's runs — `spend(taskId:)` narrows it to one
+task, which is its refinement, its decomposition and every run of every card it became. It shows
+on the board beside the lane button, and on a task beside its cards.
+
+The total is read from the run rows every time it is asked for rather than kept in a counter,
+because `runRetentionDays` deletes runs: a counter would go on reporting money spent on runs
+nobody can look at any more. That is also why the label says `from` — the oldest run in the
+total — instead of the window that was asked for. Thirty days of runs on a board that keeps
+seven is seven days of tokens, and it says so.
+
 ## Layout
 
 ```
@@ -252,9 +264,9 @@ somewhere work is handed off. In dev it is on the server's own port (`:8788`); v
 claude mcp add --transport http kanban http://localhost:8788/mcp
 ```
 
-Twenty-four tools, chosen in `server/mcp-endpoint.ts` rather than projected from the whole schema:
+Twenty-five tools, chosen in `server/mcp-endpoint.ts` rather than projected from the whole schema:
 
-- **read** — `projects`, `lanes`, `cards`, `tasks`, `runs`, `agents`, `run_events`
+- **read** — `projects`, `lanes`, `cards`, `tasks`, `runs`, `agents`, `run_events`, `spend`
 - **projects** — `create_project`, `update_project_single`
 - **tasks** — `submit_task`, `create_task`, `refine_task`, `accept_task`, `decompose_task`,
   `delete_task_single`

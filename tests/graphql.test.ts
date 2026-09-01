@@ -10,11 +10,15 @@ const dir = fs.mkdtempSync(path.join(os.tmpdir(), "kanban-server-test-"));
 process.env.KANBAN_SERVER_DATA_DIR = dir;
 
 let schema: GraphQLSchema;
+let db: typeof import("../server/db/client.ts").db;
+let tables: typeof import("../server/db/schema.ts");
 
 beforeAll(async () => {
   const { ensureSchema } = await import("../server/db/migrate.ts");
   await ensureSchema();
   schema = (await import("../server/graphql/schema.ts")).schema;
+  db = (await import("../server/db/client.ts")).db;
+  tables = await import("../server/db/schema.ts");
 });
 
 afterAll(() => fs.rmSync(dir, { recursive: true, force: true }));
@@ -257,4 +261,91 @@ test("submitting a task with no decomposer says so rather than leaving a task in
   // Kept, not thrown away: the task is there to retry once an agent exists, and it says why.
   expect(submitTask.status).toBe("error");
   expect(submitTask.error).toMatch(/decompose/i);
+});
+
+test("spend adds up the runs behind it, and says how far back they go", async () => {
+  const project = await newProject("what it cost");
+  const { lanes } = await run(
+    `query Lanes($projectId: String!) { lanes(where: { projectId: { eq: $projectId } }) { id } }`,
+    { projectId: project.id },
+  );
+  const laneId = lanes[0].id as string;
+
+  const [task] = await db
+    .insert(tables.tasks)
+    .values({ projectId: project.id, title: "the expensive one", brief: "..." })
+    .returning();
+  const [card] = await db
+    .insert(tables.cards)
+    .values({ projectId: project.id, laneId, taskId: task.id, title: "its card" })
+    .returning();
+  const [other] = await db
+    .insert(tables.cards)
+    .values({ projectId: project.id, laneId, title: "somebody else's card" })
+    .returning();
+
+  const day = 24 * 60 * 60 * 1000;
+  const tokens = (n: number) => ({
+    promptTokens: n,
+    completionTokens: n,
+    totalTokens: n * 2,
+    status: "ok" as const,
+  });
+  await db.insert(tables.runs).values([
+    // The task's own refinement, and a run of the card it was broken into: both are its cost.
+    { projectId: project.id, taskId: task.id, kind: "refine", ...tokens(10) },
+    { projectId: project.id, cardId: card.id, kind: "card", ...tokens(100) },
+    // Another card's run: the project paid for it, the task did not.
+    { projectId: project.id, cardId: other.id, kind: "card", ...tokens(1000) },
+    // Older than the window asked for, and so outside every total below.
+    {
+      projectId: project.id,
+      cardId: other.id,
+      kind: "card",
+      startedAt: new Date(Date.now() - 40 * day),
+      ...tokens(9999),
+    },
+  ]);
+
+  const { spend } = await run(
+    `query Spend($projectId: String!) {
+       spend(projectId: $projectId, days: 30) { runs promptTokens totalTokens days retentionDays from }
+     }`,
+    { projectId: project.id },
+  );
+  expect(spend).toMatchObject({
+    runs: 3,
+    promptTokens: 1110,
+    totalTokens: 2220,
+    days: 30,
+    // Nothing is swept by default, so the window is the whole truth.
+    retentionDays: 0,
+  });
+  // The oldest run counted, which is what the number actually covers — not the window asked for.
+  expect(new Date(spend.from).getTime()).toBeGreaterThan(Date.now() - day);
+
+  const { spend: forTask } = await run(
+    `query Spend($projectId: String!, $taskId: String!) {
+       spend(projectId: $projectId, taskId: $taskId, days: 30) { runs totalTokens }
+     }`,
+    { projectId: project.id, taskId: task.id },
+  );
+  expect(forTask).toEqual({ runs: 2, totalTokens: 220 });
+
+  // Zero days is everything still kept, which is the run the window left out.
+  const { spend: everything } = await run(
+    `query Spend($projectId: String!) {
+       spend(projectId: $projectId, days: 0) { runs totalTokens }
+     }`,
+    { projectId: project.id },
+  );
+  expect(everything).toEqual({ runs: 4, totalTokens: 22218 });
+
+  // A project nobody has run anything on says so rather than dividing by nothing.
+  const empty = await newProject("untouched");
+  const { spend: nothing } = await run(
+    `query Spend($projectId: String!) { spend(projectId: $projectId) { runs totalTokens from } }`,
+    { projectId: empty.id },
+  );
+  expect(nothing).toEqual({ runs: 0, totalTokens: 0, from: null });
 });

@@ -29,6 +29,7 @@ const TOOLS = [
   "Query.runs",
   "Query.runEvents",
   "Query.agents",
+  "Query.spend",
   "Mutation.createProject",
   "Mutation.updateProjectSingle",
   "Mutation.submitTask",
@@ -83,6 +84,11 @@ const HINTS: Record<string, string> = {
     "Who does the work: which model on which endpoint, and what for. `role` is `refine`, " +
     "`decompose`, `review` or `execute`. Read-only here — an agent's endpoint and key are the " +
     "operator's to set.",
+  spend:
+    "What a board has cost in tokens, added up from its runs. With a `taskId` it is one task " +
+    "instead — its refinement, its decomposition and every run of every card it became. `from` " +
+    "is the oldest run counted: quote that rather than `days`, because runs older than the " +
+    "retention setting are gone and cannot be in the total.",
   create_project:
     "Adds a board. It comes with four lanes — Backlog, Doing, Review, Done — already wired to " +
     "this server's execute and review agents, so it is ready for work as soon as it exists. " +
