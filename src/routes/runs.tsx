@@ -1,8 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { RefreshCw, Square, Trash2 } from "lucide-react";
+import { ChevronRight, History, RefreshCw, Square, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { Page } from "@/components/app-shell";
+import { ActionButton } from "@/components/action-button";
+import { Page, useCurrentProject } from "@/components/app-shell";
+import { ConfirmButton } from "@/components/confirm-button";
+import { EmptyState, NoProject } from "@/components/empty-state";
+import { QueryError } from "@/components/query-error";
+import { RowSkeleton } from "@/components/row-skeleton";
 import { RunStream } from "@/components/run-stream";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,6 +22,7 @@ import {
 import { request } from "@/lib/gql";
 import { useProjectId } from "@/lib/project";
 import { duration, RUN_STATUS_VARIANT } from "@/lib/runs";
+import { cn } from "@/lib/utils";
 
 type Run = RunsQuery["runs"][number];
 
@@ -52,6 +58,7 @@ function ToolChips({ calls }: { calls: unknown }) {
  */
 export function RunsRoute() {
   const projectId = useProjectId();
+  const project = useCurrentProject();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState<string | null>(null);
 
@@ -92,8 +99,8 @@ export function RunsRoute() {
 
   if (!projectId) {
     return (
-      <Page title="Runs" description="Pick a project first.">
-        <p className="text-sm text-muted-foreground">No project selected.</p>
+      <Page title="Runs">
+        <NoProject what="A run" />
       </Page>
     );
   }
@@ -101,6 +108,7 @@ export function RunsRoute() {
   return (
     <Page
       title="Runs"
+      crumb={project?.name}
       description="Every execution, newest first."
       actions={
         <Button variant="outline" onClick={refresh}>
@@ -109,8 +117,16 @@ export function RunsRoute() {
         </Button>
       }
     >
+      {runs.isError ? (
+        <QueryError error={runs.error} onRetry={() => runs.refetch()} what="these runs" />
+      ) : null}
+      {runs.isPending ? <RowSkeleton rows={3} /> : null}
       {runs.data?.runs.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Nothing has run yet.</p>
+        <EmptyState
+          icon={History}
+          title="Nothing has run yet"
+          description="Every time an agent is asked to do anything — refine a task, or work a card — it shows up here."
+        />
       ) : null}
 
       {runs.data?.runs.map((run) => {
@@ -121,47 +137,60 @@ export function RunsRoute() {
             <div className="flex items-start justify-between gap-3">
               <button
                 type="button"
-                className="min-w-0 flex-1 text-left"
+                className="flex min-w-0 flex-1 items-start gap-2 text-left"
+                aria-expanded={expanded}
                 onClick={() => setOpen(expanded ? null : run.id)}
               >
-                <div className="flex items-center gap-2">
-                  <Badge variant={RUN_STATUS_VARIANT[run.status] ?? "secondary"}>
-                    {run.status}
-                  </Badge>
-                  <Badge variant="outline">{run.kind}</Badge>
-                  <span className="truncate font-medium">{subject(run)}</span>
-                  <span className="shrink-0 text-xs text-muted-foreground">
-                    {run.agent?.name ? `${run.agent.name} · ` : ""}
-                    {new Date(run.startedAt).toLocaleString()} ·{" "}
-                    {duration(run.startedAt, run.finishedAt)}
-                    {run.totalTokens ? ` · ${run.totalTokens} tokens` : ""}
-                  </span>
-                </div>
-                <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
-                  {run.error || run.output || "(no output)"}
-                </p>
+                <ChevronRight
+                  className={cn(
+                    "mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform",
+                    expanded && "rotate-90",
+                  )}
+                  aria-hidden
+                />
+                <span className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <Badge variant={RUN_STATUS_VARIANT[run.status] ?? "secondary"}>
+                      {run.status}
+                    </Badge>
+                    <Badge variant="outline">{run.kind}</Badge>
+                    <span className="truncate font-medium">{subject(run)}</span>
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {run.agent?.name ? `${run.agent.name} · ` : ""}
+                      {new Date(run.startedAt).toLocaleString()} ·{" "}
+                      {duration(run.startedAt, run.finishedAt)}
+                      {run.totalTokens ? ` · ${run.totalTokens} tokens` : ""}
+                    </span>
+                  </div>
+                  <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+                    {run.error || run.output || "(no output)"}
+                  </p>
+                </span>
               </button>
               <div className="flex shrink-0 items-center gap-1">
                 {running ? (
-                  <Button
+                  <ActionButton
                     variant="ghost"
                     size="icon"
-                    title="Stop this run"
+                    label="Stop this run"
                     disabled={stop.isPending}
                     onClick={() => stop.mutate(run)}
                   >
-                    <Square className="size-4" />
-                  </Button>
+                    <Square className="size-4" aria-hidden />
+                  </ActionButton>
                 ) : null}
-                <Button
+                <ConfirmButton
                   variant="ghost"
                   size="icon"
-                  title={running ? "Stop the run before deleting" : "Delete"}
+                  label="Delete this run"
+                  hint={running ? "Stop the run before deleting it" : "Delete"}
                   disabled={running}
-                  onClick={() => remove.mutate(run.id)}
+                  title="Delete this run?"
+                  description="The output and the tool calls go. The card's ledger keeps the moves this run caused, and the totals are read from the rows that are left."
+                  onConfirm={() => remove.mutate(run.id)}
                 >
-                  <Trash2 className="size-4" />
-                </Button>
+                  <Trash2 className="size-4" aria-hidden />
+                </ConfirmButton>
               </div>
             </div>
 

@@ -1,9 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Notebook, Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { ActionButton } from "@/components/action-button";
 import { Page } from "@/components/app-shell";
+import { ConfirmButton } from "@/components/confirm-button";
+import { EmptyState } from "@/components/empty-state";
+import { QueryError } from "@/components/query-error";
 import { RoleDialog } from "@/components/role-dialog";
+import { RowSkeleton } from "@/components/row-skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -52,6 +57,19 @@ export function RolesRoute() {
         </Button>
       }
     >
+      {roles.isError ? (
+        <QueryError error={roles.error} onRetry={() => roles.refetch()} what="your roles" />
+      ) : null}
+      {roles.isPending ? <RowSkeleton rows={3} /> : null}
+      {roles.data?.roles.length === 0 ? (
+        <EmptyState
+          icon={Notebook}
+          title="No kinds of lane yet"
+          description="A role is what a station does — work a card, judge it, or break it up. Every board on this server picks its lanes from this list."
+          action={<Button onClick={() => setCreating(true)}>New role</Button>}
+        />
+      ) : null}
+
       {roles.data?.roles.map((role) => {
         const count = lanes.filter((lane) => lane.roleId === role.id).length;
         return (
@@ -70,17 +88,30 @@ export function RolesRoute() {
                 ) : null}
               </div>
               <div className="flex shrink-0 items-center gap-1">
-                <Button variant="ghost" size="icon" title="Edit" onClick={() => setEditing(role)}>
-                  <Pencil className="size-4" />
-                </Button>
-                <Button
+                <ActionButton
                   variant="ghost"
                   size="icon"
-                  title="Delete"
-                  onClick={() => remove.mutate(role.id)}
+                  label={`Edit ${role.name}`}
+                  hint="Edit"
+                  onClick={() => setEditing(role)}
                 >
-                  <Trash2 className="size-4" />
-                </Button>
+                  <Pencil className="size-4" aria-hidden />
+                </ActionButton>
+                <ConfirmButton
+                  variant="ghost"
+                  size="icon"
+                  label={`Delete ${role.name}`}
+                  hint="Delete"
+                  title={`Delete the role "${role.name}"?`}
+                  description={
+                    count
+                      ? `${count} lane${count === 1 ? " is" : "s are"} of this kind, on this and any other board. The role cannot be deleted while that is true.`
+                      : "This kind of lane goes for every board on the server, not just this one."
+                  }
+                  onConfirm={() => remove.mutate(role.id)}
+                >
+                  <Trash2 className="size-4" aria-hidden />
+                </ConfirmButton>
               </div>
             </div>
             <p className="line-clamp-2 font-mono text-muted-foreground text-xs">

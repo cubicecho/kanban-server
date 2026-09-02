@@ -25,12 +25,16 @@ export const CARD_STATUS_VARIANT: Record<CardsStatusEnum, "destructive" | "outli
  * amber and not red, because that is the whole point of it being its own word — a reviewer
  * saying no is the board working and wants a decision, where red is a fault and wants looking
  * at. Telling the two apart at a glance is what a person comes to the board for.
+ *
+ * The hues are `--status-*` tokens rather than `emerald-*`/`amber-*` utilities, because a
+ * green that reads on a near-black card is not the green that reads on a white one, and the
+ * light palette is now something you can actually be looking at.
  */
 export const CARD_STATUS_CLASS: Partial<Record<CardsStatusEnum, string>> = {
   [CardsStatusEnum.Running]:
-    "border-emerald-600/30 bg-emerald-500/15 text-emerald-700 dark:border-emerald-400/30 dark:text-emerald-400",
+    "border-status-running/30 bg-status-running/15 text-status-running-foreground",
   [CardsStatusEnum.Rejected]:
-    "border-amber-600/30 bg-amber-500/15 text-amber-700 dark:border-amber-400/30 dark:text-amber-400",
+    "border-status-rejected/30 bg-status-rejected/15 text-status-rejected-foreground",
 };
 
 /** A card waiting on a person: one that was turned down, or one that broke. */

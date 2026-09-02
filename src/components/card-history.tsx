@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { ArrowDownUp } from "lucide-react";
+import { ArrowDownUp, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { RunStream } from "@/components/run-stream";
 import { Badge } from "@/components/ui/badge";
@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { CardRunsDocument, type CardRunsQuery, RunsVerdictEnum } from "@/gql/graphql";
 import { request } from "@/lib/gql";
 import { duration, RUN_STATUS_VARIANT } from "@/lib/runs";
+import { cn } from "@/lib/utils";
 
 type Run = CardRunsQuery["runs"][number];
 type Move = CardRunsQuery["cardEvents"][number];
@@ -52,12 +53,26 @@ const moved = (event: Move): string => {
   return to ? `judged in ${to}` : "moved";
 };
 
-/** A verdict is the one thing worth a colour of its own here: it is why the card moved. */
+/**
+ * A verdict is the one thing worth a colour of its own here: it is why the card moved.
+ *
+ * It said so and then drew both of them grey. They take the board's own two status colours —
+ * a FAIL is amber like a `rejected` card, because it is the same event seen from the run's
+ * side, and red stays what it has always been here, which is a fault.
+ */
 function VerdictBadge({ verdict }: { verdict: RunsVerdictEnum }) {
   if (verdict === RunsVerdictEnum.None) return null;
+  const failed = verdict === RunsVerdictEnum.Fail;
   return (
-    <Badge variant={verdict === RunsVerdictEnum.Fail ? "outline" : "secondary"}>
-      {verdict === RunsVerdictEnum.Fail ? "FAIL" : "PASS"}
+    <Badge
+      variant="outline"
+      className={
+        failed
+          ? "border-status-rejected/30 bg-status-rejected/15 text-status-rejected-foreground"
+          : "border-status-running/30 bg-status-running/15 text-status-running-foreground"
+      }
+    >
+      {failed ? "FAIL" : "PASS"}
     </Badge>
   );
 }
@@ -112,8 +127,17 @@ export function CardHistory({ cardId }: { cardId: string }) {
                 type="button"
                 className="flex w-full items-center gap-2 text-left"
                 disabled={!run}
+                aria-expanded={run ? open === id : undefined}
                 onClick={() => run && setOpen(open === id ? null : id)}
               >
+                <ChevronRight
+                  aria-hidden
+                  className={cn(
+                    "size-3 shrink-0 text-muted-foreground transition-transform",
+                    !run && "invisible",
+                    open === id && "rotate-90",
+                  )}
+                />
                 {run ? (
                   <>
                     <VerdictBadge verdict={run.verdict} />

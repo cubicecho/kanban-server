@@ -11,8 +11,13 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { ActionButton } from "@/components/action-button";
 import { Page } from "@/components/app-shell";
+import { ConfirmButton } from "@/components/confirm-button";
+import { EmptyState } from "@/components/empty-state";
 import { McpDialog } from "@/components/mcp-dialog";
+import { QueryError } from "@/components/query-error";
+import { RowSkeleton } from "@/components/row-skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -99,13 +104,17 @@ export function McpRoute() {
         </div>
       }
     >
+      {servers.isError ? (
+        <QueryError error={servers.error} onRetry={() => servers.refetch()} what="your servers" />
+      ) : null}
+      {servers.isPending ? <RowSkeleton rows={2} /> : null}
       {servers.data?.mcpServers.length === 0 ? (
-        <Card className="items-center gap-2 p-8 text-center">
-          <Plug className="size-5 text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">
-            No servers yet. Without one an agent can think, but not act.
-          </p>
-        </Card>
+        <EmptyState
+          icon={Plug}
+          title="No servers yet"
+          description="An MCP server is where an agent's tools come from. Without one an agent can think, but not act."
+          action={<Button onClick={() => setCreating(true)}>New server</Button>}
+        />
       ) : null}
 
       {servers.data?.mcpServers.map((server) => {
@@ -137,21 +146,36 @@ export function McpRoute() {
                 onCheckedChange={(enabled) => toggle.mutate({ id: server.id, enabled })}
                 aria-label={`Enable ${server.slug}`}
               />
-              <Button
+              <ActionButton
                 variant="ghost"
                 size="icon"
-                title="Test connection"
+                label={`Test the connection to ${server.slug}`}
+                hint="Test connection"
                 onClick={() => test.mutate(server)}
                 disabled={test.isPending && test.variables?.id === server.id}
               >
-                <PlugZap className="size-4" />
-              </Button>
-              <Button variant="ghost" size="icon" onClick={() => setEditing(server)}>
-                <Pencil className="size-4" />
-              </Button>
-              <Button variant="ghost" size="icon" onClick={() => remove.mutate(server.id)}>
-                <Trash2 className="size-4" />
-              </Button>
+                <PlugZap className="size-4" aria-hidden />
+              </ActionButton>
+              <ActionButton
+                variant="ghost"
+                size="icon"
+                label={`Edit ${server.slug}`}
+                hint="Edit"
+                onClick={() => setEditing(server)}
+              >
+                <Pencil className="size-4" aria-hidden />
+              </ActionButton>
+              <ConfirmButton
+                variant="ghost"
+                size="icon"
+                label={`Delete ${server.slug}`}
+                hint="Delete"
+                title={`Delete the server "${server.slug}"?`}
+                description="Every agent given these tools loses them, on every board on this server. The tools themselves are wherever they were — this is only the connection to them."
+                onConfirm={() => remove.mutate(server.id)}
+              >
+                <Trash2 className="size-4" aria-hidden />
+              </ConfirmButton>
             </div>
 
             {status?.error ? (

@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { CardDepsField, type DepCard } from "@/components/card-deps-field";
 import { CardHistory } from "@/components/card-history";
+import { useDiscardGuard } from "@/components/discard-guard";
+import { useFieldError } from "@/components/field-error";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,6 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import {
   type BoardQuery,
@@ -24,6 +27,7 @@ import {
   UpdateCardDocument,
 } from "@/gql/graphql";
 import type { DepGraph } from "@/lib/cards";
+import { useDirty } from "@/lib/dirty";
 import { request } from "@/lib/gql";
 
 type Card = BoardQuery["cards"][number];
@@ -109,10 +113,21 @@ export function CardDialog({
   // — it is the answer to "why does this one matter".
   const blocking = links.data?.blockedBy ?? [];
 
+  // `dependsOn` is null until the query lands, so the snapshot waits for it — otherwise the
+  // answer arriving would count as an edit. Sorted, because the picker's order is the order
+  // things were clicked in and nobody means anything by it.
+  const { close, guard } = useDiscardGuard(
+    useDirty(
+      { title, body, acceptance, dependsOn: dependsOn && [...dependsOn].sort() },
+      dependsOn !== null,
+    ),
+    onClose,
+  );
+  const titleError = useFieldError("card-title", title.trim() ? "" : "A card needs a title.");
+
   const save = useMutation({
     mutationFn: async () => {
       const values = { title: title.trim(), body, acceptance };
-      if (!values.title) throw new Error("A card needs a title.");
 
       const before = (links.data?.cardDeps ?? []).map((link) => link.dependsOnCardId);
       const wanted = dependsOn ?? before;
@@ -143,7 +158,7 @@ export function CardDialog({
   });
 
   return (
-    <Dialog open onOpenChange={(open) => !open && onClose()}>
+    <Dialog open onOpenChange={(open) => !open && close()}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>{card ? "Edit card" : "New card"}</DialogTitle>
@@ -152,86 +167,118 @@ export function CardDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="card-title">Title</Label>
-            <Input
-              id="card-title"
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-            />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="card-body">Body</Label>
-            <Textarea
-              id="card-body"
-              rows={6}
-              value={body}
-              onChange={(event) => setBody(event.target.value)}
-              placeholder="What to do, in enough detail that the agent does not have to guess."
-            />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="card-acceptance">Acceptance</Label>
-            <Textarea
-              id="card-acceptance"
-              rows={3}
-              value={acceptance}
-              onChange={(event) => setAcceptance(event.target.value)}
-              placeholder="What a reviewer checks against. Kept apart from the body so it does not get skipped."
-            />
-          </div>
+        {/* Three things a card is: what to do, what it waits on, and what has happened to it.
+            They were one scroll, which meant the deps picker appearing when its query landed
+            shoved the history down the page under whoever was reading it. */}
+        <Tabs defaultValue="details">
+          <TabsList>
+            <TabsTrigger value="details">Details</TabsTrigger>
+            <TabsTrigger value="deps">
+              Dependencies
+              {dependsOn?.length ? (
+                <span className="ml-1.5 text-muted-foreground">{dependsOn.length}</span>
+              ) : null}
+            </TabsTrigger>
+            {/* A card that does not exist yet has no history, and asking for one would be a
+                query for the id of a row nobody has written. */}
+            {card ? <TabsTrigger value="history">History</TabsTrigger> : null}
+          </TabsList>
 
-          {choices.length && dependsOn ? (
-            <CardDepsField
-              cardId={card?.id}
-              cards={choices}
-              laneNames={laneNames}
-              graph={graph}
-              value={dependsOn}
-              onChange={setDependsOn}
-            />
-          ) : null}
-
-          {blocking.length ? (
+          <TabsContent value="details" className="flex flex-col gap-4">
             <div className="flex flex-col gap-2">
-              <Label>Holding up</Label>
-              <div className="flex flex-wrap gap-1">
-                {blocking.map((link) => (
-                  <Badge key={link.cardId} variant="outline">
-                    {link.card.title || "Untitled"}
-                  </Badge>
-                ))}
+              <Label htmlFor="card-title">Title</Label>
+              <Input
+                id="card-title"
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                placeholder="One thing an agent can finish"
+                {...titleError.field}
+              />
+              {titleError.error}
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="card-body">Body</Label>
+              <Textarea
+                id="card-body"
+                rows={6}
+                value={body}
+                onChange={(event) => setBody(event.target.value)}
+                placeholder="What to do, in enough detail that the agent does not have to guess."
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="card-acceptance">Acceptance</Label>
+              <Textarea
+                id="card-acceptance"
+                rows={3}
+                value={acceptance}
+                onChange={(event) => setAcceptance(event.target.value)}
+                placeholder="What a reviewer checks against. Kept apart from the body so it does not get skipped."
+              />
+            </div>
+
+            {card?.result ? (
+              <div className="flex flex-col gap-2">
+                <Label>Last result</Label>
+                <pre className="max-h-60 overflow-auto rounded-md border bg-muted/30 p-3 text-xs whitespace-pre-wrap">
+                  {card.result}
+                </pre>
               </div>
-              <p className="text-xs text-muted-foreground">
-                These wait on this card. Change that from their own dialogs — a card that edited
-                other cards' dependencies would be a change with no visible cause.
+            ) : null}
+          </TabsContent>
+
+          <TabsContent value="deps" className="flex flex-col gap-4">
+            {choices.length && dependsOn ? (
+              <CardDepsField
+                cardId={card?.id}
+                cards={choices}
+                laneNames={laneNames}
+                graph={graph}
+                value={dependsOn}
+                onChange={setDependsOn}
+              />
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                {dependsOn
+                  ? "There is nothing else on this board for this card to wait on."
+                  : "Reading this card's dependencies…"}
               </p>
-            </div>
-          ) : null}
+            )}
 
-          {card?.result ? (
-            <div className="flex flex-col gap-2">
-              <Label>Last result</Label>
-              <pre className="max-h-60 overflow-auto rounded-md border bg-muted/30 p-3 text-xs whitespace-pre-wrap">
-                {card.result}
-              </pre>
-            </div>
-          ) : null}
+            {blocking.length ? (
+              <div className="flex flex-col gap-2">
+                <Label>Holding up</Label>
+                <div className="flex flex-wrap gap-1">
+                  {blocking.map((link) => (
+                    <Badge key={link.cardId} variant="outline">
+                      {link.card.title || "Untitled"}
+                    </Badge>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  These wait on this card. Change that from their own dialogs — a card that edited
+                  other cards' dependencies would be a change with no visible cause.
+                </p>
+              </div>
+            ) : null}
+          </TabsContent>
 
-          {/* A card that does not exist yet has no history, and asking for one would be a query
-              for the id of a row nobody has written. */}
-          {card ? <CardHistory cardId={card.id} /> : null}
-        </div>
+          {card ? (
+            <TabsContent value="history">
+              <CardHistory cardId={card.id} />
+            </TabsContent>
+          ) : null}
+        </Tabs>
 
         <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>
+          <Button variant="ghost" onClick={close}>
             Cancel
           </Button>
-          <Button onClick={() => save.mutate()} disabled={save.isPending}>
+          <Button onClick={() => save.mutate()} disabled={titleError.invalid || save.isPending}>
             {save.isPending ? "Saving…" : "Save"}
           </Button>
         </DialogFooter>
+        {guard}
       </DialogContent>
     </Dialog>
   );

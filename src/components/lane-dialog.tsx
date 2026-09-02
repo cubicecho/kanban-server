@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
+import { useDiscardGuard } from "@/components/discard-guard";
+import { useFieldError } from "@/components/field-error";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -28,6 +30,7 @@ import {
   RolesDocument,
   UpdateLaneDocument,
 } from "@/gql/graphql";
+import { useDirty } from "@/lib/dirty";
 import { request } from "@/lib/gql";
 
 type Lane = BoardQuery["lanes"][number];
@@ -79,6 +82,22 @@ export function LaneDialog({
   const others = lanes.filter((row) => row.id !== lane?.id);
   const kind = (roles.data?.roles ?? []).find((row) => row.id === roleId);
 
+  const { close, guard } = useDiscardGuard(
+    useDirty({
+      name,
+      roleId,
+      prompt,
+      agentId,
+      onSuccessLaneId,
+      onFailureLaneId,
+      wipLimit,
+      maxAttempts,
+      intake,
+    }),
+    onClose,
+  );
+  const nameError = useFieldError("lane-name", name.trim() ? "" : "A lane needs a name.");
+
   const save = useMutation({
     mutationFn: async () => {
       const values = {
@@ -92,7 +111,6 @@ export function LaneDialog({
         maxAttempts,
         intake,
       };
-      if (!values.name) throw new Error("A lane needs a name.");
       if (lane) await request(UpdateLaneDocument, { id: lane.id, set: values });
       else {
         await request(CreateLaneDocument, {
@@ -115,9 +133,14 @@ export function LaneDialog({
     if (!name.trim()) setName((roles.data?.roles ?? []).find((row) => row.id === id)?.name ?? "");
   };
 
-  const laneSelect = (value: string, onChange: (next: string) => void, empty: string) => (
+  const laneSelect = (
+    id: string,
+    value: string,
+    onChange: (next: string) => void,
+    empty: string,
+  ) => (
     <Select value={value || NONE} onValueChange={(next) => onChange(next === NONE ? "" : next)}>
-      <SelectTrigger className="w-full">
+      <SelectTrigger id={id} className="w-full">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
@@ -132,7 +155,7 @@ export function LaneDialog({
   );
 
   return (
-    <Dialog open onOpenChange={(open) => !open && onClose()}>
+    <Dialog open onOpenChange={(open) => !open && close()}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{lane ? "Edit lane" : "New lane"}</DialogTitle>
@@ -143,19 +166,22 @@ export function LaneDialog({
         </DialogHeader>
 
         <div className="flex flex-col gap-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-2">
               <Label htmlFor="lane-name">Name</Label>
               <Input
                 id="lane-name"
                 value={name}
                 onChange={(event) => setName(event.target.value)}
+                placeholder="Review"
+                {...nameError.field}
               />
+              {nameError.error}
             </div>
             <div className="flex flex-col gap-2">
-              <Label>Kind</Label>
+              <Label htmlFor="lane-kind">Kind</Label>
               <Select value={roleId || NONE} onValueChange={pickKind}>
-                <SelectTrigger className="w-full">
+                <SelectTrigger id="lane-kind" className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -195,12 +221,12 @@ export function LaneDialog({
           </div>
 
           <div className="flex flex-col gap-2">
-            <Label>Agent</Label>
+            <Label htmlFor="lane-agent">Agent</Label>
             <Select
               value={agentId || NONE}
               onValueChange={(value) => setAgentId(value === NONE ? "" : value)}
             >
-              <SelectTrigger className="w-full">
+              <SelectTrigger id="lane-agent" className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -217,18 +243,18 @@ export function LaneDialog({
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-2">
-              <Label>On success, move to</Label>
-              {laneSelect(onSuccessLaneId, setOnSuccess, "Stay here")}
+              <Label htmlFor="lane-success">On success, move to</Label>
+              {laneSelect("lane-success", onSuccessLaneId, setOnSuccess, "Stay here")}
             </div>
             <div className="flex flex-col gap-2">
-              <Label>On failure, move to</Label>
-              {laneSelect(onFailureLaneId, setOnFailure, "Stay here")}
+              <Label htmlFor="lane-failure">On failure, move to</Label>
+              {laneSelect("lane-failure", onFailureLaneId, setOnFailure, "Stay here")}
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-2">
               <Label htmlFor="lane-wip">Work in progress limit</Label>
               <Input
@@ -271,13 +297,14 @@ export function LaneDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>
+          <Button variant="ghost" onClick={close}>
             Cancel
           </Button>
-          <Button onClick={() => save.mutate()} disabled={save.isPending}>
+          <Button onClick={() => save.mutate()} disabled={nameError.invalid || save.isPending}>
             {save.isPending ? "Saving…" : "Save"}
           </Button>
         </DialogFooter>
+        {guard}
       </DialogContent>
     </Dialog>
   );

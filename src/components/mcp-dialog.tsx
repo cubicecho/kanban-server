@@ -2,6 +2,8 @@ import { useMutation } from "@tanstack/react-query";
 import { CheckCircle2, ClipboardPaste, PlugZap, XCircle } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { useDiscardGuard } from "@/components/discard-guard";
+import { useFieldError } from "@/components/field-error";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -30,6 +32,7 @@ import {
   TestMcpServerDocument,
   UpdateMcpServerDocument,
 } from "@/gql/graphql";
+import { useDirty } from "@/lib/dirty";
 import { request } from "@/lib/gql";
 import { parseJson, parseMcpJson } from "@/lib/mcp-config";
 
@@ -78,6 +81,22 @@ export function McpDialog({
   const set = (patch: Partial<Draft>) => setDraft((current) => ({ ...current, ...patch }));
   const stdio = draft.transport === McpServersTransportEnum.Stdio;
 
+  const { close, guard } = useDiscardGuard(useDirty({ ...draft }), onClose);
+  // What each transport actually needs, said under the field rather than thrown from the save.
+  const slugError = useFieldError(
+    "slug",
+    draft.slug.trim() ? "" : "A server needs a slug — its tools are named after it.",
+  );
+  const commandError = useFieldError(
+    "command",
+    stdio && !draft.command.trim() ? "A stdio server is started by a command." : "",
+  );
+  const urlError = useFieldError(
+    "url",
+    !stdio && !draft.url.trim() ? "An http server needs a url to reach." : "",
+  );
+  const invalid = slugError.invalid || commandError.invalid || urlError.invalid;
+
   /** The connection half of the draft, as the API wants it. Throws on malformed JSON. */
   const connection = () => ({
     transport: draft.transport,
@@ -101,10 +120,6 @@ export function McpDialog({
   const save = useMutation({
     mutationFn: async () => {
       const values = { ...connection(), slug: draft.slug.trim(), label: draft.label.trim() };
-      if (!values.slug) throw new Error("A server needs a slug — its tools are named after it.");
-      if (stdio && !values.command) throw new Error("A stdio server needs a command.");
-      if (!stdio && !values.url) throw new Error("An http server needs a url.");
-
       if (server) {
         await request(UpdateMcpServerDocument, {
           id: server.id,
@@ -133,7 +148,7 @@ export function McpDialog({
   };
 
   return (
-    <Dialog open onOpenChange={(open) => !open && onClose()}>
+    <Dialog open onOpenChange={(open) => !open && close()}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{server ? "Edit server" : "New MCP server"}</DialogTitle>
@@ -165,7 +180,7 @@ export function McpDialog({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-2">
               <Label htmlFor="slug">Slug</Label>
               <Input
@@ -174,7 +189,9 @@ export function McpDialog({
                 value={draft.slug}
                 onChange={(event) => set({ slug: event.target.value })}
                 placeholder="filesystem"
+                {...slugError.field}
               />
+              {slugError.error}
             </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor="label">Label</Label>
@@ -217,7 +234,9 @@ export function McpDialog({
                   value={draft.command}
                   onChange={(event) => set({ command: event.target.value })}
                   placeholder="npx"
+                  {...commandError.field}
                 />
+                {commandError.error}
               </div>
               <div className="flex flex-col gap-2">
                 <Label htmlFor="args">Args</Label>
@@ -253,7 +272,9 @@ export function McpDialog({
                   value={draft.url}
                   onChange={(event) => set({ url: event.target.value })}
                   placeholder="https://example.com/mcp"
+                  {...urlError.field}
                 />
+                {urlError.error}
               </div>
               <div className="flex flex-col gap-2">
                 <Label htmlFor="headers">Headers</Label>
@@ -323,14 +344,15 @@ export function McpDialog({
             {test.isPending ? "Connecting…" : "Test connection"}
           </Button>
           <div className="flex gap-2">
-            <Button variant="ghost" onClick={onClose}>
+            <Button variant="ghost" onClick={close}>
               Cancel
             </Button>
-            <Button onClick={() => save.mutate()} disabled={save.isPending}>
+            <Button onClick={() => save.mutate()} disabled={invalid || save.isPending}>
               {save.isPending ? "Saving…" : "Save"}
             </Button>
           </div>
         </DialogFooter>
+        {guard}
       </DialogContent>
     </Dialog>
   );

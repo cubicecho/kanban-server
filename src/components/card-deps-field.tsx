@@ -1,11 +1,13 @@
-import { X } from "lucide-react";
+import { Check, X } from "lucide-react";
 import { useMemo, useState } from "react";
+import { ActionButton } from "@/components/action-button";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { CardsStatusEnum } from "@/gql/graphql";
 import { CARD_STATUS_CLASS, CARD_STATUS_VARIANT, cyclingCards, type DepGraph } from "@/lib/cards";
+import { cn } from "@/lib/utils";
 
 /** A card as this field needs to know it, which is the same for a live one and an archived one. */
 export interface DepCard {
@@ -100,15 +102,16 @@ export function CardDepsField({
                 {card?.archived ? (
                   <span className="text-muted-foreground italic">archived</span>
                 ) : null}
-                <Button
+                <ActionButton
                   variant="ghost"
                   size="icon"
-                  className="size-4"
-                  title="Stop waiting on this"
+                  className="-my-1 -mr-1 size-6"
+                  label={`Stop waiting on ${card?.title || "an archived card"}`}
+                  hint="Stop waiting on this"
                   onClick={() => toggle(id)}
                 >
-                  <X className="size-3" />
-                </Button>
+                  <X className="size-3.5" />
+                </ActionButton>
               </Badge>
             );
           })}
@@ -130,33 +133,59 @@ export function CardDepsField({
             {group.rows.map((card) => {
               const looping = cycles.has(card.id);
               const held = value.includes(card.id);
-              return (
-                <button
+              // The tooltip hangs off the label rather than the input, for the reason
+              // `ActionButton` exists: a disabled control never fires the hover, and why this
+              // row cannot be picked is the one thing a person wants off it.
+              const row = (
+                <label
                   key={card.id}
-                  type="button"
-                  disabled={looping && !held}
-                  title={
+                  className={cn(
+                    "flex w-full items-center gap-2 rounded px-1 py-1 text-left text-sm",
                     looping && !held
-                      ? "That card is already waiting on this one, directly or through others."
-                      : undefined
-                  }
-                  className="flex w-full items-center gap-2 rounded px-1 py-1 text-left text-sm hover:bg-muted/60 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
-                  onClick={() => toggle(card.id)}
+                      ? "cursor-not-allowed opacity-40"
+                      : "cursor-pointer hover:bg-muted/60",
+                  )}
                 >
-                  <span
-                    className={`size-3 shrink-0 rounded-sm border ${held ? "border-primary bg-primary" : ""}`}
+                  {/* A real checkbox, kept off-screen: the row used to say "chosen" with a
+                      filled 12px square, which is colour alone — nothing to a screen reader,
+                      and little to anyone who cannot tell the two greys apart. */}
+                  <input
+                    type="checkbox"
+                    className="peer sr-only"
+                    checked={held}
+                    disabled={looping && !held}
+                    onChange={() => toggle(card.id)}
                   />
+                  <span
+                    className={cn(
+                      "flex size-4 shrink-0 items-center justify-center rounded-sm border",
+                      "peer-focus-visible:ring-2 peer-focus-visible:ring-ring",
+                      held && "border-primary bg-primary text-primary-foreground",
+                    )}
+                  >
+                    {held ? <Check className="size-3" /> : null}
+                  </span>
                   <span className="min-w-0 truncate">{card.title || "Untitled"}</span>
                   <Badge
                     variant={CARD_STATUS_VARIANT[card.status]}
-                    className={`ml-auto shrink-0 ${CARD_STATUS_CLASS[card.status] ?? ""}`}
+                    className={cn("ml-auto shrink-0", CARD_STATUS_CLASS[card.status])}
                   >
                     {card.status}
                   </Badge>
                   {card.archived ? (
                     <span className="shrink-0 text-xs text-muted-foreground italic">archived</span>
                   ) : null}
-                </button>
+                </label>
+              );
+              return looping && !held ? (
+                <Tooltip key={card.id}>
+                  <TooltipTrigger asChild>{row}</TooltipTrigger>
+                  <TooltipContent side="left">
+                    That card is already waiting on this one, directly or through others.
+                  </TooltipContent>
+                </Tooltip>
+              ) : (
+                row
               );
             })}
           </div>

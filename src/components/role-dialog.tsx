@@ -1,6 +1,8 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
+import { useDiscardGuard } from "@/components/discard-guard";
+import { useFieldError } from "@/components/field-error";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -26,6 +28,7 @@ import {
   type RolesQuery,
   UpdateRoleDocument,
 } from "@/gql/graphql";
+import { useDirty } from "@/lib/dirty";
 import { request } from "@/lib/gql";
 
 type Role = RolesQuery["roles"][number];
@@ -62,6 +65,14 @@ export function RoleDialog({ role, onClose }: { role?: Role; onClose: () => void
   const [contract, setContract] = useState<string>(role?.contract ?? "work");
   const [prompt, setPrompt] = useState(role?.prompt ?? "");
 
+  const { close, guard } = useDiscardGuard(
+    useDirty({ name, description, contract, prompt }),
+    onClose,
+  );
+  // Said where the field is, before the button is pressed, rather than thrown as an error from
+  // inside the mutation and landed in the far corner of the screen as a toast.
+  const nameError = useFieldError("role-name", name.trim() ? "" : "A role needs a name.");
+
   const save = useMutation({
     mutationFn: async () => {
       const values = {
@@ -70,7 +81,6 @@ export function RoleDialog({ role, onClose }: { role?: Role; onClose: () => void
         contract: contract as RolesContractEnum,
         prompt,
       };
-      if (!values.name) throw new Error("A role needs a name.");
       if (role) await request(UpdateRoleDocument, { id: role.id, set: values });
       else await request(CreateRoleDocument, { values });
     },
@@ -84,7 +94,7 @@ export function RoleDialog({ role, onClose }: { role?: Role; onClose: () => void
   const chosen = CONTRACTS.find((row) => row.value === contract);
 
   return (
-    <Dialog open onOpenChange={(open) => !open && onClose()}>
+    <Dialog open onOpenChange={(open) => !open && close()}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{role ? "Edit role" : "New role"}</DialogTitle>
@@ -95,7 +105,7 @@ export function RoleDialog({ role, onClose }: { role?: Role; onClose: () => void
         </DialogHeader>
 
         <div className="flex flex-col gap-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-2">
               <Label htmlFor="role-name">Name</Label>
               <Input
@@ -103,12 +113,14 @@ export function RoleDialog({ role, onClose }: { role?: Role; onClose: () => void
                 value={name}
                 onChange={(event) => setName(event.target.value)}
                 placeholder="Testing"
+                {...nameError.field}
               />
+              {nameError.error}
             </div>
             <div className="flex flex-col gap-2">
-              <Label>Answers with</Label>
+              <Label htmlFor="role-contract">Answers with</Label>
               <Select value={contract} onValueChange={setContract}>
-                <SelectTrigger className="w-full">
+                <SelectTrigger id="role-contract" className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -152,13 +164,14 @@ export function RoleDialog({ role, onClose }: { role?: Role; onClose: () => void
         </div>
 
         <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>
+          <Button variant="ghost" onClick={close}>
             Cancel
           </Button>
-          <Button onClick={() => save.mutate()} disabled={save.isPending}>
+          <Button onClick={() => save.mutate()} disabled={nameError.invalid || save.isPending}>
             {save.isPending ? "Saving…" : "Save"}
           </Button>
         </DialogFooter>
+        {guard}
       </DialogContent>
     </Dialog>
   );

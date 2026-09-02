@@ -3,9 +3,16 @@ import { RouterProvider } from "@tanstack/react-router";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { AuthGate } from "@/components/auth-gate";
+import { ErrorBoundary } from "@/components/error-boundary";
 import { Toaster } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { startTheme } from "@/lib/theme";
 import { router } from "@/router";
 import "./index.css";
+
+// Before the first render, and outside it: `index.html` has already painted the stored
+// choice, and this attaches the listener that keeps `system` honest afterwards.
+startTheme();
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -32,9 +39,13 @@ if (!root) throw new Error("#root is missing from index.html");
 createRoot(root).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <AuthGate>
-        <RouterProvider router={router} />
-      </AuthGate>
+      <TooltipProvider delayDuration={300}>
+        <ErrorBoundary>
+          <AuthGate>
+            <RouterProvider router={router} />
+          </AuthGate>
+        </ErrorBoundary>
+      </TooltipProvider>
       <Toaster position="bottom-right" />
     </QueryClientProvider>
   </StrictMode>,

@@ -5,6 +5,7 @@ import {
   lazyRouteComponent,
 } from "@tanstack/react-router";
 import { AppShell } from "@/components/app-shell";
+import { RouteError, RouteNotFound } from "@/components/route-error";
 
 /**
  * Each page is its own chunk, fetched when it is first needed.
@@ -91,6 +92,10 @@ export const router = createRouter({
     settingsRoute,
   ]),
   defaultPreload: "intent",
+  // Without these, a route that threw and a path that does not exist both render the shell
+  // with nothing in it, which reads as a page that is still loading and never will.
+  defaultErrorComponent: RouteError,
+  defaultNotFoundComponent: RouteNotFound,
 });
 
 declare module "@tanstack/react-router" {

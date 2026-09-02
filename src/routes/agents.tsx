@@ -1,12 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Bot, Pencil, Plus, Trash2, TriangleAlert } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { ActionButton } from "@/components/action-button";
 import { AgentDialog } from "@/components/agent-dialog";
 import { Page } from "@/components/app-shell";
+import { ConfirmButton } from "@/components/confirm-button";
+import { EmptyState } from "@/components/empty-state";
+import { QueryError } from "@/components/query-error";
+import { RowSkeleton } from "@/components/row-skeleton";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   AgentsDocument,
   type AgentsQuery,
@@ -16,6 +23,33 @@ import {
 import { request } from "@/lib/gql";
 
 type Agent = AgentsQuery["agents"][number];
+
+/**
+ * An agent that inherits what it does not have, from a Settings that has not got it either.
+ *
+ * Every knob on an agent falls back to Settings by sentinel, which is right — but the seeded
+ * agent inherits *everything*, and a fresh install's Settings is empty, so the first run of
+ * the first card failed with an upstream error and nothing on any page had said why.
+ */
+function SettingsNeeded({
+  missing,
+  settings,
+}: {
+  missing: string;
+  settings?: { baseUrl?: string | null; model?: string | null } | null;
+}) {
+  const inherited =
+    (missing.includes("endpoint") ? Boolean(settings?.baseUrl) : true) &&
+    (missing.includes("model") ? Boolean(settings?.model) : true);
+  if (inherited) return null;
+
+  return (
+    <Badge variant="outline" className="mt-2 gap-1 border-destructive/40 text-destructive">
+      <TriangleAlert className="size-3" aria-hidden />
+      Needs {missing} — set one here or in Settings
+    </Badge>
+  );
+}
 
 /**
  * Which models are available to work with.
@@ -48,6 +82,7 @@ export function AgentsRoute() {
   });
 
   const servers = agents.data?.mcpServers ?? [];
+  const settings = agents.data?.settings?.[0];
 
   return (
     <Page
@@ -60,10 +95,17 @@ export function AgentsRoute() {
         </Button>
       }
     >
+      {agents.isError ? (
+        <QueryError error={agents.error} onRetry={() => agents.refetch()} what="your agents" />
+      ) : null}
+      {agents.isPending ? <RowSkeleton rows={2} /> : null}
       {agents.data?.agents.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          No agents yet. Without one, no lane on any board can run.
-        </p>
+        <EmptyState
+          icon={Bot}
+          title="No agents yet"
+          description="An agent is an endpoint and a model. Without one, no lane on any board can run."
+          action={<Button onClick={() => setCreating(true)}>New agent</Button>}
+        />
       ) : null}
 
       {agents.data?.agents.map((agent) => (
@@ -83,24 +125,55 @@ export function AgentsRoute() {
               <p className="mt-1 truncate font-mono text-xs text-muted-foreground">
                 {agent.model || "model from Settings"} · {agent.baseUrl || "endpoint from Settings"}
               </p>
+              {/* The seeded agent is a name and nothing else, and inheriting from a Settings
+                  that was never filled in resolves to no endpoint at all — which showed up
+                  as a raw connection error on the first run and nowhere before it. */}
+              {!agent.model || !agent.baseUrl ? (
+                <SettingsNeeded
+                  missing={
+                    !agent.model && !agent.baseUrl
+                      ? "a model and an endpoint"
+                      : agent.model
+                        ? "an endpoint"
+                        : "a model"
+                  }
+                  settings={settings}
+                />
+              ) : null}
             </div>
             <div className="flex shrink-0 items-center gap-1">
-              <Switch
-                checked={agent.enabled}
-                onCheckedChange={(enabled) => toggle.mutate({ id: agent.id, enabled })}
-                title={agent.enabled ? "Disable" : "Enable"}
-              />
-              <Button variant="ghost" size="icon" title="Edit" onClick={() => setEditing(agent)}>
-                <Pencil className="size-4" />
-              </Button>
-              <Button
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Switch
+                    checked={agent.enabled}
+                    onCheckedChange={(enabled) => toggle.mutate({ id: agent.id, enabled })}
+                    // `title` on a Radix switch is a hint the accessibility tree does not
+                    // read; the name has to be said outright.
+                    aria-label={`${agent.enabled ? "Disable" : "Enable"} ${agent.name}`}
+                  />
+                </TooltipTrigger>
+                <TooltipContent>{agent.enabled ? "Disable" : "Enable"}</TooltipContent>
+              </Tooltip>
+              <ActionButton
                 variant="ghost"
                 size="icon"
-                title="Delete"
-                onClick={() => remove.mutate(agent.id)}
+                label={`Edit ${agent.name}`}
+                hint="Edit"
+                onClick={() => setEditing(agent)}
               >
-                <Trash2 className="size-4" />
-              </Button>
+                <Pencil className="size-4" aria-hidden />
+              </ActionButton>
+              <ConfirmButton
+                variant="ghost"
+                size="icon"
+                label={`Delete ${agent.name}`}
+                hint="Delete"
+                title={`Delete the agent "${agent.name}"?`}
+                description="Any lane staffed by it stops running until another agent is picked, on every board on this server."
+                onConfirm={() => remove.mutate(agent.id)}
+              >
+                <Trash2 className="size-4" aria-hidden />
+              </ConfirmButton>
             </div>
           </div>
           {agent.systemPrompt ? (

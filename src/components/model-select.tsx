@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { List } from "lucide-react";
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
+import { ActionButton } from "@/components/action-button";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -64,14 +64,14 @@ export function ModelSelect({
           onChange={(event) => onChange(event.target.value)}
           placeholder="llama3.1:8b"
         />
-        <Button
+        <ActionButton
           variant="ghost"
           size="icon"
-          title="Pick from the list"
+          label="Pick from the list"
           onClick={() => setTyping(false)}
         >
           <List className="size-4" />
-        </Button>
+        </ActionButton>
       </div>
     );
   }
