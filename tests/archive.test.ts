@@ -162,6 +162,13 @@ test("an archived card is not run, not moved, and not waited on", async () => {
     ),
   ).toContain("archived");
 
+  // Nor is its error cleared while it is out of sight: a card comes back as what went in.
+  expect(
+    await fails(`mutation Retry($cardId: String!) { retryCard(cardId: $cardId) { id } }`, {
+      cardId: ids.first,
+    }),
+  ).toContain("archived");
+
   await expect(runner.runCard(ids.first)).rejects.toThrow(/archived/);
 
   // The board is untouched by any of it.

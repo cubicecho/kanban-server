@@ -154,8 +154,8 @@ up, and folding the two together would lose the outcome it is being archived wit
 card keeps its `laneId` — that is where `restoreCard` puts it back, at the end of the lane,
 since the position it had has long been taken. Everything that reads the board filters it out:
 the `Board` query, `readyCards`, and `blockers`, where an archived card counts as no longer in
-the way — otherwise a dependent waits forever on a card nobody can find. `moveCard` and
-`runCard` refuse one outright. Deleting a lane is refused while it holds archived cards, because
+the way — otherwise a dependent waits forever on a card nobody can find. `moveCard`,
+`runCard` and `retryCard` refuse one outright. Deleting a lane is refused while it holds archived cards, because
 the cascade would take them with it and the board cannot show they are there: the guard that
 matters is the one for what you cannot see.
 

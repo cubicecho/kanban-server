@@ -170,7 +170,8 @@ const HINTS: Record<string, string> = {
   retry_card:
     "Puts a failed card back in play where it stands, without running it. A card a reviewer " +
     "rejected keeps its `error` status so the board waits for a person, and this is what " +
-    "clears it — after which its lane's agent will pick it up again.",
+    "clears it — after which its lane's agent will pick it up again. Refused on an archived " +
+    "card: `restore_card` puts it back on the board first.",
   archive_card:
     "Takes a card off the board without deleting it — the Done pile once it is long enough to " +
     "be in the way, or the card nobody is going to do. It keeps its lane, its status and its " +

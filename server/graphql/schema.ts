@@ -766,7 +766,8 @@ export const schema = new GraphQLSchema({
           "a card a reviewer rejected — those stay `error` on purpose, so the board waits for " +
           "a person rather than looping — and for one interrupted by a restart. It does not " +
           "run anything itself; `runCard` does that, and `autoRun` does it unasked. Refused " +
-          "while an agent is working the card.",
+          "while an agent is working the card, and on an archived one — `restoreCard` puts " +
+          "that back on the board first.",
         args: { cardId: { type: new GraphQLNonNull(GraphQLString) } },
         resolve: async (_source, args: { cardId: string }) => {
           if (isRunning(args.cardId)) {
@@ -774,17 +775,20 @@ export const schema = new GraphQLSchema({
               extensions: { code: "RUN_IN_FLIGHT" },
             });
           }
-          const [card] = await db
-            .update(cards)
-            .set({ status: "idle", error: "" })
-            .where(eq(cards.id, args.cardId))
-            .returning();
-          if (!card) {
-            throw new GraphQLError(`There is no card with id ${args.cardId}.`, {
-              extensions: { code: "NOT_FOUND" },
+          const card = await cardOrThrow(args.cardId);
+          // Clearing the error of a card nobody can see is a change with no visible cause, and
+          // it would let one come back from the archive as something other than what went in.
+          if (card.archivedAt) {
+            throw new GraphQLError("This card is archived. Restore it before retrying it.", {
+              extensions: { code: "ARCHIVED" },
             });
           }
-          return card;
+          const [retried] = await db
+            .update(cards)
+            .set({ status: "idle", error: "" })
+            .where(eq(cards.id, card.id))
+            .returning();
+          return retried;
         },
       },
       archiveCard: {

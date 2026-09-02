@@ -169,8 +169,9 @@ This is the middle answer between a Done pile that grows forever and a delete th
 undone, and it is the one to reach for. Deleting is still there, on the archive page, for a card
 that should never have existed.
 
-Archiving is refused while an agent is working the card — stop it first — and deleting a lane is
-refused while it holds archived cards. The board cannot show you those, and a lane takes its cards
+Archiving is refused while an agent is working the card — stop it first — moving, running and
+retrying are refused on an archived one, and deleting a lane is refused while it holds archived
+cards. The board cannot show you those, and a lane takes its cards
 with it when it goes.
 
 It is also drawn at the top of its lane and its badge is green, because a run is the one thing on
@@ -356,10 +357,10 @@ somewhere work is handed off. In dev it is on the server's own port (`:8788`); v
 claude mcp add --transport http kanban http://localhost:8788/mcp
 ```
 
-Thirty tools, chosen in `server/mcp-endpoint.ts` rather than projected from the whole schema:
+Thirty-one tools, chosen in `server/mcp-endpoint.ts` rather than projected from the whole schema:
 
-- **read** — `projects`, `lanes`, `cards`, `tasks`, `runs`, `agents`, `run_events`, `spend`,
-  `board_templates`
+- **read** — `projects`, `lanes`, `cards`, `tasks`, `runs`, `agents`, `roles`, `run_events`,
+  `spend`, `board_templates`
 - **projects** — `create_project`, `update_project_single`
 - **tasks** — `submit_task`, `create_task`, `refine_task`, `accept_task`, `decompose_task`,
   `delete_task_single`
