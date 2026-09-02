@@ -10,17 +10,19 @@ import {
   type LucideIcon,
   MessageSquare,
   Notebook,
+  Pencil,
   Plug,
+  Plus,
   SlidersHorizontal,
 } from "lucide-react";
 import { useEffect, useMemo } from "react";
+import { ActionButton } from "@/components/action-button";
 import { ProjectActions, useProjectActions } from "@/components/project-actions";
 import { ThemeToggle } from "@/components/theme-toggle";
 import {
   Select,
   SelectContent,
   SelectItem,
-  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -104,10 +106,6 @@ function NavGroup({
   );
 }
 
-// Radix refuses an empty item value, so the two things that are not a project carry sentinels.
-const NEW = "__new__";
-const EDIT = "__edit__";
-
 /**
  * The picker every other page reads. It lives in the frame rather than on each page because
  * the project is not what you are doing, it is where you are doing it — and switching it
@@ -116,10 +114,14 @@ const EDIT = "__edit__";
  * The first project is selected automatically when nothing is, which is what makes a server
  * with one board need no selection at all.
  *
- * Making and editing one are in the menu rather than beside it: on the rail there is no room
- * for a second control, and the list of projects is the natural place to reach the project you
- * are in. It is never disabled now — an empty picker reading "No projects yet" with nothing
- * behind it was an instruction with no way to follow it.
+ * Making one and editing one are buttons above the picker rather than rows inside it. They
+ * were sentinel `SelectItem`s — "New project…" and "Project settings…" sitting under a
+ * separator among the projects themselves — which put two commands in a list of places: the
+ * menu answered "which project?" and "do what to it?" at once, and picking either one read as
+ * a selection right up until a dialog opened instead. A command belongs to a button.
+ *
+ * The picker is never disabled — an empty one reading "No projects yet" with nothing behind
+ * it was an instruction with no way to follow it, and the button beside it is now the way.
  */
 function ProjectPicker() {
   const projectId = useProjectId();
@@ -140,16 +142,40 @@ function ProjectPicker() {
     }
   }, [rows, projectId]);
 
-  const choose = (value: string) => {
-    if (value === NEW) newProject();
-    else if (value === EDIT) {
-      if (current) editProject(current);
-    } else selectProject(value);
-  };
-
   return (
-    <div className="px-2 pb-3">
-      <Select value={projectId} onValueChange={choose}>
+    <div className="flex flex-col gap-1 px-2 pb-3">
+      {/* On the rail the word has nowhere to go and the buttons stack under the logo instead,
+          which is the same trade the nav groups make with their own headings. */}
+      <div className="flex items-center gap-1 max-lg:flex-col lg:justify-between">
+        <p className="px-1 text-[11px] font-medium tracking-wide text-muted-foreground uppercase max-lg:hidden">
+          Project
+        </p>
+        <div className="flex items-center gap-1 max-lg:flex-col">
+          <ActionButton
+            variant="ghost"
+            size="icon"
+            className="size-7"
+            label="New project"
+            side="right"
+            onClick={newProject}
+          >
+            <Plus className="size-4" aria-hidden />
+          </ActionButton>
+          <ActionButton
+            variant="ghost"
+            size="icon"
+            className="size-7"
+            label={current ? `Settings for ${current.name}` : "Project settings"}
+            hint={current ? "Project settings" : "There is no project to edit yet"}
+            side="right"
+            disabled={!current}
+            onClick={() => current && editProject(current)}
+          >
+            <Pencil className="size-4" aria-hidden />
+          </ActionButton>
+        </div>
+      </div>
+      <Select value={projectId} onValueChange={selectProject}>
         {/* On the rail the name has nowhere to go, so the trigger becomes the folder icon
             alone — switching projects is not something to lose at 900px. */}
         <SelectTrigger
@@ -160,14 +186,19 @@ function ProjectPicker() {
           <SelectValue placeholder={rows.length ? "Pick a project" : "No projects yet"} />
         </SelectTrigger>
         <SelectContent>
-          {rows.map((project) => (
-            <SelectItem key={project.id} value={project.id}>
-              {project.name}
-            </SelectItem>
-          ))}
-          {rows.length ? <SelectSeparator /> : null}
-          {current ? <SelectItem value={EDIT}>Project settings…</SelectItem> : null}
-          <SelectItem value={NEW}>New project…</SelectItem>
+          {/* With the commands gone the menu can be empty, and an empty popover says nothing
+              about where the projects went. */}
+          {rows.length ? (
+            rows.map((project) => (
+              <SelectItem key={project.id} value={project.id}>
+                {project.name}
+              </SelectItem>
+            ))
+          ) : (
+            <p className="px-2 py-1.5 text-muted-foreground text-sm">
+              No projects yet — make one above.
+            </p>
+          )}
         </SelectContent>
       </Select>
     </div>
