@@ -303,9 +303,11 @@ Editing what every Review lane is told is one edit to the role rather than one p
 lane may add its own paragraph on top without touching the kind. A role a lane is still of cannot
 be deleted until nothing is of it.
 
-The prompt a run starts with is three layers: the agent's `systemPrompt` (who it is — expected
-empty), the role's `prompt` (what happens here), and the lane's `prompt` (and on this board). The
-lane speaks last, and a station whose three layers come out empty is refused rather than run.
+The prompt a run starts with is four layers: the project's context (where you are), the agent's
+`systemPrompt` (who it is — expected empty), the role's `prompt` (what happens here), and the
+lane's `prompt` (and on this board). The lane speaks last, and a station whose lower three come
+out empty is refused rather than run — background alone is nothing an agent can act on. The
+card's own prompt then says what to do, and does not repeat where it is.
 
 Inheritance is by sentinel, and it is worth knowing which: `0` means "inherit" for every numeric
 knob except `temperature` and `maxRetries`, which use `-1` because `0` is a value someone may

@@ -339,6 +339,38 @@ test("one agent, three lanes, three kinds — and it knows about none of them", 
   expect(runs.map((run) => run.verdict)).toEqual(["none", "pass", "none"]);
 });
 
+test("the project's background is standing context, and a card is not told it twice", async () => {
+  const { projectId, doing } = await seedProject("background");
+  await db
+    .update(tables.projects)
+    .set({ description: "a board that works itself", context: "ALWAYS-RUN-THE-TESTS" })
+    .where(eq(tables.projects.id, projectId));
+
+  let system = "";
+  let user = "";
+  bodies = (body) => {
+    system = body.messages[0].content;
+    user = body.messages[body.messages.length - 1].content;
+  };
+
+  const [card] = await db
+    .insert(tables.cards)
+    .values({ projectId, laneId: doing.id, title: "anything" })
+    .returning();
+  replies = ["done"];
+  expect((await runner.runCard(card.id)).status).toBe("ok");
+  bodies = undefined;
+
+  // Where you are does not change from card to card, so it sits with who you are and what
+  // happens here rather than being retyped into every prompt.
+  expect(system).toContain("ALWAYS-RUN-THE-TESTS");
+  expect(system).toContain("a board that works itself");
+  // And the card's own prompt says what to do, not where it is. Both would be the same
+  // paragraph twice, on every run the board ever makes.
+  expect(user).not.toContain("ALWAYS-RUN-THE-TESTS");
+  expect(user).toContain("Card: anything");
+});
+
 test("a card waiting on an unfinished one does not run", async () => {
   const { projectId, doing } = await seedProject("ordering");
   const [first] = await db

@@ -105,24 +105,26 @@ export const VERDICT_CONTRACT = "verdict";
 export const DEFAULT_AGENTS = [{ name: "default" }];
 
 /**
- * The system prompt a run is given: who the agent is, then what happens where it is working.
+ * The system prompt a run is given: where it is, who the agent is, then what happens here.
  *
- * The layers go in the order the sentence does. `identity` is the agent's own standing
+ * The layers go in the order the sentence does. `where` is the project's own background, the
+ * same paragraph for every agent working it. `identity` is the agent's own standing
  * instruction and is expected empty — it is for the thing a particular model needs said
  * wherever it works. `role` is the job, shared by every lane of that kind. `extra` is this
  * lane's addendum, appended and never replacing, so a board can say "the acceptance criteria
  * are in the card body" without forking a role to say it.
  *
  * The lane speaks last on purpose: an agent says who it is, and the lane says what to do.
- * A composition that comes out empty is a lane with no job, which the caller refuses rather
- * than starting a run on an empty system message.
+ * A composition of the three lower layers that comes out empty is a lane with no job, which
+ * the caller refuses rather than starting a run on a system message that is only background.
  */
 export const systemPromptFor = (layers: {
+  where?: string | null;
   identity?: string | null;
   role?: string | null;
   extra?: string | null;
 }): string =>
-  [layers.identity, layers.role, layers.extra]
+  [layers.where, layers.identity, layers.role, layers.extra]
     .map((layer) => (layer ?? "").trim())
     .filter(Boolean)
     .join("\n\n");
@@ -136,10 +138,11 @@ export interface DecomposedCard {
 }
 
 /**
- * The project's own background, ahead of whatever the agent was asked to do.
+ * The project's own background: standing context, so it belongs in the system prompt.
  *
  * Every agent working a project needs the same paragraph about it, and putting it in each
- * card's prompt would mean the decomposer writing it out ten times.
+ * card's prompt would mean the decomposer writing it out ten times. It is the `where` layer
+ * of `systemPromptFor` — the card's own prompt says what to do, not where it is.
  */
 export const projectContext = (project: Project): string =>
   [
@@ -155,7 +158,10 @@ export const decomposePrompt = (project: Project, task: Task): string =>
   `${projectContext(project)}\n\nTask: ${task.title || "(untitled)"}\n\n${task.brief}`.trim();
 
 /**
- * What an agent working a card is given: the project, the card, and its criteria.
+ * What an agent working a card is given: the card, and its criteria.
+ *
+ * Not the project — that is standing context every run of this board shares, so it is the
+ * system prompt's `where` layer. Repeating it here would send it twice.
  *
  * `note` is the reason the card is in this lane, off the ledger — a reviewer's FAIL in its own
  * words, or what a person said when they dragged it back. An agent picking up a card that came
@@ -166,10 +172,9 @@ export const decomposePrompt = (project: Project, task: Task): string =>
  * handing an agent a stack trace under the heading "why this came back" was how a broken
  * network read as a review.
  */
-export const cardPrompt = (project: Project, card: Card, note = ""): string =>
+export const cardPrompt = (card: Card, note = ""): string =>
   [
-    projectContext(project),
-    `\n\nCard: ${card.title}`,
+    `Card: ${card.title}`,
     card.body ? `\n\n${card.body}` : "",
     card.acceptance ? `\n\nDone when:\n${card.acceptance}` : "",
     // An agent judging a card is reading the same card another just worked, so it needs what

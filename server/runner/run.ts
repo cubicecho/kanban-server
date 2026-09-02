@@ -284,10 +284,11 @@ export async function refineTask(taskId: string, userMessage: string): Promise<R
     kind: "refine",
     taskId,
     label: `refining "${task.title || "untitled task"}"`,
-    systemPrompt: `${systemPromptFor({
+    systemPrompt: systemPromptFor({
+      where: projectContext(project),
       identity: agent.systemPrompt,
       role: config.refinePrompt || REFINE_SYSTEM,
-    })}\n\n${projectContext(project)}`,
+    }),
     prompt: `Current brief:\n${task.brief || "(nothing yet)"}\n\nConversation so far:\n\n${transcript}`,
   });
 
@@ -484,13 +485,16 @@ export async function runCard(cardId: string, agentId?: string | null): Promise<
   const [role] = lane.roleId
     ? await db.select().from(roles).where(eq(roles.id, lane.roleId)).limit(1)
     : [undefined];
-  const systemPrompt = systemPromptFor({
+  // The project's background is asked for separately from the job, because a lane that says
+  // nothing at all is a lane with no job — and a system prompt made only of background would
+  // hide that behind text an agent cannot act on.
+  const job = systemPromptFor({
     identity: agent.systemPrompt,
     role: role?.prompt,
     extra: lane.prompt,
   });
-  if (!systemPrompt)
-    throw new Error(`lane "${lane.name}" has nothing to tell an agent — give it a role`);
+  if (!job) throw new Error(`lane "${lane.name}" has nothing to tell an agent — give it a role`);
+  const systemPrompt = systemPromptFor({ where: projectContext(project), role: job });
 
   // Nothing is written about waiting. What a card waits on is a fact about the cards around
   // it, and the one this used to store went stale the moment a dependency finished — a card
@@ -513,7 +517,7 @@ export async function runCard(cardId: string, agentId?: string | null): Promise<
     laneId: lane.id,
     label: `working "${card.title}"`,
     systemPrompt,
-    prompt: cardPrompt(project, card, note),
+    prompt: cardPrompt(card, note),
   });
 
   const output = result?.output?.trim() ?? "";

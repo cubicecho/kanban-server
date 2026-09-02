@@ -114,13 +114,19 @@ and none should need a migration. What cannot be invented is `contract`, the sha
 cards. That is the only part of a role anything reads, and `seedLanes` finds the two it draws by
 contract rather than by name, a name being a thing somebody edits.
 
-The prompt a run starts with is composed by `systemPromptFor`, in layers: the agent's
-`systemPrompt` says who it is, the role's `prompt` says what happens here, and the lane's own
-`prompt` adds whatever is true of this board only. The lane speaks last, and a composition that
-comes out empty is refused at run time — which is the one guard replacing both a `notNull` on the
-agent and the worry about a run starting with an empty system message. Editing what every Review
-lane is told is one edit rather than one per board, which is why a lane points at a role instead
-of carrying a copy of its prompt.
+The prompt a run starts with is composed by `systemPromptFor`, in layers: the project's context
+says where you are, the agent's `systemPrompt` says who it is, the role's `prompt` says what
+happens here, and the lane's own `prompt` adds whatever is true of this board only. The lane
+speaks last, and a composition of the lower three that comes out empty is refused at run time —
+which is the one guard replacing both a `notNull` on the agent and the worry about a run starting
+with an empty system message. The project's background is asked for separately so that it cannot
+satisfy that guard: a system prompt made only of background is a lane with no job. Editing what
+every Review lane is told is one edit rather than one per board, which is why a lane points at a
+role instead of carrying a copy of its prompt.
+
+`projectContext` is standing context and lives in that first layer alone. `cardPrompt` says what
+to do and never where — the same paragraph in both would be sent twice on every run of the board,
+and it is what the on-demand tool preselector reads to guess which tools a card needs.
 
 Refining has no contract, because refinement is not something a lane does. Its prompt is
 `settings.refinePrompt` (empty meaning `REFINE_SYSTEM`), and `resolveJobAgent` finds an agent for
