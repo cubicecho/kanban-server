@@ -424,6 +424,18 @@ const McpProbeType = new GraphQLObjectType({
   },
 });
 
+const RunUsageType = new GraphQLObjectType({
+  name: "RunUsage",
+  description:
+    "What a run has spent so far, counted from its start rather than for the turn that carried " +
+    "it — the newest one seen is the answer, with no adding up to do.",
+  fields: {
+    promptTokens: { type: new GraphQLNonNull(GraphQLInt) },
+    completionTokens: { type: new GraphQLNonNull(GraphQLInt) },
+    totalTokens: { type: new GraphQLNonNull(GraphQLInt) },
+  },
+});
+
 const RunEventType = new GraphQLObjectType({
   name: "RunEvent",
   description:
@@ -438,7 +450,7 @@ const RunEventType = new GraphQLObjectType({
     at: { type: new GraphQLNonNull(GraphQLDateTime) },
     kind: {
       type: new GraphQLNonNull(GraphQLString),
-      description: "turn | thinking | output | tool-call | tool-result | notice | done.",
+      description: "turn | thinking | output | tool-call | tool-result | notice | usage | done.",
     },
     text: { type: new GraphQLNonNull(GraphQLString) },
     name: {
@@ -446,6 +458,12 @@ const RunEventType = new GraphQLObjectType({
       description: "Tool name, where there is one.",
     },
     ok: { type: GraphQLBoolean },
+    usage: {
+      type: RunUsageType,
+      description:
+        "On `usage` only: the running totals as the endpoint last reported them. Null on every " +
+        "other kind, and absent for a whole run whose endpoint does not report usage midstream.",
+    },
   },
 });
 

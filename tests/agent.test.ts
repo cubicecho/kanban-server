@@ -3,6 +3,7 @@ import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, expect, test } from "vitest";
+import type { RunUsage } from "../server/runner/events.ts";
 import type { Resolved } from "../server/runner/llm.ts";
 import { replyWith } from "./fixtures/sse.ts";
 
@@ -108,6 +109,25 @@ test("reports the run as it happens, tokens and tool calls alike", async () => {
     name: "missing__tool",
   });
   expect(events.find((event) => event.kind === "tool-result")).toMatchObject({ ok: false });
+});
+
+test("reports what the run has spent, turn by turn and counted from the start", async () => {
+  const { runAgent } = await import("../server/runner/agent.ts");
+  replies = [toolCall("missing__tool"), completion({ role: "assistant", content: "all done" })];
+
+  const events: { kind: string; usage?: RunUsage | null }[] = [];
+  await runAgent({
+    config: config(),
+    systemPrompt: "",
+    prompt: "go",
+    onEvent: (event) => events.push(event as (typeof events)[number]),
+  });
+
+  // Cumulative, not per turn: the watcher draws the newest one it has and adds up nothing.
+  expect(events.filter((event) => event.kind === "usage").map((event) => event.usage)).toEqual([
+    { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
+    { promptTokens: 20, completionTokens: 10, totalTokens: 30 },
+  ]);
 });
 
 test("gives up once it has spent its tool iterations", async () => {

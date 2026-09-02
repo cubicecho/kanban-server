@@ -9,6 +9,7 @@ import { EmptyState, NoProject } from "@/components/empty-state";
 import { QueryError } from "@/components/query-error";
 import { RowSkeleton } from "@/components/row-skeleton";
 import { RunStream } from "@/components/run-stream";
+import { TokenStats } from "@/components/token-stats";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -21,7 +22,7 @@ import {
 } from "@/gql/graphql";
 import { request } from "@/lib/gql";
 import { useProjectId } from "@/lib/project";
-import { duration, RUN_STATUS_VARIANT } from "@/lib/runs";
+import { compactTokens, duration, RUN_STATUS_VARIANT } from "@/lib/runs";
 import { cn } from "@/lib/utils";
 
 type Run = RunsQuery["runs"][number];
@@ -176,7 +177,7 @@ export function RunsRoute() {
                       {run.agent?.name ? `${run.agent.name} · ` : ""}
                       {new Date(run.startedAt).toLocaleString()} ·{" "}
                       {duration(run.startedAt, run.finishedAt)}
-                      {run.totalTokens ? ` · ${run.totalTokens} tokens` : ""}
+                      {run.totalTokens ? ` · ${compactTokens(run.totalTokens)} tokens` : ""}
                     </span>
                   </div>
                   <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
@@ -218,6 +219,22 @@ export function RunsRoute() {
                   <RunStream runId={run.id} />
                 ) : (
                   <>
+                    {/* The split and the rate live here rather than in the row above, which is
+                        a button: a tooltip trigger is a button too, and one cannot sit in the
+                        other. */}
+                    {run.totalTokens ? (
+                      <TokenStats
+                        usage={run}
+                        seconds={
+                          run.finishedAt
+                            ? (new Date(run.finishedAt).getTime() -
+                                new Date(run.startedAt).getTime()) /
+                              1000
+                            : null
+                        }
+                        className="self-start"
+                      />
+                    ) : null}
                     <ToolChips calls={run.toolCalls} />
                     <pre className="overflow-x-auto text-sm whitespace-pre-wrap">
                       {run.error || run.output || "(no output)"}

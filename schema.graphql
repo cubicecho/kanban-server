@@ -5840,13 +5840,29 @@ type RunEvent {
   seq: Int!
   at: DateTime!
 
-  """turn | thinking | output | tool-call | tool-result | notice | done."""
+  """
+  turn | thinking | output | tool-call | tool-result | notice | usage | done.
+  """
   kind: String!
   text: String!
 
   """Tool name, where there is one."""
   name: String!
   ok: Boolean
+
+  """
+  On `usage` only: the running totals as the endpoint last reported them. Null on every other kind, and absent for a whole run whose endpoint does not report usage midstream.
+  """
+  usage: RunUsage
+}
+
+"""
+What a run has spent so far, counted from its start rather than for the turn that carried it — the newest one seen is the answer, with no adding up to do.
+"""
+type RunUsage {
+  promptTokens: Int!
+  completionTokens: Int!
+  totalTokens: Int!
 }
 
 """

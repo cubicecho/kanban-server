@@ -37,8 +37,21 @@ export type RunEventKind =
   | "tool-result"
   /** Something the runner did that is not the model's doing — a preselection, a retry. */
   | "notice"
+  /** What the run has cost so far, as the endpoint reported it at the end of a turn. */
+  | "usage"
   /** The run ended. Always last, and always sent. */
   | "done";
+
+/**
+ * What a run has spent, counted from the start of the run rather than for the turn that
+ * carried it: a client draws the latest one it has seen and needs no arithmetic of its own,
+ * and one lost to the backlog cap costs nothing because the next supersedes it.
+ */
+export interface RunUsage {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+}
 
 export interface RunEvent {
   runId: string;
@@ -52,6 +65,8 @@ export interface RunEvent {
   name: string;
   /** Outcome on `tool-result` and `done`, otherwise null. */
   ok: boolean | null;
+  /** Running totals on `usage`, otherwise null. */
+  usage: RunUsage | null;
 }
 
 /** What `emit` is given: the run and the sequence are the bus's to assign. */
@@ -83,6 +98,7 @@ export function emit(runId: string, input: RunEventInput): RunEvent {
     text: "",
     name: "",
     ok: null,
+    usage: null,
     ...input,
   };
   stream.events.push(event);

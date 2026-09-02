@@ -1,4 +1,5 @@
 import { memo, useEffect, useRef, useState } from "react";
+import { TokenStats, type Usage } from "@/components/token-stats";
 import { RunEventsDocument, type RunEventsSubscription } from "@/gql/graphql";
 import { subscribe } from "@/lib/gql";
 import { cn } from "@/lib/utils";
@@ -65,6 +66,10 @@ export function RunStream({
   className?: string;
 }) {
   const [blocks, setBlocks] = useState<Block[]>([]);
+  // The running totals, kept apart from the blocks: a `usage` event is not something the run
+  // said, it is what the run has cost, and it belongs in the header where it can be watched
+  // rather than in the log where it would scroll away.
+  const [usage, setUsage] = useState<Usage | null>(null);
   const [error, setError] = useState("");
   const [ended, setEnded] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
@@ -74,6 +79,7 @@ export function RunStream({
 
   useEffect(() => {
     setBlocks([]);
+    setUsage(null);
     setError("");
     setEnded(false);
 
@@ -84,9 +90,15 @@ export function RunStream({
       if (pending.length === 0) return;
       const batch = pending;
       pending = [];
+      // Only the newest of a batch matters: each usage event carries the run's totals, not the
+      // turn's, so the last one is the answer and the ones before it are history.
+      const counted = batch.filter((event) => event.kind === "usage").pop();
+      if (counted?.usage) setUsage(counted.usage);
+      const said = batch.filter((event) => event.kind !== "usage");
+      if (said.length === 0) return;
       setBlocks((prev) => {
         const next = prev.slice();
-        for (const event of batch) appendInto(next, event);
+        for (const event of said) appendInto(next, event);
         return next;
       });
     };
@@ -136,8 +148,11 @@ export function RunStream({
   };
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+    // `min-w-0` all the way down: a dialog lays its content out in a grid, whose items are
+    // `min-width: auto` and so refuse to shrink below their longest unbreakable word. One
+    // minified JSON tool result was enough to push the whole run past the dialog's edge.
+    <div className="flex min-w-0 flex-col gap-2">
+      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
         <span
           className={cn(
             "size-2 rounded-full",
@@ -145,6 +160,12 @@ export function RunStream({
           )}
         />
         {ended ? "Run ended" : "Live"}
+        {usage ? (
+          <>
+            <span aria-hidden>·</span>
+            <TokenStats usage={usage} />
+          </>
+        ) : null}
         {error ? <span className="text-destructive">· {error}</span> : null}
       </div>
 
@@ -154,12 +175,15 @@ export function RunStream({
         role="log"
         aria-live="polite"
         aria-label="Run output"
-        className={cn("max-h-80 overflow-y-auto rounded-md border bg-muted/30 p-3", className)}
+        className={cn(
+          "max-h-80 min-w-0 overflow-y-auto rounded-md border bg-muted/30 p-3",
+          className,
+        )}
       >
         {blocks.length === 0 ? (
           <p className="text-sm text-muted-foreground">Waiting for the model…</p>
         ) : null}
-        <div className="flex flex-col gap-2">
+        <div className="flex min-w-0 flex-col gap-2">
           {blocks.map((block) => (
             <BlockView key={`${block.kind}-${block.seq}`} block={block} />
           ))}
@@ -177,15 +201,15 @@ const BlockView = memo(function BlockView({ block }: { block: Block }) {
   switch (block.kind) {
     case "thinking":
       return (
-        <p className="whitespace-pre-wrap border-l-2 pl-2 text-sm text-muted-foreground italic">
+        <p className="wrap-anywhere whitespace-pre-wrap border-l-2 pl-2 text-sm text-muted-foreground italic">
           {block.text}
         </p>
       );
     case "output":
-      return <p className="whitespace-pre-wrap text-sm">{block.text}</p>;
+      return <p className="wrap-anywhere whitespace-pre-wrap text-sm">{block.text}</p>;
     case "tool-call":
       return (
-        <p className="font-mono text-xs break-all text-muted-foreground">
+        <p className="font-mono text-xs wrap-anywhere text-muted-foreground">
           → {block.name}({block.text})
         </p>
       );
@@ -193,7 +217,7 @@ const BlockView = memo(function BlockView({ block }: { block: Block }) {
       return (
         <p
           className={cn(
-            "font-mono text-xs whitespace-pre-wrap",
+            "wrap-anywhere font-mono text-xs whitespace-pre-wrap",
             block.ok ? "text-muted-foreground" : "text-destructive",
           )}
         >
@@ -202,12 +226,12 @@ const BlockView = memo(function BlockView({ block }: { block: Block }) {
       );
     case "turn":
       return (
-        <p className="border-t pt-2 text-xs tracking-wide text-muted-foreground uppercase">
+        <p className="wrap-anywhere border-t pt-2 text-xs tracking-wide text-muted-foreground uppercase">
           {block.text}
         </p>
       );
     default:
       // `notice` and `done`: the runner speaking rather than the model.
-      return <p className="text-xs text-muted-foreground">{block.text}</p>;
+      return <p className="wrap-anywhere text-xs text-muted-foreground">{block.text}</p>;
   }
 });
