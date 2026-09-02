@@ -1,9 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { SquarePlus, Trash2 } from "lucide-react";
+import { ChevronRight, ListChecks, SquarePlus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { Page } from "@/components/app-shell";
+import { ActionButton } from "@/components/action-button";
+import { Page, useCurrentProject } from "@/components/app-shell";
+import { ConfirmButton } from "@/components/confirm-button";
+import { EmptyState, NoProject } from "@/components/empty-state";
+import { QueryError } from "@/components/query-error";
+import { RowSkeleton } from "@/components/row-skeleton";
 import { Spend } from "@/components/spend";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,6 +16,7 @@ import { Card } from "@/components/ui/card";
 import { DeleteTaskDocument, MakeCardDocument, TasksDocument } from "@/gql/graphql";
 import { request } from "@/lib/gql";
 import { useProjectId } from "@/lib/project";
+import { cn } from "@/lib/utils";
 
 /**
  * What has been asked for, and what became of it.
@@ -25,6 +31,7 @@ import { useProjectId } from "@/lib/project";
  */
 export function TasksRoute() {
   const projectId = useProjectId();
+  const project = useCurrentProject();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState<string | null>(null);
 
@@ -59,16 +66,33 @@ export function TasksRoute() {
 
   if (!projectId) {
     return (
-      <Page title="Tasks" description="Pick a project first.">
-        <p className="text-sm text-muted-foreground">No project selected.</p>
+      <Page title="Tasks">
+        <NoProject what="A task" />
       </Page>
     );
   }
 
   return (
-    <Page title="Tasks" description="What was asked for, and the cards it became.">
+    <Page
+      title="Tasks"
+      crumb={project?.name}
+      description="What was asked for, and the cards it became."
+    >
+      {tasks.isError ? (
+        <QueryError error={tasks.error} onRetry={() => tasks.refetch()} what="these tasks" />
+      ) : null}
+      {tasks.isPending ? <RowSkeleton rows={3} /> : null}
       {tasks.data?.tasks.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Nothing asked for yet.</p>
+        <EmptyState
+          icon={ListChecks}
+          title="Nothing asked for yet"
+          description="Describe something on the New task page and it lands here, along with whatever cards it became."
+          action={
+            <Button asChild>
+              <Link to="/">New task</Link>
+            </Button>
+          }
+        />
       ) : null}
 
       {tasks.data?.tasks.map((task) => {
@@ -78,22 +102,32 @@ export function TasksRoute() {
             <div className="flex items-start justify-between gap-3">
               <button
                 type="button"
-                className="min-w-0 flex-1 text-left"
+                className="flex min-w-0 flex-1 items-start gap-2 text-left"
+                aria-expanded={expanded}
                 onClick={() => setOpen(expanded ? null : task.id)}
               >
-                <div className="flex items-center gap-2">
-                  <Badge variant={task.cards.length ? "secondary" : "outline"}>
-                    {task.cards.length ? "on the board" : "being talked about"}
-                  </Badge>
-                  <span className="truncate font-medium">{task.title || "Untitled task"}</span>
-                  <span className="shrink-0 text-xs text-muted-foreground">
-                    {task.cards.length} card{task.cards.length === 1 ? "" : "s"} ·{" "}
-                    {new Date(task.createdAt).toLocaleString()}
-                  </span>
-                </div>
-                <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
-                  {task.brief || "(no brief)"}
-                </p>
+                <ChevronRight
+                  className={cn(
+                    "mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform",
+                    expanded && "rotate-90",
+                  )}
+                  aria-hidden
+                />
+                <span className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <Badge variant={task.cards.length ? "secondary" : "outline"}>
+                      {task.cards.length ? "on the board" : "being talked about"}
+                    </Badge>
+                    <span className="truncate font-medium">{task.title || "Untitled task"}</span>
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {task.cards.length} card{task.cards.length === 1 ? "" : "s"} ·{" "}
+                      {new Date(task.createdAt).toLocaleString()}
+                    </span>
+                  </div>
+                  <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+                    {task.brief || "(no brief)"}
+                  </p>
+                </span>
               </button>
               <div className="flex shrink-0 items-center gap-1">
                 {/* Only while the conversation has not reached the board. Making a second card
@@ -104,26 +138,36 @@ export function TasksRoute() {
                     <Link to="/board">On the board</Link>
                   </Button>
                 ) : (
-                  <Button
+                  <ActionButton
                     variant="ghost"
                     size="icon"
-                    title={
-                      task.brief ? "Make a card at the front door" : "Nothing to make a card of"
+                    label="Make a card"
+                    hint={
+                      task.brief.trim()
+                        ? "Make a card at the front door"
+                        : "There is no brief to make a card of"
                     }
                     disabled={!task.brief.trim() || make.isPending}
                     onClick={() => make.mutate(task.id)}
                   >
-                    <SquarePlus className="size-4" />
-                  </Button>
+                    <SquarePlus className="size-4" aria-hidden />
+                  </ActionButton>
                 )}
-                <Button
+                <ConfirmButton
                   variant="ghost"
                   size="icon"
-                  title="Delete the task — its cards stay"
-                  onClick={() => remove.mutate(task.id)}
+                  label="Delete this task"
+                  hint="Delete"
+                  title="Delete this task?"
+                  description={
+                    task.cards.length
+                      ? `The ${task.cards.length} card${task.cards.length === 1 ? "" : "s"} it became stay on the board. The conversation behind them goes.`
+                      : "The conversation goes. Nothing has come of it yet."
+                  }
+                  onConfirm={() => remove.mutate(task.id)}
                 >
-                  <Trash2 className="size-4" />
-                </Button>
+                  <Trash2 className="size-4" aria-hidden />
+                </ConfirmButton>
               </div>
             </div>
 

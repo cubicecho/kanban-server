@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Page } from "@/components/app-shell";
 import { ModelSelect } from "@/components/model-select";
+import { QueryError } from "@/components/query-error";
+import { RowSkeleton } from "@/components/row-skeleton";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -20,6 +22,7 @@ import {
   AgentsDocument,
   SetApiKeyDocument,
   SettingsDocument,
+  type SettingsQuery,
   SettingsToolDiscoveryEnum,
   UpdateSettingsDocument,
 } from "@/gql/graphql";
@@ -113,6 +116,36 @@ interface Form {
   refinePrompt: string;
 }
 
+type Loaded = NonNullable<SettingsQuery["settings"][number]>;
+
+/** The row as the form holds it: nulls become the empty string the pickers speak. */
+const toForm = (row: Loaded): Form => ({
+  baseUrl: row.baseUrl,
+  model: row.model,
+  maxTokens: row.maxTokens,
+  temperature: row.temperature,
+  maxToolIterations: row.maxToolIterations,
+  toolDiscovery: row.toolDiscovery,
+  toolSelectModel: row.toolSelectModel,
+  requestTimeoutSeconds: row.requestTimeoutSeconds,
+  maxRetries: row.maxRetries,
+  runRetentionDays: row.runRetentionDays,
+  workerIntervalSeconds: row.workerIntervalSeconds,
+  refineAgentId: row.refineAgentId ?? "",
+  refinePrompt: row.refinePrompt,
+});
+
+/** The numeric fields, by the label above each rather than by its column name. */
+const NUMBERS = [
+  ["maxTokens", "Max tokens"],
+  ["temperature", "Temperature"],
+  ["maxToolIterations", "Max tool steps"],
+  ["requestTimeoutSeconds", "Silence before giving up"],
+  ["maxRetries", "Retries"],
+  ["runRetentionDays", "Keep runs for"],
+  ["workerIntervalSeconds", "Look for work every"],
+] as const;
+
 export function SettingsRoute() {
   const queryClient = useQueryClient();
   const [form, setForm] = useState<Form | null>(null);
@@ -129,42 +162,20 @@ export function SettingsRoute() {
   // The row is the source of truth; the form is a copy taken once it has loaded.
   const loaded = settings.data?.settings[0];
   useEffect(() => {
-    if (loaded && !form) {
-      const { baseUrl, model, maxTokens, temperature, maxToolIterations } = loaded;
-      setForm({
-        baseUrl,
-        model,
-        maxTokens,
-        temperature,
-        maxToolIterations,
-        toolDiscovery: loaded.toolDiscovery,
-        toolSelectModel: loaded.toolSelectModel,
-        requestTimeoutSeconds: loaded.requestTimeoutSeconds,
-        maxRetries: loaded.maxRetries,
-        runRetentionDays: loaded.runRetentionDays,
-        workerIntervalSeconds: loaded.workerIntervalSeconds,
-        // Nulls become the empty string the pickers speak, and go back as null on save.
-        refineAgentId: loaded.refineAgentId ?? "",
-        refinePrompt: loaded.refinePrompt,
-      });
-    }
+    if (loaded && !form) setForm(toForm(loaded));
   }, [loaded, form]);
+
+  // Compared against the row as it stands rather than against a snapshot taken when the page
+  // opened: this form is copied once and never re-synced, so a tab left open all afternoon is
+  // exactly the one that saves over somebody else's change. Reset is the way back.
+  const dirty = Boolean(
+    form && loaded && (JSON.stringify(form) !== JSON.stringify(toForm(loaded)) || apiKey),
+  );
+  const badNumber = form ? NUMBERS.find(([key]) => !Number.isFinite(form[key])) : undefined;
 
   const save = useMutation({
     mutationFn: async () => {
       if (!form) return;
-      // An emptied number input parses to NaN, which would go over the wire as null.
-      for (const key of [
-        "maxTokens",
-        "temperature",
-        "maxToolIterations",
-        "requestTimeoutSeconds",
-        "maxRetries",
-        "runRetentionDays",
-        "workerIntervalSeconds",
-      ] as const) {
-        if (!Number.isFinite(form[key])) throw new Error(`${key} must be a number.`);
-      }
       await request(UpdateSettingsDocument, {
         // An unnamed agent is no row, not a row with an empty id.
         set: {
@@ -192,11 +203,39 @@ export function SettingsRoute() {
       title="Settings"
       description="What every agent falls back to for anything it does not set itself."
       actions={
-        <Button onClick={() => save.mutate()} disabled={!form || save.isPending}>
-          {save.isPending ? "Saving…" : "Save"}
-        </Button>
+        <>
+          {badNumber ? (
+            <p className="text-xs text-destructive">{badNumber[1]} needs to be a number.</p>
+          ) : dirty ? (
+            <p className="text-xs text-muted-foreground">Unsaved changes</p>
+          ) : null}
+          <Button
+            variant="ghost"
+            disabled={!dirty || save.isPending}
+            onClick={() => {
+              if (loaded) setForm(toForm(loaded));
+              setApiKey("");
+            }}
+          >
+            Reset
+          </Button>
+          <Button
+            onClick={() => save.mutate()}
+            disabled={!form || !dirty || Boolean(badNumber) || save.isPending}
+          >
+            {save.isPending ? "Saving…" : "Save"}
+          </Button>
+        </>
       }
     >
+      {settings.isError ? (
+        <QueryError
+          error={settings.error}
+          onRetry={() => settings.refetch()}
+          what="these settings"
+        />
+      ) : null}
+
       <Card className="gap-4 p-4">
         <h2 className="font-medium">Model</h2>
         {form ? (
@@ -238,7 +277,7 @@ export function SettingsRoute() {
               </p>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <div className="flex flex-col gap-2">
                 <Label htmlFor="maxTokens">Max tokens</Label>
                 <Input
@@ -317,8 +356,8 @@ export function SettingsRoute() {
               </div>
             </div>
           </>
-        ) : (
-          <p className="text-sm text-muted-foreground">Loading…</p>
+        ) : settings.isError ? null : (
+          <RowSkeleton rows={3} />
         )}
       </Card>
 
@@ -379,14 +418,14 @@ export function SettingsRoute() {
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-2">
-              <Label>Refining agent</Label>
+              <Label htmlFor="refineAgent">Refining agent</Label>
               <Select
                 value={form.refineAgentId || ANY}
                 onValueChange={(value) => field("refineAgentId", value === ANY ? "" : value)}
               >
-                <SelectTrigger className="w-full">
+                <SelectTrigger id="refineAgent" className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

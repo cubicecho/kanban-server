@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
+import { useDiscardGuard } from "@/components/discard-guard";
+import { useFieldError } from "@/components/field-error";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -29,6 +31,7 @@ import {
   type ProjectsQuery,
   UpdateProjectDocument,
 } from "@/gql/graphql";
+import { useDirty } from "@/lib/dirty";
 import { request } from "@/lib/gql";
 import { selectProject } from "@/lib/project";
 
@@ -76,6 +79,12 @@ export function ProjectDialog({
 
   const [templateId, setTemplateId] = useState(SEEDED);
 
+  const { close, guard } = useDiscardGuard(useDirty({ ...draft, templateId }), onClose);
+  const nameError = useFieldError(
+    "project-name",
+    draft.name.trim() ? "" : "A project needs a name.",
+  );
+
   const agents = useQuery({ queryKey: ["agents"], queryFn: () => request(AgentsDocument) });
   // Every enabled agent, for both pickers: an agent is a model, and refining is a prompt this
   // server holds rather than a job any particular agent has been minted for.
@@ -98,7 +107,6 @@ export function ProjectDialog({
         autoRun: draft.autoRun,
         refineAgentId: draft.refineAgentId || null,
       };
-      if (!values.name) throw new Error("A project needs a name.");
       if (project) return request(UpdateProjectDocument, { id: project.id, set: values });
       const created = await request(CreateProjectDocument, { values });
       // Made from here, it is the one you meant to work in.
@@ -119,7 +127,7 @@ export function ProjectDialog({
   });
 
   return (
-    <Dialog open onOpenChange={(open) => !open && onClose()}>
+    <Dialog open onOpenChange={(open) => !open && close()}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>{project ? "Edit project" : "New project"}</DialogTitle>
@@ -130,13 +138,15 @@ export function ProjectDialog({
 
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
-            <Label htmlFor="name">Name</Label>
+            <Label htmlFor="project-name">Name</Label>
             <Input
-              id="name"
+              id="project-name"
               value={draft.name}
               onChange={(event) => set({ name: event.target.value })}
               placeholder="Billing rewrite"
+              {...nameError.field}
             />
+            {nameError.error}
           </div>
 
           <div className="flex flex-col gap-2">
@@ -162,9 +172,9 @@ export function ProjectDialog({
 
           {project ? null : (
             <div className="flex flex-col gap-2">
-              <Label>Board</Label>
+              <Label htmlFor="project-board">Board</Label>
               <Select value={templateId} onValueChange={setTemplateId}>
-                <SelectTrigger className="w-full">
+                <SelectTrigger id="project-board" className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -200,14 +210,14 @@ export function ProjectDialog({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-2">
-              <Label>Refining agent</Label>
+              <Label htmlFor="project-refiner">Refining agent</Label>
               <Select
                 value={draft.refineAgentId || ANY}
                 onValueChange={(value) => set({ refineAgentId: value === ANY ? "" : value })}
               >
-                <SelectTrigger className="w-full">
+                <SelectTrigger id="project-refiner" className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -224,13 +234,14 @@ export function ProjectDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>
+          <Button variant="ghost" onClick={close}>
             Cancel
           </Button>
-          <Button onClick={() => save.mutate()} disabled={save.isPending}>
+          <Button onClick={() => save.mutate()} disabled={nameError.invalid || save.isPending}>
             {save.isPending ? "Saving…" : "Save"}
           </Button>
         </DialogFooter>
+        {guard}
       </DialogContent>
     </Dialog>
   );

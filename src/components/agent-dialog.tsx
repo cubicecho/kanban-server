@@ -1,6 +1,8 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
+import { useDiscardGuard } from "@/components/discard-guard";
+import { useFieldError } from "@/components/field-error";
 import { ModelSelect } from "@/components/model-select";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,6 +32,7 @@ import {
   SetAgentServersDocument,
   UpdateAgentDocument,
 } from "@/gql/graphql";
+import { useDirty } from "@/lib/dirty";
 import { request } from "@/lib/gql";
 
 type Agent = AgentsQuery["agents"][number];
@@ -63,6 +66,15 @@ const toDraft = (agent?: Agent): Draft => ({
   maxRetries: agent?.maxRetries ?? -1,
 });
 
+/** The numeric fields, by the label above each one rather than by its column name. */
+const NUMBERS = [
+  ["maxTokens", "Max tokens"],
+  ["temperature", "Temperature"],
+  ["maxToolIterations", "Max tool steps"],
+  ["requestTimeoutSeconds", "Silence before giving up"],
+  ["maxRetries", "Retries"],
+] as const;
+
 /**
  * An agent: an endpoint, the tools it may reach, and an optional word about itself.
  *
@@ -91,20 +103,20 @@ export function AgentDialog({
   );
   const set = (patch: Partial<Draft>) => setDraft((current) => ({ ...current, ...patch }));
 
+  // The key is deliberately not part of this: it is write-only and never comes back down, so
+  // there is nothing to compare it against — typing one is a change by definition.
+  const { close, guard } = useDiscardGuard(
+    useDirty({ ...draft, apiKey, linked: [...linked].sort() }),
+    onClose,
+  );
+  const nameError = useFieldError("agent-name", draft.name.trim() ? "" : "An agent needs a name.");
+  // These used to be checked inside the mutation and reported by their column name — a toast
+  // reading "maxToolIterations must be a number." names something that is nowhere on the form.
+  const badNumber = NUMBERS.find(([key]) => !Number.isFinite(draft[key]));
+
   const save = useMutation({
     mutationFn: async () => {
       const values = { ...draft, name: draft.name.trim() };
-      if (!values.name) throw new Error("An agent needs a name.");
-      for (const key of [
-        "maxTokens",
-        "temperature",
-        "maxToolIterations",
-        "requestTimeoutSeconds",
-        "maxRetries",
-      ] as const) {
-        if (!Number.isFinite(values[key])) throw new Error(`${key} must be a number.`);
-      }
-
       let id = agent?.id;
       if (id) await request(UpdateAgentDocument, { id, set: values });
       else id = (await request(CreateAgentDocument, { values })).createAgent.id;
@@ -127,7 +139,7 @@ export function AgentDialog({
     );
 
   return (
-    <Dialog open onOpenChange={(open) => !open && onClose()}>
+    <Dialog open onOpenChange={(open) => !open && close()}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{agent ? "Edit agent" : "New agent"}</DialogTitle>
@@ -145,7 +157,9 @@ export function AgentDialog({
               value={draft.name}
               onChange={(event) => set({ name: event.target.value })}
               placeholder="local llama"
+              {...nameError.field}
             />
+            {nameError.error}
             <p className="text-xs text-muted-foreground">
               Name it after the model or the machine — never after a job, which is the lane's.
             </p>
@@ -244,7 +258,7 @@ export function AgentDialog({
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div className="flex flex-col gap-2">
               <Label htmlFor="agent-tokens">Max tokens</Label>
               <Input
@@ -297,12 +311,12 @@ export function AgentDialog({
               <p className="text-xs text-muted-foreground">-1 inherits.</p>
             </div>
             <div className="flex flex-col gap-2">
-              <Label>Tool discovery</Label>
+              <Label htmlFor="agent-discovery">Tool discovery</Label>
               <Select
                 value={draft.toolDiscovery}
                 onValueChange={(value) => set({ toolDiscovery: value as AgentsToolDiscoveryEnum })}
               >
-                <SelectTrigger className="w-full">
+                <SelectTrigger id="agent-discovery" className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -316,13 +330,22 @@ export function AgentDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>
+          {badNumber ? (
+            <p className="mr-auto self-center text-xs text-destructive">
+              {badNumber[1]} needs to be a number.
+            </p>
+          ) : null}
+          <Button variant="ghost" onClick={close}>
             Cancel
           </Button>
-          <Button onClick={() => save.mutate()} disabled={save.isPending}>
+          <Button
+            onClick={() => save.mutate()}
+            disabled={nameError.invalid || Boolean(badNumber) || save.isPending}
+          >
             {save.isPending ? "Saving…" : "Save"}
           </Button>
         </DialogFooter>
+        {guard}
       </DialogContent>
     </Dialog>
   );

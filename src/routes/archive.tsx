@@ -1,8 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { RefreshCw, RotateCcw, Trash2 } from "lucide-react";
+import { Archive as ArchiveIcon, ChevronRight, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { Page } from "@/components/app-shell";
+import { ActionButton } from "@/components/action-button";
+import { Page, useCurrentProject } from "@/components/app-shell";
+import { ConfirmButton } from "@/components/confirm-button";
+import { EmptyState, NoProject } from "@/components/empty-state";
+import { QueryError } from "@/components/query-error";
+import { RowSkeleton } from "@/components/row-skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -15,6 +20,7 @@ import {
 import { CARD_STATUS_CLASS, CARD_STATUS_VARIANT } from "@/lib/cards";
 import { request } from "@/lib/gql";
 import { useProjectId } from "@/lib/project";
+import { cn } from "@/lib/utils";
 
 type Archived = ArchiveQuery["cards"][number];
 
@@ -31,6 +37,7 @@ type Archived = ArchiveQuery["cards"][number];
  */
 export function ArchiveRoute() {
   const projectId = useProjectId();
+  const project = useCurrentProject();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState<string | null>(null);
 
@@ -65,8 +72,8 @@ export function ArchiveRoute() {
 
   if (!projectId) {
     return (
-      <Page title="Archive" description="Pick a project first.">
-        <p className="text-sm text-muted-foreground">No project selected.</p>
+      <Page title="Archive">
+        <NoProject what="An archived card" />
       </Page>
     );
   }
@@ -76,6 +83,7 @@ export function ArchiveRoute() {
   return (
     <Page
       title="Archive"
+      crumb={project?.name}
       description="Cards taken off the board, most recently archived first."
       actions={
         <Button variant="outline" onClick={refresh}>
@@ -84,11 +92,16 @@ export function ArchiveRoute() {
         </Button>
       }
     >
-      {cards.length === 0 && !archive.isLoading ? (
-        <p className="text-sm text-muted-foreground">
-          Nothing is archived. Archiving a card takes it off the board without deleting it — the
-          Done pile, once it is long enough to be in the way.
-        </p>
+      {archive.isError ? (
+        <QueryError error={archive.error} onRetry={() => archive.refetch()} what="the archive" />
+      ) : null}
+      {archive.isPending ? <RowSkeleton rows={3} /> : null}
+      {cards.length === 0 && !archive.isPending && !archive.isError ? (
+        <EmptyState
+          icon={ArchiveIcon}
+          title="Nothing is archived"
+          description="Archiving a card takes it off the board without deleting it — the Done pile, once it is long enough to be in the way."
+        />
       ) : null}
 
       {cards.map((card: Archived) => {
@@ -98,44 +111,59 @@ export function ArchiveRoute() {
             <div className="flex items-start justify-between gap-3">
               <button
                 type="button"
-                className="min-w-0 flex-1 text-left"
+                className="flex min-w-0 flex-1 items-start gap-2 text-left"
+                aria-expanded={expanded}
                 onClick={() => setOpen(expanded ? null : card.id)}
               >
-                <div className="flex items-center gap-2">
-                  <Badge
-                    variant={CARD_STATUS_VARIANT[card.status] ?? "secondary"}
-                    className={CARD_STATUS_CLASS[card.status]}
-                  >
-                    {card.status}
-                  </Badge>
-                  <span className="truncate font-medium">{card.title}</span>
-                  <span className="shrink-0 text-xs text-muted-foreground">
-                    {card.lane?.name ?? "(lane gone)"} ·{" "}
-                    {card.archivedAt ? new Date(card.archivedAt).toLocaleString() : ""}
-                  </span>
-                </div>
-                <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
-                  {card.error || card.result || card.body || "(nothing written down)"}
-                </p>
+                <ChevronRight
+                  className={cn(
+                    "mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform",
+                    expanded && "rotate-90",
+                  )}
+                  aria-hidden
+                />
+                <span className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <Badge
+                      variant={CARD_STATUS_VARIANT[card.status] ?? "secondary"}
+                      className={CARD_STATUS_CLASS[card.status]}
+                    >
+                      {card.status}
+                    </Badge>
+                    <span className="truncate font-medium">{card.title}</span>
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {card.lane?.name ?? "(lane gone)"} ·{" "}
+                      {card.archivedAt ? new Date(card.archivedAt).toLocaleString() : ""}
+                    </span>
+                  </div>
+                  <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+                    {card.error || card.result || card.body || "(nothing written down)"}
+                  </p>
+                </span>
               </button>
               <div className="flex shrink-0 items-center gap-1">
-                <Button
+                <ActionButton
                   variant="ghost"
                   size="icon"
-                  title="Put it back at the end of its lane"
-                  disabled={restore.isPending}
+                  label={`Restore ${card.title}`}
+                  hint={`Put it back at the end of ${card.lane?.name ?? "its lane"}`}
+                  disabled={restore.isPending && restore.variables === card.id}
                   onClick={() => restore.mutate(card.id)}
                 >
-                  <RotateCcw className="size-4" />
-                </Button>
-                <Button
+                  <RotateCcw className="size-4" aria-hidden />
+                </ActionButton>
+                <ConfirmButton
                   variant="ghost"
                   size="icon"
-                  title="Delete for good"
-                  onClick={() => remove.mutate(card.id)}
+                  label={`Delete ${card.title} for good`}
+                  hint="Delete for good"
+                  title={`Delete "${card.title}" for good?`}
+                  description="This is the only place the card's result still exists. Deleting it also removes it as a dependency from anything that was waiting on it. There is no undo."
+                  confirmLabel="Delete for good"
+                  onConfirm={() => remove.mutate(card.id)}
                 >
-                  <Trash2 className="size-4" />
-                </Button>
+                  <Trash2 className="size-4" aria-hidden />
+                </ConfirmButton>
               </div>
             </div>
 

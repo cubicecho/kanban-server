@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { Plus, Send, Settings2, SquarePlus } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Page } from "@/components/app-shell";
 import { ProjectDialog } from "@/components/project-dialog";
 import { RunStream } from "@/components/run-stream";
+import { SetupChecklist } from "@/components/setup-checklist";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -66,11 +67,13 @@ export function HomeRoute() {
         </div>
       }
     >
+      <SetupChecklist onNewProject={() => setCreating(true)} />
+
       {project ? (
         <TaskComposer project={project} />
       ) : (
         <p className="text-sm text-muted-foreground">
-          {projects.isLoading
+          {projects.isPending
             ? "Loading…"
             : "No project yet. Make one — it comes with a board already wired up."}
         </p>
@@ -173,6 +176,16 @@ function TaskComposer({ project }: { project: Project }) {
   });
   const liveRunId = active.data?.runs.find((run) => run.taskId === watched)?.id;
 
+  // The transcript is a scroller that never scrolled: a fourth answer arrived below the fold and
+  // the page sat looking at the first one. Following the newest turn is the whole of it — unlike
+  // the run stream there is no token-by-token growth to fight a reader for.
+  const transcript = useRef<HTMLDivElement>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a new turn is what scrolls it.
+  useEffect(() => {
+    const element = transcript.current;
+    if (element) element.scrollTop = element.scrollHeight;
+  }, [draft?.messages.length, talking]);
+
   return (
     <Tabs defaultValue="refine">
       <TabsList>
@@ -181,7 +194,7 @@ function TaskComposer({ project }: { project: Project }) {
       </TabsList>
 
       <TabsContent value="refine" className="flex flex-col gap-4">
-        <Card className="flex max-h-[26rem] flex-col gap-3 overflow-y-auto p-4">
+        <Card ref={transcript} className="flex max-h-[26rem] flex-col gap-3 overflow-y-auto p-4">
           {draft?.messages.length ? (
             draft.messages.map((entry) => (
               <div
@@ -213,17 +226,27 @@ function TaskComposer({ project }: { project: Project }) {
         </Card>
 
         <form
-          className="flex gap-2"
+          className="flex items-end gap-2"
           onSubmit={(event) => {
             event.preventDefault();
-            if (message.trim()) say.mutate(message.trim());
+            if (message.trim() && !working) say.mutate(message.trim());
           }}
         >
-          <Input
+          {/* A textarea, because what you say here is a paragraph about what you want and the
+              other tab gives the same thing eight rows. Enter still sends — this is a chat —
+              and shift-enter is the newline. */}
+          <Textarea
+            rows={3}
             value={message}
             onChange={(event) => setMessage(event.target.value)}
-            placeholder="What needs doing?"
+            onKeyDown={(event) => {
+              if (event.key !== "Enter" || event.shiftKey) return;
+              event.preventDefault();
+              if (message.trim() && !working) say.mutate(message.trim());
+            }}
+            placeholder="What needs doing? Shift-enter for a new line."
             disabled={working}
+            className="min-h-0 resize-y"
           />
           <Button type="submit" disabled={working || !message.trim()}>
             <Send className="size-4" />

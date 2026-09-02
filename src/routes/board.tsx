@@ -15,17 +15,22 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Save, Settings2, Trash2 } from "lucide-react";
+import { KanbanSquare, Plus, Save, Settings2, Trash2 } from "lucide-react";
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
+import { ActionButton } from "@/components/action-button";
 import { Page } from "@/components/app-shell";
 import { CardGhost, SortableCard } from "@/components/board-card";
 import { CardDialog } from "@/components/card-dialog";
+import { ConfirmButton } from "@/components/confirm-button";
+import { EmptyState, NoProject } from "@/components/empty-state";
 import { LaneDialog } from "@/components/lane-dialog";
+import { QueryError } from "@/components/query-error";
 import { SaveTemplateDialog } from "@/components/save-template-dialog";
 import { Spend } from "@/components/spend";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   ActiveRunsDocument,
   AgentsDocument,
@@ -44,22 +49,66 @@ import {
 import { landing, laneOrder, placement } from "@/lib/board-order";
 import { request } from "@/lib/gql";
 import { useProjectId } from "@/lib/project";
+import { cn } from "@/lib/utils";
 
 type Lane = BoardQuery["lanes"][number];
 type BoardCard = BoardQuery["cards"][number];
 
-/** The whole lane is a drop target, so a card can be put in an empty one. */
-function LaneDrop({ laneId, children }: { laneId: string; children: ReactNode }) {
+/**
+ * The whole lane is a drop target, so a card can be put in an empty one.
+ *
+ * A hovered lane used to say so in `bg-muted` alone, which on a dark board is one step of
+ * lightness against the card behind it — a difference you can only see if you already know it
+ * is there. A ring in the accent colour is the same statement made at a contrast somebody can
+ * act on, and an empty lane says in words that it will take the card.
+ */
+function LaneDrop({
+  laneId,
+  empty,
+  children,
+}: {
+  laneId: string;
+  empty: boolean;
+  children: ReactNode;
+}) {
   const { setNodeRef, isOver } = useDroppable({ id: `lane:${laneId}` });
   return (
     <div
       ref={setNodeRef}
-      className={`flex min-h-24 flex-col gap-2 rounded-md p-1 transition-colors ${
-        isOver ? "bg-muted" : ""
-      }`}
+      className={cn(
+        "flex min-h-24 flex-col gap-2 rounded-md p-1 transition-colors",
+        isOver && "bg-primary/10 ring-2 ring-primary/50",
+        empty && "border border-dashed",
+      )}
     >
       {children}
+      {empty ? (
+        <p className="m-auto px-2 text-center text-xs text-muted-foreground">Drop a card here</p>
+      ) : null}
     </div>
+  );
+}
+
+/**
+ * Two lanes' worth of grey while the first board loads.
+ *
+ * `isPending` only — the board refetches every three seconds, and gating this on `isFetching`
+ * would replace a working board with shapes every time it did.
+ */
+function BoardSkeleton() {
+  return (
+    <>
+      {[0, 1, 2].map((lane) => (
+        <section key={lane} className="flex w-72 shrink-0 flex-col gap-2">
+          <Skeleton className="h-5 w-32" />
+          <Skeleton className="h-3 w-20" />
+          <div className="mt-1 flex flex-col gap-2">
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-24 w-full" />
+          </div>
+        </section>
+      ))}
+    </>
   );
 }
 
@@ -239,6 +288,45 @@ export function BoardRoute() {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
+  // dnd-kit's defaults read the draggable's id, which here is a uuid: a keyboard user heard
+  // "picked up draggable item 3f2a…" and then, on every arrow press, another one. What a person
+  // needs told is which card is in the air and which lane it is over.
+  const announcements = useMemo(() => {
+    const cardTitle = (id: string) => cards.find((card) => card.id === id)?.title ?? "a card";
+    const laneName = (id: string) => {
+      const laneId = id.startsWith("lane:")
+        ? id.slice("lane:".length)
+        : cards.find((card) => card.id === id)?.laneId;
+      return lanes.find((lane) => lane.id === laneId)?.name ?? "a lane";
+    };
+    return {
+      onDragStart: ({ active }: { active: { id: string | number } }) =>
+        `Picked up ${cardTitle(String(active.id))}.`,
+      onDragOver: ({
+        active,
+        over,
+      }: {
+        active: { id: string | number };
+        over: { id: string | number } | null;
+      }) =>
+        over
+          ? `${cardTitle(String(active.id))} is over ${laneName(String(over.id))}.`
+          : `${cardTitle(String(active.id))} is not over a lane.`,
+      onDragEnd: ({
+        active,
+        over,
+      }: {
+        active: { id: string | number };
+        over: { id: string | number } | null;
+      }) =>
+        over
+          ? `Dropped ${cardTitle(String(active.id))} in ${laneName(String(over.id))}.`
+          : `${cardTitle(String(active.id))} was put back.`,
+      onDragCancel: ({ active }: { active: { id: string | number } }) =>
+        `Left ${cardTitle(String(active.id))} where it was.`,
+    };
+  }, [cards, lanes]);
+
   const onDragEnd = ({ active, over }: DragEndEvent) => {
     setDragging(null);
     if (!over) return;
@@ -253,8 +341,8 @@ export function BoardRoute() {
 
   if (!projectId) {
     return (
-      <Page title="Board" description="Pick a project first.">
-        <p className="text-sm text-muted-foreground">No project selected.</p>
+      <Page title="Board">
+        <NoProject what="A board" />
       </Page>
     );
   }
@@ -298,6 +386,7 @@ export function BoardRoute() {
       <DndContext
         sensors={sensors}
         collisionDetection={closestCorners}
+        accessibility={{ announcements }}
         onDragStart={({ active }: DragStartEvent) => setDragging(String(active.id))}
         onDragCancel={() => setDragging(null)}
         onDragEnd={onDragEnd}
@@ -321,35 +410,42 @@ export function BoardRoute() {
                     </p>
                   </div>
                   <div className="flex shrink-0">
-                    <Button
+                    <ActionButton
                       variant="ghost"
                       size="icon"
-                      title="Add a card"
+                      label={`Add a card to ${lane.name}`}
+                      hint="Add a card"
                       onClick={() => setEditingCard({ laneId: lane.id })}
                     >
-                      <Plus className="size-4" />
-                    </Button>
-                    <Button
+                      <Plus className="size-4" aria-hidden />
+                    </ActionButton>
+                    <ActionButton
                       variant="ghost"
                       size="icon"
-                      title="Edit this lane"
+                      label={`Edit ${lane.name}`}
+                      hint="What happens here: the role, the agent, and where cards go next"
                       onClick={() => setEditingLane({ lane })}
                     >
-                      <Settings2 className="size-4" />
-                    </Button>
-                    <Button
+                      <Settings2 className="size-4" aria-hidden />
+                    </ActionButton>
+                    <ConfirmButton
                       variant="ghost"
                       size="icon"
-                      title={here.length ? "Empty the lane first" : "Delete this lane"}
+                      label={`Delete ${lane.name}`}
+                      hint={
+                        here.length ? "Move its cards somewhere else first" : "Delete this lane"
+                      }
                       disabled={here.length > 0}
-                      onClick={() => removeLane.mutate(lane.id)}
+                      title={`Delete the lane "${lane.name}"?`}
+                      description="Any other lane whose success or failure arrow pointed here stops pointing anywhere, and cards that land in it will sit still."
+                      onConfirm={() => removeLane.mutate(lane.id)}
                     >
-                      <Trash2 className="size-4" />
-                    </Button>
+                      <Trash2 className="size-4" aria-hidden />
+                    </ConfirmButton>
                   </div>
                 </header>
 
-                <LaneDrop laneId={lane.id}>
+                <LaneDrop laneId={lane.id} empty={here.length === 0}>
                   <SortableContext
                     items={here.map((card) => card.id)}
                     strategy={verticalListSortingStrategy}
@@ -365,10 +461,15 @@ export function BoardRoute() {
                         waitingOn={card.deps.map((dep) => title(dep.dependsOnCardId))}
                         watching={watching === card.id}
                         runId={runFor(card.id)}
+                        // Per card, not per mutation: these are one mutation object shared by
+                        // the whole board, so `move.isPending` alone greyed out every card's
+                        // controls because one of them was moving.
                         busy={{
-                          move: move.isPending,
-                          run: run.isPending,
-                          retry: retry.isPending,
+                          move: move.isPending && move.variables?.cardId === card.id,
+                          run: run.isPending && run.variables === card.id,
+                          retry: retry.isPending && retry.variables === card.id,
+                          archive: archive.isPending && archive.variables === card.id,
+                          remove: removeCard.isPending && removeCard.variables === card.id,
                         }}
                         on={{
                           edit: () => setEditingCard({ card, laneId: lane.id }),
@@ -388,10 +489,20 @@ export function BoardRoute() {
             );
           })}
 
-          {lanes.length === 0 && !board.isLoading ? (
-            <p className="text-sm text-muted-foreground">
-              This board has no lanes. Add one — a lane with an agent is where work happens.
-            </p>
+          {/* Three ways to have no lanes on screen, and they want different things done about
+              them. A failed request that reads as an empty board invites somebody to rebuild a
+              board that was never broken. */}
+          {board.isPending ? <BoardSkeleton /> : null}
+          {board.isError ? (
+            <QueryError error={board.error} onRetry={() => board.refetch()} what="this board" />
+          ) : null}
+          {lanes.length === 0 && !board.isPending && !board.isError ? (
+            <EmptyState
+              icon={KanbanSquare}
+              title="This board has no lanes"
+              description="A lane is a column; a lane that names a role and an agent is a station, and stations are where work actually happens."
+              action={<Button onClick={() => setEditingLane({})}>Add a lane</Button>}
+            />
           ) : null}
         </div>
 

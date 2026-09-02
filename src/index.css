@@ -7,6 +7,10 @@
 
 @theme inline {
   --font-heading: var(--font-sans);
+  --color-status-running: var(--status-running);
+  --color-status-running-foreground: var(--status-running-foreground);
+  --color-status-rejected: var(--status-rejected);
+  --color-status-rejected-foreground: var(--status-rejected-foreground);
   --font-sans: "Geist Variable", sans-serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -81,6 +85,14 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+
+  /* The only two statuses that get a colour of their own — see `lib/cards.ts` for why it is
+     two and not five. They live here rather than as `emerald-*`/`amber-*` utilities because
+     a hue picked for a dark card is not the same hue that reads on a white one. */
+  --status-running: oklch(0.596 0.145 163.225);
+  --status-running-foreground: oklch(0.432 0.115 166.913);
+  --status-rejected: oklch(0.769 0.158 70.08);
+  --status-rejected-foreground: oklch(0.473 0.137 62.884);
 }
 
 .dark {
@@ -115,6 +127,11 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+
+  --status-running: oklch(0.696 0.17 162.48);
+  --status-running-foreground: oklch(0.845 0.143 164.978);
+  --status-rejected: oklch(0.828 0.189 84.429);
+  --status-rejected-foreground: oklch(0.879 0.169 91.605);
 }
 
 @layer base {
@@ -126,5 +143,12 @@
   }
   html {
     @apply font-sans;
+  }
+  /* `h-full` on anything below `#root` resolves to nothing without these, which is why the
+     auth screen's centering silently did not centre. */
+  html,
+  body,
+  #root {
+    @apply h-full;
   }
 }

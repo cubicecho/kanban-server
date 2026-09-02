@@ -1,6 +1,7 @@
 import { memo, useEffect, useRef, useState } from "react";
 import { RunEventsDocument, type RunEventsSubscription } from "@/gql/graphql";
 import { subscribe } from "@/lib/gql";
+import { cn } from "@/lib/utils";
 
 type RunEvent = RunEventsSubscription["runEvents"];
 
@@ -60,6 +61,9 @@ export function RunStream({ runId }: { runId: string }) {
   const [error, setError] = useState("");
   const [ended, setEnded] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
+  // Whether the reader is at the bottom, sampled before the new output lands rather than after
+  // — once it has been drawn, the answer is always no.
+  const following = useRef(true);
 
   useEffect(() => {
     setBlocks([]);
@@ -90,7 +94,12 @@ export function RunStream({ runId }: { runId: string }) {
           seen = event.seq;
           pending.push(event);
         },
-        error: (failure) => setError(failure.message),
+        // A dropped connection is the end of this stream whatever the run is doing: the dot
+        // said "Live" next to the error that had just killed it.
+        error: (failure) => {
+          setError(failure.message);
+          setEnded(true);
+        },
         complete: () => {
           flush();
           setEnded(true);
@@ -104,23 +113,42 @@ export function RunStream({ runId }: { runId: string }) {
     };
   }, [runId]);
 
+  // Follow the output only for a reader who was already at the bottom. Scrolling back to
+  // re-read something a long run said ten seconds ago was impossible before: the next flush,
+  // a tenth of a second later, dragged the view back down again.
   // biome-ignore lint/correctness/useExhaustiveDependencies: following new output is the point.
   useEffect(() => {
     const element = scroller.current;
-    if (element) element.scrollTop = element.scrollHeight;
+    if (element && following.current) element.scrollTop = element.scrollHeight;
   }, [blocks]);
+
+  const onScroll = () => {
+    const element = scroller.current;
+    if (element)
+      following.current = element.scrollHeight - element.scrollTop - element.clientHeight < 40;
+  };
 
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <span
-          className={`size-2 rounded-full ${ended ? "bg-muted-foreground" : "animate-pulse bg-emerald-500"}`}
+          className={cn(
+            "size-2 rounded-full",
+            ended ? "bg-muted-foreground" : "animate-pulse bg-status-running",
+          )}
         />
         {ended ? "Run ended" : "Live"}
         {error ? <span className="text-destructive">· {error}</span> : null}
       </div>
 
-      <div ref={scroller} className="max-h-80 overflow-y-auto rounded-md border bg-muted/30 p-3">
+      <div
+        ref={scroller}
+        onScroll={onScroll}
+        role="log"
+        aria-live="polite"
+        aria-label="Run output"
+        className="max-h-80 overflow-y-auto rounded-md border bg-muted/30 p-3"
+      >
         {blocks.length === 0 ? (
           <p className="text-sm text-muted-foreground">Waiting for the model…</p>
         ) : null}
@@ -157,7 +185,10 @@ const BlockView = memo(function BlockView({ block }: { block: Block }) {
     case "tool-result":
       return (
         <p
-          className={`font-mono text-xs whitespace-pre-wrap ${block.ok ? "text-muted-foreground" : "text-destructive"}`}
+          className={cn(
+            "font-mono text-xs whitespace-pre-wrap",
+            block.ok ? "text-muted-foreground" : "text-destructive",
+          )}
         >
           ← {block.name}: {block.text}
         </p>

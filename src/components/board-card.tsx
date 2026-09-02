@@ -2,9 +2,11 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
   Archive,
-  ChevronLeft,
-  ChevronRight,
+  ArrowLeft,
+  ArrowRight,
+  Clock,
   GripVertical,
+  MoreHorizontal,
   Pencil,
   Play,
   Radio,
@@ -12,12 +14,33 @@ import {
   Square,
   Trash2,
 } from "lucide-react";
+import { useState } from "react";
+import { ActionButton } from "@/components/action-button";
 import { RunStream } from "@/components/run-stream";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { BoardQuery } from "@/gql/graphql";
 import { CARD_STATUS_CLASS, CARD_STATUS_VARIANT, needsAttention } from "@/lib/cards";
+import { cn } from "@/lib/utils";
 
 type Lane = BoardQuery["lanes"][number];
 type BoardCard = BoardQuery["cards"][number];
@@ -49,13 +72,16 @@ export function CardGhost({ card }: { card: BoardCard }) {
  * One card on the board, draggable by its grip.
  *
  * The grip is a handle rather than the whole card being one, and that is about the keyboard as
- * much as the mouse: a card carries eight buttons, and a drag listener on the card would take
- * the space bar off every one of them. On the handle, the keyboard sensor gets a focusable
- * element of its own — tab to it, space to lift, arrows to move, space to drop — and the
- * buttons inside stay buttons.
+ * much as the mouse: a card carries buttons, and a drag listener on the card would take the
+ * space bar off every one of them. On the handle, the keyboard sensor gets a focusable element
+ * of its own — tab to it, space to lift, arrows to move, space to drop — and the buttons
+ * inside stay buttons.
  *
- * The lane arrows stay too. Dragging is what a board is, but "two lanes to the right" is one
- * keystroke on an arrow and a dozen on a drag, and the arrows are what a screen reader meets.
+ * There used to be eight of those buttons, all icons, all identical grey, in 288px of lane,
+ * with `title` for a label and Delete four pixels from Archive. What a card wants is nearly
+ * always one thing — run it, stop it, or put it back in play — so that one is a button with a
+ * word on it and the rest are behind the overflow. The lane arrows moved in there with them,
+ * where they can say *which* lane rather than pointing at one.
  */
 export function SortableCard({
   card,
@@ -77,7 +103,7 @@ export function SortableCard({
   waitingOn: string[];
   watching: boolean;
   runId?: string;
-  busy: { move: boolean; run: boolean; retry: boolean };
+  busy: { move: boolean; run: boolean; retry: boolean; archive: boolean; remove: boolean };
   on: {
     edit: () => void;
     move: (laneId: string) => void;
@@ -89,6 +115,8 @@ export function SortableCard({
     watch: () => void;
   };
 }) {
+  const [confirming, setConfirming] = useState(false);
+
   // A card an agent is working cannot be moved out from under it — the server refuses, so the
   // board should not offer.
   const pinned = card.status === "running";
@@ -102,24 +130,34 @@ export function SortableCard({
       ref={setNodeRef}
       style={{ transform: CSS.Translate.toString(transform), transition }}
       // Left in place and faded, not removed: the gap it leaves is where the ghost will land.
-      className={`gap-2 p-3 ${isDragging ? "opacity-40" : ""}`}
+      className={cn("group/card gap-2 p-3", isDragging && "opacity-40")}
     >
       <div className="flex items-start justify-between gap-2">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              // Dim until the card is under the cursor or something on it has focus: a grip on
+              // every card at full contrast is twenty pieces of furniture on a full board.
+              className={cn(
+                "-ml-1 shrink-0 touch-none rounded text-muted-foreground/40 transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none group-focus-within/card:text-muted-foreground group-hover/card:text-muted-foreground",
+                pinned ? "cursor-not-allowed opacity-40" : "cursor-grab active:cursor-grabbing",
+              )}
+              aria-label={pinned ? `${card.title} cannot be moved` : `Drag ${card.title}`}
+              disabled={pinned}
+              {...attributes}
+              {...listeners}
+            >
+              <GripVertical className="size-4" aria-hidden />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>
+            {pinned ? "An agent is working this card" : "Drag, or press space to lift"}
+          </TooltipContent>
+        </Tooltip>
         <button
           type="button"
-          className={`-ml-1 shrink-0 touch-none text-muted-foreground ${
-            pinned ? "cursor-not-allowed opacity-40" : "cursor-grab"
-          }`}
-          title={pinned ? "An agent is working this card" : "Drag, or press space to lift"}
-          disabled={pinned}
-          {...attributes}
-          {...listeners}
-        >
-          <GripVertical className="size-4" />
-        </button>
-        <button
-          type="button"
-          className="min-w-0 flex-1 text-left text-sm font-medium"
+          className="min-w-0 flex-1 rounded text-left text-sm font-medium hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
           onClick={on.edit}
         >
           {card.title}
@@ -136,7 +174,10 @@ export function SortableCard({
       {/* An ordering is only useful if it is visible before it bites: a card shows what it
           waits on whether or not it has been asked to run yet. */}
       {waitingOn.length ? (
-        <p className="text-xs text-muted-foreground">After {waitingOn.join(", ")}</p>
+        <p className="flex items-start gap-1 text-xs text-muted-foreground">
+          <Clock className="mt-0.5 size-3 shrink-0" aria-hidden />
+          <span>After {waitingOn.join(", ")}</span>
+        </p>
       ) : null}
 
       {/* A card that has been round the loop looks like any other one, and the difference
@@ -149,81 +190,78 @@ export function SortableCard({
       ) : null}
 
       <div className="flex items-center gap-1">
-        <Button
+        <PrimaryAction
+          card={card}
+          lane={lane}
+          agentLabel={agentLabel}
+          busy={busy}
+          on={{ run: on.run, stop: on.stop, retry: on.retry }}
+        />
+        <ActionButton
           variant="ghost"
-          size="icon"
-          title={previous ? `Move to ${previous.name}` : "Nowhere to the left"}
-          disabled={!previous || busy.move}
-          onClick={() => previous && on.move(previous.id)}
+          size="icon-sm"
+          label={`Edit ${card.title}`}
+          hint="Edit"
+          onClick={on.edit}
         >
-          <ChevronLeft className="size-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          title={next ? `Move to ${next.name}` : "Nowhere to the right"}
-          disabled={!next || busy.move}
-          onClick={() => next && on.move(next.id)}
-        >
-          <ChevronRight className="size-4" />
-        </Button>
-        {/* A card a reviewer turned down is put back in play by the same button as one that
-            broke: both are stopped, and both are waiting on somebody to say try again. */}
-        {needsAttention(card.status) ? (
-          <Button
-            variant="ghost"
-            size="icon"
-            title={
-              card.status === "rejected"
-                ? "Put it back in play, keeping the reason it came back"
-                : "Clear the error and put it back in play"
-            }
-            disabled={busy.retry}
-            onClick={on.retry}
-          >
-            <RotateCcw className="size-4" />
-          </Button>
-        ) : null}
-        {card.status === "running" ? (
-          <Button
-            variant="ghost"
-            size="icon"
-            title={watching ? "Hide the run" : "Watch this run"}
-            onClick={on.watch}
-          >
-            <Radio className="size-4" />
-          </Button>
-        ) : null}
-        {card.status === "running" ? (
-          <Button variant="ghost" size="icon" title="Stop the agent" onClick={on.stop}>
-            <Square className="size-4" />
-          </Button>
-        ) : (
-          <Button
-            variant="ghost"
-            size="icon"
-            title={lane.agentId ? `Run with ${agentLabel}` : "This lane has no agent"}
-            disabled={!lane.agentId || busy.run}
-            onClick={on.run}
-          >
-            <Play className="size-4" />
-          </Button>
-        )}
-        <Button variant="ghost" size="icon" title="Edit" onClick={on.edit}>
-          <Pencil className="size-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          title={pinned ? "Stop the agent before archiving" : "Archive — off the board, not gone"}
-          disabled={pinned}
-          onClick={on.archive}
-        >
-          <Archive className="size-4" />
-        </Button>
-        <Button variant="ghost" size="icon" title="Delete" disabled={pinned} onClick={on.remove}>
-          <Trash2 className="size-4" />
-        </Button>
+          <Pencil className="size-4" aria-hidden />
+        </ActionButton>
+
+        {/* Everything a card can do that is not the one thing it usually wants. In a menu
+            rather than in a row, because eight ghost icons at 32px in a 288px lane is a
+            guessing game, and a menu can spell out which lane an arrow meant. */}
+        <DropdownMenu>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="ml-auto"
+                  aria-label={`More actions for ${card.title}`}
+                >
+                  <MoreHorizontal className="size-4" aria-hidden />
+                </Button>
+              </DropdownMenuTrigger>
+            </TooltipTrigger>
+            <TooltipContent>More</TooltipContent>
+          </Tooltip>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuItem
+              disabled={!previous || pinned || busy.move}
+              onSelect={() => previous && on.move(previous.id)}
+            >
+              <ArrowLeft className="size-4" aria-hidden />
+              {previous ? `Move to ${previous.name}` : "Nowhere to the left"}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={!next || pinned || busy.move}
+              onSelect={() => next && on.move(next.id)}
+            >
+              <ArrowRight className="size-4" aria-hidden />
+              {next ? `Move to ${next.name}` : "Nowhere to the right"}
+            </DropdownMenuItem>
+            {card.status === "running" ? (
+              <DropdownMenuItem onSelect={on.watch}>
+                <Radio className="size-4" aria-hidden />
+                {watching ? "Hide the run" : "Watch this run"}
+              </DropdownMenuItem>
+            ) : null}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem disabled={pinned || busy.archive} onSelect={on.archive}>
+              <Archive className="size-4" aria-hidden />
+              Archive — off the board, not gone
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              variant="destructive"
+              disabled={pinned || busy.remove}
+              onSelect={() => setConfirming(true)}
+            >
+              <Trash2 className="size-4" aria-hidden />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* The middle of the run, where the run is: what the agent is thinking and which tools it
@@ -236,6 +274,102 @@ export function SortableCard({
           <p className="text-xs text-muted-foreground">Looking for the run…</p>
         )
       ) : null}
+
+      <AlertDialog open={confirming} onOpenChange={setConfirming}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete "{card.title}"?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The card goes, along with whatever the agent wrote on it and its history of moves.
+              Archiving keeps all of that and still takes it off the board.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel onClick={on.archive}>Archive instead</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={on.remove}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
+  );
+}
+
+/**
+ * The one thing this card wants, with a word on it.
+ *
+ * A card is running, or it is waiting on somebody, or it is ready — three states and three
+ * verbs, and which one is showing says more about the card at a glance than the status badge
+ * beside it. It is the only control on a card wide enough to read, which is what makes the
+ * icons around it legible as the secondary things they are.
+ */
+function PrimaryAction({
+  card,
+  lane,
+  agentLabel,
+  busy,
+  on,
+}: {
+  card: BoardCard;
+  lane: Lane;
+  agentLabel?: string;
+  busy: { run: boolean; retry: boolean };
+  on: { run: () => void; stop: () => void; retry: () => void };
+}) {
+  if (card.status === "running") {
+    return (
+      <ActionButton
+        variant="outline"
+        size="sm"
+        label={`Stop the agent working ${card.title}`}
+        hint="Stop the agent"
+        onClick={on.stop}
+      >
+        <Square className="size-3.5" aria-hidden />
+        Stop
+      </ActionButton>
+    );
+  }
+
+  // A card a reviewer turned down is put back in play by the same button as one that broke:
+  // both are stopped, and both are waiting on somebody to say try again.
+  if (needsAttention(card.status)) {
+    return (
+      <ActionButton
+        variant="outline"
+        size="sm"
+        label={`Put ${card.title} back in play`}
+        hint={
+          card.status === "rejected"
+            ? "Put it back in play, keeping the reason it came back"
+            : "Clear the error and put it back in play"
+        }
+        disabled={busy.retry}
+        onClick={on.retry}
+      >
+        <RotateCcw className="size-3.5" aria-hidden />
+        Retry
+      </ActionButton>
+    );
+  }
+
+  return (
+    <ActionButton
+      variant="outline"
+      size="sm"
+      label={`Run ${card.title}`}
+      hint={
+        lane.agentId
+          ? `Run with ${agentLabel}`
+          : `${lane.name} has no agent — a lane without one is a resting place`
+      }
+      disabled={!lane.agentId || busy.run}
+      onClick={on.run}
+    >
+      <Play className="size-3.5" aria-hidden />
+      Run
+    </ActionButton>
   );
 }
