@@ -1,9 +1,9 @@
 import path from "node:path";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { ROOT } from "../paths.ts";
-import { DEFAULT_AGENTS } from "../runner/prompts.ts";
+import { DEFAULT_AGENTS, DEFAULT_ROLES } from "../runner/prompts.ts";
 import { db, ensureDatabase, runMigrations } from "./client.ts";
-import { agents, cards, runs, settings } from "./schema.ts";
+import { agents, cards, roles, runs, settings } from "./schema.ts";
 
 /**
  * Brings the database up to the current schema on boot, so a fresh clone — or a fresh postgres
@@ -29,11 +29,25 @@ export async function ensureSchema() {
 
   // A server with no agents cannot refine, decompose or execute anything, and the four it
   // needs differ only by their prompt — so they are seeded rather than left as four forms to
-  // fill in before the first task. Every model setting is left inheriting from settings, so
-  // configuring one endpoint configures all four. `onConflictDoNothing` on the unique name
-  // means an edited agent survives the next boot.
+  // fill in before the first task. `onConflictDoNothing` on the unique name means an edited
+  // role or agent survives the next boot.
+  //
+  // Roles first: an agent without one will not insert, which is the FK doing what it is for.
+  for (const role of DEFAULT_ROLES) {
+    await db.insert(roles).values(role).onConflictDoNothing();
+    // The migration that turned the role enum into rows could not carry the prompts with it —
+    // they live here, in TypeScript — so it wrote the four rows empty and left this to fill
+    // them. An edited prompt is not empty and is not touched.
+    await db
+      .update(roles)
+      .set({ systemPrompt: role.systemPrompt })
+      .where(and(eq(roles.name, role.name), eq(roles.systemPrompt, "")));
+  }
+  const seeded = new Map((await db.select().from(roles)).map((role) => [role.name, role.id]));
   for (const agent of DEFAULT_AGENTS) {
-    await db.insert(agents).values(agent).onConflictDoNothing();
+    const roleId = seeded.get(agent.role);
+    if (!roleId) continue;
+    await db.insert(agents).values({ name: agent.name, roleId }).onConflictDoNothing();
   }
 
   // A run left `running` by a crash is never going to finish; nothing would ever clear it, and

@@ -98,8 +98,11 @@ beforeEach(async () => {
   await db.delete(tables.lanes);
   await db.delete(tables.projects);
   await db.delete(tables.agents);
-  for (const role of ["execute", "review"] as const) {
-    await db.insert(tables.agents).values({ name: role, role, baseUrl, model: "fake" });
+  const roles = await db.select().from(tables.roles);
+  for (const name of ["executor", "reviewer"] as const) {
+    const role = roles.find((row) => row.name === name);
+    if (!role) throw new Error(`the ${name} role was not seeded`);
+    await db.insert(tables.agents).values({ name, roleId: role.id, baseUrl, model: "fake" });
   }
 });
 

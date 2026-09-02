@@ -11,10 +11,12 @@ query Board($projectId: String!) {
     onSuccessLaneId
     onFailureLaneId
     wipLimit
+    readVerdict
   }
+  # Archived cards are off the board by definition — see archive.graphql for the other half.
   cards(
     limit: 500
-    where: { projectId: { eq: $projectId } }
+    where: { projectId: { eq: $projectId }, archivedAt: { isNull: true } }
     orderBy: { position: { direction: asc, priority: 1 } }
   ) {
     id

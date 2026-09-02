@@ -2,7 +2,8 @@
 
 A kanban board that works itself. A **project** is a body of work; its **lanes** are the
 board's columns, and a lane that names an **agent** is a station — cards there get worked and
-then moved on. A **task** is what a person asks for in their own words, refined over a
+then moved on. An agent is a **role** — a job of work, which is a prompt and nothing else —
+pointed at a model endpoint. A **task** is what a person asks for in their own words, refined over a
 **message** thread until they accept it; a decompose agent turns the one task into many
 **cards**, which are the units an agent executes. Every time an agent is asked to do anything
 — refine, decompose, or work a card — that is one **run**. The same API is served three ways
@@ -99,17 +100,35 @@ rather than throwing, so the task survives to be retried.
 
 **A lane is a station, and the board is the pipeline.** `agentId` says what runs on the cards
 in a lane; `onSuccessLaneId` and `onFailureLaneId` say where they go afterwards; `wipLimit`
-caps how many run at once. That is the whole of the automation — there is no workflow engine,
-and the shape of the pipeline is the shape of the board someone drew. A lane with no agent is a
-resting place, which is what a backlog and a done pile are.
+caps how many run at once; `readVerdict` says this station judges cards rather than working
+them. That is the whole of the automation — there is no workflow engine, and the shape of the
+pipeline is the shape of the board someone drew. A lane with no agent is a resting place, which
+is what a backlog and a done pile are.
+
+**A role is the job; an agent is the job plus a model.** `roles` is a table, not an enum, because
+the useful ones are not knowable from here — a tester, a security reviewer, a technical writer are
+each a paragraph of instruction and none should need a migration. What cannot be invented is
+`stage`: `refine` and `decompose` answer in JSON the server itself parses, so they are two fixed
+stations, and `card` is every role a lane may point at. `resolveStage` is how the refiner and the
+decomposer are found; `seedLanes` finds the executor and the reviewer by their role's name.
+An agent's empty `systemPrompt` inherits the role's, which is why editing what every executor is
+told is one edit rather than one per agent, and why a card run no longer starts with an empty
+system message when somebody made an agent by hand.
 
 **The optimistic board and the server agree by construction.** A drop rewrites the board cache
-before the request goes out, and `src/lib/board-order.ts` holds the two pure functions that
-decide where a card lands and how its lane renumbers — the same arithmetic `moveCard` does.
+before the request goes out, and `src/lib/board-order.ts` holds the pure functions that decide
+where a card lands and how its lane renumbers — the same arithmetic `moveCard` does.
 `tests/board-order.test.ts` runs the real mutation and compares, because the failure mode of a
 disagreement is a card that moves twice: once where it was dropped, once when the refetch lands.
-Dragging is by a handle, not the whole card: a card carries seven buttons, and a keyboard drag
+Dragging is by a handle, not the whole card: a card carries eight buttons, and a keyboard drag
 listener on the card would take the space bar off all of them.
+
+`laneOrder` is the third of those functions and the one that is a view rather than arithmetic: a
+running card is drawn at the top of its lane, in green, because it is the one thing on a board
+that is happening rather than waiting. It does not renumber anything — a run that reordered its
+lane would shuffle every other card twice, once each way — and it is safe against the drag
+arithmetic only because a running card is not a drop target, so nothing is ever dropped onto the
+card whose drawn place and `position` disagree.
 
 **A board template stores indexes, not ids.** `saveBoardTemplate` snapshots a project's lanes
 into `board_templates.lanes`, turning `onSuccessLaneId`/`onFailureLaneId` into positions in the
@@ -117,8 +136,10 @@ template's own list — a lane id belongs to one project and means nothing in an
 one writes the lanes first and the arrows second, in a single transaction, which is the same
 two steps `seedLanes` takes and for the same reason. An `agentId` that no longer exists
 resolves to none rather than failing: a template is a shape, and the agents are whoever happens
-to be on this server. Applying is refused on a board with cards, because deleting a lane takes
-its cards with it.
+to be on this server. `readVerdict` is read back with `?? false`, because a template saved before
+stations could judge cards has no such key and a lane that does not say it reads a verdict does
+not read one. Applying is refused on a board with cards, because deleting a lane takes its cards
+with it.
 
 **`done` means nothing further will happen.** A card that passes into a lane that has an agent
 of its own is not finished — it is waiting for that lane's turn — so it goes back to `idle`,
@@ -126,9 +147,25 @@ because `readyCards` only picks up `idle`. `done` is for a card that stayed put,
 where no agent runs. A card a reviewer rejected stays `error`, so the Doing↔Review loop cannot
 spin on its own; `retryCard` is the way back, and clears the error where the card stands.
 
-**A review verdict is a property of the output, not of the run.** A reviewer that answers
-`FAIL` has still run fine, so the run is `ok` and the card is what fails. Ambiguity counts as a
-pass: a mumbling reviewer must not be able to wedge a board.
+**Archiving is off the board, not gone, and it is not a status.** `cards.archivedAt` is a
+timestamp rather than a flag because an archive is a list and a list wants an order; it is kept
+apart from `status` because a card is archived whether it finished, failed or was never picked
+up, and folding the two together would lose the outcome it is being archived with. An archived
+card keeps its `laneId` — that is where `restoreCard` puts it back, at the end of the lane,
+since the position it had has long been taken. Everything that reads the board filters it out:
+the `Board` query, `readyCards`, and `blockers`, where an archived card counts as no longer in
+the way — otherwise a dependent waits forever on a card nobody can find. `moveCard` and
+`runCard` refuse one outright. Deleting a lane is refused while it holds archived cards, because
+the cascade would take them with it and the board cannot show they are there: the guard that
+matters is the one for what you cannot see.
+
+**A review verdict is a property of the output, not of the run — and reading one is a property
+of the lane.** A reviewer that answers `FAIL` has still run fine, so the run is `ok` and the card
+is what fails. Ambiguity counts as a pass: a mumbling reviewer must not be able to wedge a board.
+`lanes.readVerdict` is what decides whether that first word is read at all, because judging is
+something a station does: the same agent can work cards in Doing and rule on them in Review, and
+a board may have two reviewing stations or none. Nothing in a card run branches on which role its
+agent fills.
 
 **Automation is opt-in per project.** `projects.autoRun` gates the worker; `server/worker/loop.ts`
 polls rather than waking on writes, because the things that make a card runnable are not all
@@ -137,7 +174,7 @@ writes — a dependency finishing, an agent switched back on, a run stopped.
 **Hand-written GraphQL fields go in `server/graphql/`**, beside the generated entities:
 `models`, `mcpStatus`, `runEvents`, `spend` on the query side; `refineTask`, `acceptTask`,
 `decomposeTask`, `submitTask`, `runCard`, `stopCard`, `stopTask`, `moveCard`, `retryCard`,
-`setCardDeps`, `setAgentServers`,
+`archiveCard`, `restoreCard`, `setCardDeps`, `setAgentServers`,
 `testMcpServer`, `reconnectMcp`, `setApiKey`, `setAgentApiKey` on the mutation side. Give every
 one of them a `description` — it is what an agent on `/mcp` reads to decide whether to call it.
 
@@ -151,10 +188,10 @@ belongs in a hook, not in a route handler.
 tests hold that line.
 
 **The `/mcp` surface is curated, not the whole schema.** `server/mcp-endpoint.ts` lists the
-twenty-eight tools an outside client gets. Nothing that empties a table in one call, nothing that
-reads or writes the API key, and no editing of agents or MCP servers — a visiting client can
-see which agents exist, because a lane points at one, but which model runs where and on whose
-key is the operator's business. A new tool goes in that list deliberately,
+thirty-one tools an outside client gets. Nothing that empties a table in one call, nothing that
+reads or writes the API key, and no editing of agents, roles or MCP servers — a visiting client can
+see which agents and roles exist, because a lane points at one, but which model runs where and on
+whose key is the operator's business. A new tool goes in that list deliberately,
 with a `HINTS` entry if the generated description does not say enough. The driver renames after
 it filters, so the `include` list names GraphQL fields in camelCase while `HINTS` — and the
 client — sees the snake_case tool name: `Mutation.createProject` is the tool `create_project`.
@@ -186,11 +223,13 @@ is unrepeatable, so a failure after that propagates. `requestTimeoutSeconds` is 
 watchdog that rearms on every chunk, not a deadline on the request, and an aborted stream ends
 its iteration rather than throwing — hence the `throwIfAborted()` after the loop.
 
-**Agents inherit from Settings by sentinel.** Every numeric knob treats `0` as "inherit",
+**Agents inherit from Settings by sentinel — and from their role for the prompt.** Every numeric
+knob treats `0` as "inherit",
 except `temperature` and `maxRetries`, which use `-1` because `0` is a value someone may
 genuinely want; empty strings inherit the same way, and `toolDiscovery` uses the word
 `"inherit"` rather than an empty string, because a nameless enum member reads as a bug in the
-API. `server/runner/llm.ts` is the only place that resolution happens.
+API. `systemPrompt` is the one that inherits from the agent's role instead, a prompt being what a
+role *is*. `server/runner/llm.ts` is the only place any of that resolution happens.
 
 **Run events are debugging output and are not persisted.** They live in an in-memory bus for a
 minute after the run ends, folded so consecutive output tokens arrive as one entry. Anything

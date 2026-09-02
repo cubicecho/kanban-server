@@ -12,6 +12,8 @@ process.env.KANBAN_SERVER_DATA_DIR = dir;
 
 /** What the fake model says next, one per request, in order. */
 let replies: string[] = [];
+/** Set by a test that cares what was actually sent rather than only what came back. */
+let bodies: ((body: { messages: { role: string; content: string }[] }) => void) | undefined;
 let server: http.Server;
 let baseUrl = "";
 
@@ -33,7 +35,9 @@ beforeAll(async () => {
       body += chunk;
     });
     request.on("end", () => {
-      replyWith(response, completion(replies.shift() ?? "ok"), JSON.parse(body));
+      const sent = JSON.parse(body);
+      bodies?.(sent);
+      replyWith(response, completion(replies.shift() ?? "ok"), sent);
     });
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -52,10 +56,13 @@ afterAll(async () => {
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-/** The three agents a board needs, each pointed at the fake model. */
+/** The three agents a board needs, each filling a seeded role and pointed at the fake model. */
 const seedAgents = async () => {
-  for (const role of ["decompose", "execute", "review"] as const) {
-    await db.insert(tables.agents).values({ name: role, role, baseUrl, model: "fake" });
+  const roles = await db.select().from(tables.roles);
+  for (const name of ["decomposer", "executor", "reviewer"] as const) {
+    const role = roles.find((row) => row.name === name);
+    if (!role) throw new Error(`the ${name} role was not seeded`);
+    await db.insert(tables.agents).values({ name, roleId: role.id, baseUrl, model: "fake" });
   }
 };
 
@@ -193,6 +200,76 @@ test("a reviewer that says FAIL sends the card back, and one that rambles does n
   expect(forward.laneId).toBe(done.id);
   // Done has no agent, so nothing more will happen to this card and it says so.
   expect(forward.status).toBe("done");
+});
+
+test("the verdict is the lane's to read, not the agent's to declare", async () => {
+  const { projectId, doing, review, done } = await seedProject("stations");
+  // The same reviewing agent in both lanes. Only Review is set to read what it says as a
+  // ruling, so the identical answer means two different things depending on where it lands.
+  const [reviewer] = await db
+    .select()
+    .from(tables.agents)
+    .where(eq(tables.agents.name, "reviewer"))
+    .limit(1);
+  await db.update(tables.lanes).set({ agentId: reviewer.id }).where(eq(tables.lanes.id, doing.id));
+
+  const worked = (
+    await db
+      .insert(tables.cards)
+      .values({ projectId, laneId: doing.id, title: "worked, not judged" })
+      .returning()
+  )[0];
+  replies = ["FAIL: this is prose, not a verdict"];
+  await runner.runCard(worked.id);
+  const forward = await cardById(worked.id);
+  // Doing does not read verdicts, so a leading FAIL is just the first word of a report.
+  expect(forward.laneId).toBe(review.id);
+  expect(forward.status).toBe("idle");
+  expect(forward.error).toBe("");
+
+  const judged = (
+    await db
+      .insert(tables.cards)
+      .values({ projectId, laneId: review.id, title: "judged" })
+      .returning()
+  )[0];
+  replies = ["FAIL: this is a verdict"];
+  await runner.runCard(judged.id);
+  const back = await cardById(judged.id);
+  expect(back.laneId).toBe(doing.id);
+  expect(back.status).toBe("error");
+  expect(done).toBeDefined();
+});
+
+test("an agent with no prompt of its own is told its role's", async () => {
+  const { projectId, doing } = await seedProject("inherited prompts");
+  const sent: string[] = [];
+  const listener = (body: { messages: { role: string; content: string }[] }) => {
+    sent.push(body.messages[0].content);
+  };
+  bodies = listener;
+
+  const [card] = await db
+    .insert(tables.cards)
+    .values({ projectId, laneId: doing.id, title: "anything" })
+    .returning();
+  replies = ["done"];
+  await runner.runCard(card.id);
+  expect(sent[0]).toContain("You carry out one card of work");
+
+  // And an agent that writes its own overrides the role rather than appending to it.
+  await db
+    .update(tables.agents)
+    .set({ systemPrompt: "You are terse." })
+    .where(eq(tables.agents.name, "executor"));
+  const [second] = await db
+    .insert(tables.cards)
+    .values({ projectId, laneId: doing.id, title: "again" })
+    .returning();
+  replies = ["done"];
+  await runner.runCard(second.id);
+  expect(sent[1]).toBe("You are terse.");
+  bodies = undefined;
 });
 
 test("a card waiting on an unfinished one does not run", async () => {

@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 import { errorMessage } from "../../shared/errors.ts";
 import { db } from "../db/client.ts";
 import {
@@ -14,7 +14,7 @@ import {
 } from "../db/schema.ts";
 import { type AgentResult, runAgent } from "./agent.ts";
 import { emit } from "./events.ts";
-import { type Resolved, resolveAgentId, resolveRole } from "./llm.ts";
+import { type Resolved, resolveAgentId, resolveStage } from "./llm.ts";
 import {
   cardPrompt,
   DECOMPOSE_SYSTEM,
@@ -194,7 +194,7 @@ export async function refineTask(taskId: string, userMessage: string): Promise<R
   const task = await loadTask(taskId);
   if (task.status !== "draft") throw new Error("this task has been accepted; it is past refining");
   const project = await loadProject(task.projectId);
-  const agent = await resolveRole("refine", project.refineAgentId);
+  const agent = await resolveStage("refine", project.refineAgentId);
 
   await db.insert(messages).values({ taskId, role: "user", content: userMessage });
   const thread = await db
@@ -270,7 +270,7 @@ export async function decomposeTask(taskId: string): Promise<Run> {
   const task = await loadTask(taskId);
   if (!task.brief.trim()) throw new Error("this task has no brief for the decomposer to read");
   const project = await loadProject(task.projectId);
-  const agent = await resolveRole("decompose", project.decomposeAgentId);
+  const agent = await resolveStage("decompose", project.decomposeAgentId);
   const lane = await intakeLane(project.id);
 
   await db.update(tasks).set({ status: "decomposing", error: "" }).where(eq(tasks.id, taskId));
@@ -342,7 +342,14 @@ export async function decomposeTask(taskId: string): Promise<Run> {
   return run;
 }
 
-/** Cards this one is waiting on that are not finished yet. */
+/**
+ * Cards this one is waiting on that are not finished yet.
+ *
+ * An archived card counts as no longer in the way, the same as a done one. It is off the board:
+ * nothing is going to move it on, and a card left waiting for it would wait for good — with a
+ * hint on its face naming a card that is not drawn anywhere. Archiving a dependency is a
+ * decision that it does not have to happen, and this is that decision taking effect.
+ */
 export async function blockers(cardId: string): Promise<Card[]> {
   const deps = await db
     .select({ id: cardDeps.dependsOnCardId })
@@ -358,7 +365,7 @@ export async function blockers(cardId: string): Promise<Card[]> {
         deps.map((dep) => dep.id),
       ),
     );
-  return rows.filter((card) => card.status !== "done");
+  return rows.filter((card) => card.status !== "done" && !card.archivedAt);
 }
 
 /**
@@ -368,14 +375,16 @@ export async function blockers(cardId: string): Promise<Card[]> {
  * `onFailureLaneId` are what make a board a pipeline, and a lane that names neither simply
  * keeps its cards. A card with no lane agent cannot be run at all — that is what a backlog is.
  *
- * A `review` agent is judged on what it said rather than on whether it answered: it did its job
- * either way, so its run is `ok`, and a verdict beginning FAIL sends the card down the failure
- * arm. Anything else counts as a pass, because a reviewer that cannot make itself clear should
- * not silently block the board.
+ * A lane with `readVerdict` is judged on what its agent said rather than on whether it answered:
+ * a reviewer did its job either way, so its run is `ok`, and a verdict beginning FAIL sends the
+ * card down the failure arm. Anything else counts as a pass, because a reviewer that cannot make
+ * itself clear should not silently block the board.
  */
 export async function runCard(cardId: string, agentId?: string | null): Promise<Run> {
   const card = await loadCard(cardId);
   const project = await loadProject(card.projectId);
+  if (card.archivedAt)
+    throw new Error(`"${card.title}" is archived — restore it before running it`);
   const [lane] = await db.select().from(lanes).where(eq(lanes.id, card.laneId)).limit(1);
   if (!lane) throw new Error("this card is not in a lane");
 
@@ -407,8 +416,9 @@ export async function runCard(cardId: string, agentId?: string | null): Promise<
   });
 
   const output = result?.output?.trim() ?? "";
-  const reviewed = agent.role === "review";
-  const passed = ok && (!reviewed || !/^\s*FAIL\b/i.test(output));
+  // The verdict is the lane's business, not the agent's: a station that judges cards says so,
+  // and the same agent works cards elsewhere without its answer being read as a ruling.
+  const passed = ok && (!lane.readVerdict || !/^\s*FAIL\b/i.test(output));
 
   const target = passed ? lane.onSuccessLaneId : lane.onFailureLaneId;
   const [next] = target
@@ -424,7 +434,7 @@ export async function runCard(cardId: string, agentId?: string | null): Promise<
       status:
         run.status === "stopped" ? "idle" : !passed ? "error" : next?.agentId ? "idle" : "done",
       result: output || card.result,
-      error: passed ? "" : run.error || (reviewed ? output : "the agent did not finish"),
+      error: passed ? "" : run.error || (lane.readVerdict ? output : "the agent did not finish"),
       ...(target ? { laneId: target, position: await nextPosition(target) } : {}),
     })
     .where(eq(cards.id, cardId));
@@ -432,12 +442,23 @@ export async function runCard(cardId: string, agentId?: string | null): Promise<
   return run;
 }
 
-/** Cards a lane's agent could pick up right now, oldest position first. */
+/**
+ * Cards a lane's agent could pick up right now, oldest position first.
+ *
+ * An archived card is not one of them however runnable it looks. It is still in a lane — that
+ * is where restoring puts it back — so nothing but this excludes it from the lane's own queue.
+ */
 export async function readyCards(laneId: string): Promise<Card[]> {
   const rows = await db
     .select()
     .from(cards)
-    .where(and(eq(cards.laneId, laneId), inArray(cards.status, ["idle", "blocked"])))
+    .where(
+      and(
+        eq(cards.laneId, laneId),
+        isNull(cards.archivedAt),
+        inArray(cards.status, ["idle", "blocked"]),
+      ),
+    )
     .orderBy(asc(cards.position));
 
   const ready: Card[] = [];

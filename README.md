@@ -36,12 +36,18 @@ key from the environment instead of the UI.
   own.
 - **lane** — a column, and where it names an `agentId`, a station. `onSuccessLaneId` and
   `onFailureLaneId` are where a card goes when that agent is finished with it, and `wipLimit`
-  caps how many run there at once. A lane with no agent is a resting place, which is what a
-  backlog and a done pile are.
-- **agent** — a model endpoint, a system prompt, and a set of MCP servers. `role` is `refine`,
-  `decompose`, `review` or `execute`. Each agent carries its own base URL, key and model, so one
-  can be a local llama.cpp and the next a frontier API; anything left empty inherits from
-  Settings.
+  caps how many run there at once. `readVerdict` says this station judges cards rather than
+  working them — its agent's answer is read as `PASS` or `FAIL`, and that word picks the arm. A
+  lane with no agent is a resting place, which is what a backlog and a done pile are.
+- **role** — a job of work: a name, a `stage`, and the prompt that goes with it. `stage` is
+  `refine`, `decompose` or `card`; the first two are fixed stations whose answers this server
+  parses, and `card` is every role a lane can point at — an executor, a reviewer, a tester, a
+  technical writer, as many as somebody has written. A role is a row, so a new kind of station
+  is something you write rather than something we ship.
+- **agent** — a role given a model to run on: an endpoint, optionally a prompt of its own, and a
+  set of MCP servers. Each agent carries its own base URL, key and model, so one can be a local
+  llama.cpp and the next a frontier API; anything left empty inherits from Settings, and an
+  empty `systemPrompt` inherits from the role.
 - **task** — what a person asked for, in their own words. A title, a `brief`, and a `status`
   that walks `draft` → `ready` → `decomposing` → `decomposed`.
 - **message** — one turn of the conversation refining a task. The thread is the task's history.
@@ -118,6 +124,11 @@ The review verdict is a property of the output, not of the run: a reviewer that 
 has still run fine, so the run is `ok` and it is the card that failed. An answer that is neither
 counts as a pass. A mumbling reviewer must not be able to wedge a board.
 
+Reading an answer as a verdict is the **lane's** setting (`readVerdict`), not the agent's. A new
+board has it on Review and nowhere else, and the lane dialog is where it moves — which is what
+lets the same agent judge cards at one station and work them at another, and lets a board have
+two reviewing stations, or none.
+
 A card whose dependencies have not finished is skipped by the worker rather than run out of
 order. Asking for it by hand marks it `blocked` and says on the card what it is waiting on.
 
@@ -129,7 +140,7 @@ the board stays in the order it looks like — and brings the card back to `idle
 cleared, which is why dragging a failed card is a retry.
 
 The grip is a handle rather than the whole card being draggable, and that is about the keyboard
-as much as the mouse: a card carries seven buttons, and a drag listener on the card itself would
+as much as the mouse: a card carries eight buttons, and a drag listener on the card itself would
 take the space bar off every one of them. On the handle it is tab to reach, space to lift, arrows
 to move, space to drop, escape to think better of it. The lane arrows stay because "two lanes to
 the right" is one keystroke on an arrow and a dozen on a drag.
@@ -144,12 +155,39 @@ a lane that renumbers itself under the cursor is a card dropped where nobody aim
 A card an agent is working does not drag at all. The server refuses to move it, so the board does
 not offer to.
 
+## Archiving a card
+
+A board that has been worked for a while is mostly Done, and a Done pile long enough to scroll is
+a lane nobody reads. Archiving takes a card off the board without deleting it: it stops being
+drawn, stops being picked up by its lane's agent, and stops counting as something other cards are
+waiting on — but it keeps its lane, its status and whatever the agent produced, and the **Archive**
+page is where all of that can still be read. Restoring puts it back at the end of the lane it was
+archived from, with its status untouched: a card archived as `error` comes back as one, because
+what it was is usually why it was put away.
+
+This is the middle answer between a Done pile that grows forever and a delete that cannot be
+undone, and it is the one to reach for. Deleting is still there, on the archive page, for a card
+that should never have existed.
+
+Archiving is refused while an agent is working the card — stop it first — and deleting a lane is
+refused while it holds archived cards. The board cannot show you those, and a lane takes its cards
+with it when it goes.
+
+It is also drawn at the top of its lane and its badge is green, because a run is the one thing on
+a board that is happening rather than waiting, and hunting for it down a column of twenty is the
+wrong way to find out what a project is doing. That is a view and not a move: `position` is left
+alone, since a run that renumbered its lane would shuffle every other card on the way in and
+shuffle them back on the way out. It stays honest with the drag arithmetic precisely because a
+running card cannot be dropped onto — it is the one card whose drawn place and `position`
+disagree, and nothing ever asks `landing` about it.
+
 ## Saving a board
 
 The four lanes are a starting point, not the shape most projects end up with, and redrawing the
 same five-lane board by hand for every new project is the kind of work a tool should not ask for.
-`saveBoardTemplate` keeps a project's lanes — their names, their agents, their WIP limits and the
-arrows between them — under a name, and `applyBoardTemplate` draws them onto another project.
+`saveBoardTemplate` keeps a project's lanes — their names, their agents, their WIP limits, which
+of them judge cards rather than work them, and the arrows between them — under a name, and
+`applyBoardTemplate` draws them onto another project.
 **Save as template** on the board and the **Board** picker in the new-project dialog are the two
 ends of it.
 
@@ -185,14 +223,22 @@ Runs are started but not awaited, so one slow agent does not hold up every other
 
 ## Agents and their tools
 
-Four agents are seeded on first boot — `refiner`, `decomposer`, `reviewer`, `executor` — differing
-only by their prompt, with every model setting left inheriting. Configure one endpoint in
-Settings and all four work. Edit any of them on the **Agents** page to point it somewhere else:
-its own base URL, key, model, temperature, iteration cap, timeout and retries.
+There are two lists on the **Agents** page, because they answer different questions. A **role**
+is the job — the prompt, and nothing about a model. An **agent** is a role pointed at an
+endpoint. Four of each are seeded on first boot (`refiner`, `decomposer`, `executor`,
+`reviewer`), with every model setting left inheriting, so configuring one endpoint in Settings
+makes all four work.
+
+The split is what makes a board's staff yours to define. Write a `tester` role and an agent to
+fill it, add a lane, point the lane at the agent: that is a new station, with no release
+involved. Editing what every executor is told is one edit to the role rather than one per agent
+doing the job, and an agent may still write its own `systemPrompt` to override the role for
+itself. A role an agent is filling cannot be deleted until nothing points at it.
 
 Inheritance is by sentinel, and it is worth knowing which: `0` means "inherit" for every numeric
 knob except `temperature` and `maxRetries`, which use `-1` because `0` is a value someone may
-genuinely want. Empty strings inherit the same way, and `toolDiscovery` uses the word `inherit`.
+genuinely want. Empty strings inherit the same way, `toolDiscovery` uses the word `inherit`, and
+`systemPrompt` inherits from the role rather than from Settings — a prompt is what a role is.
 
 Which MCP servers an agent may reach is per agent (`setAgentServers`), because the answer differs
 by role: an executor wants everything it can get, and a refiner is having a conversation and
@@ -310,7 +356,7 @@ somewhere work is handed off. In dev it is on the server's own port (`:8788`); v
 claude mcp add --transport http kanban http://localhost:8788/mcp
 ```
 
-Twenty-eight tools, chosen in `server/mcp-endpoint.ts` rather than projected from the whole schema:
+Thirty tools, chosen in `server/mcp-endpoint.ts` rather than projected from the whole schema:
 
 - **read** — `projects`, `lanes`, `cards`, `tasks`, `runs`, `agents`, `run_events`, `spend`,
   `board_templates`
@@ -318,7 +364,8 @@ Twenty-eight tools, chosen in `server/mcp-endpoint.ts` rather than projected fro
 - **tasks** — `submit_task`, `create_task`, `refine_task`, `accept_task`, `decompose_task`,
   `delete_task_single`
 - **cards** — `create_card`, `update_card_single`, `delete_card_single`, `set_card_deps`,
-  `move_card`, `retry_card`, `run_card`, `stop_card`, `stop_task`
+  `move_card`, `retry_card`, `archive_card`, `restore_card`, `run_card`, `stop_card`,
+  `stop_task`
 - **boards** — `save_board_template`, `apply_board_template`
 
 `submit_task` is the one to reach for: describe what you want and it is written down, broken into
@@ -359,7 +406,8 @@ that would put it back to one call.
 name, which settles most of the destructive/idempotent marks. The ones named after neither prefix
 arrive under the conservative default — destructive, not idempotent — and are corrected by hand:
 the four that run an agent destroy nothing, none of them is idempotent (decomposing a task twice
-makes two sets of cards), and `accept_task` and `move_card` are idempotent and destroy nothing.
+makes two sets of cards), and `accept_task`, `move_card`, `archive_card` and `restore_card` are
+idempotent and destroy nothing.
 `stop_card` keeps its destructive mark, because aborting a run throws away whatever the agent had
 done, and gains an idempotent one, because a second call finds nothing in flight and says so.
 

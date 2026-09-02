@@ -1,5 +1,5 @@
 import { buildSchema, GraphQLDateTime } from "@vantreeseba/drizzle-graphql";
-import { and, asc, eq, gte, inArray, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 import {
   GraphQLBoolean,
   GraphQLError,
@@ -23,6 +23,7 @@ import {
   cards,
   lanes,
   type Project,
+  roles,
   runs,
   settings,
   type TemplateLane,
@@ -31,6 +32,7 @@ import {
 import { fold, history, type RunEvent, watch } from "../runner/events.ts";
 import { listModels, loadSettings } from "../runner/llm.ts";
 import { type McpConnection, mcp, probe } from "../runner/mcp.ts";
+import { EXECUTOR_ROLE, REVIEWER_ROLE } from "../runner/prompts.ts";
 import {
   decomposeTask,
   isRunning,
@@ -101,6 +103,31 @@ const { entities } = buildSchema(db, {
         }
       },
     },
+    // Deleting a lane takes its cards with it, which is fine for the ones drawn in it — you can
+    // see what you are destroying. Its archived cards are not drawn anywhere, so the same delete
+    // would quietly take a pile nobody was looking at. Refuse instead, and say where they are.
+    lanes: {
+      // On `tx` and not `db`: the write is already inside a transaction, and on PGlite — one
+      // connection — a read that waits for its own transaction to finish never returns.
+      before: async ({ operation, args, tx }) => {
+        if (operation !== "delete") return;
+        const laneId = whereId(args);
+        if (!laneId) return;
+        const held = await (tx as typeof db)
+          .select({ id: cards.id })
+          .from(cards)
+          .where(and(eq(cards.laneId, laneId), isNotNull(cards.archivedAt)))
+          .limit(1);
+        if (held.length) {
+          throw new GraphQLError(
+            "This lane holds archived cards. They are not drawn on the board, so deleting the " +
+              "lane would take them with it unseen — restore or delete them from the archive " +
+              "first.",
+            { extensions: { code: "HAS_ARCHIVED" } },
+          );
+        }
+      },
+    },
     // `runs` are read-only apart from deletes, so this hook only ever guards one.
     runs: {
       before: ({ args }) =>
@@ -128,23 +155,26 @@ const { entities } = buildSchema(db, {
  * its status set to `error`, which the worker will not pick up, so a rejected card waits for a
  * person instead of looping between two agents at whatever a token costs.
  *
- * The agents are looked up by role rather than created, so a project made on a server whose
- * agents have been renamed or replaced gets that server's agents. Finding none is not an
- * error: the lanes are still drawn, and the board runs as soon as an agent is named on one.
+ * The agents are looked up by their role's name rather than created, so a project made on a
+ * server whose agents have been renamed or replaced gets that server's agents. Finding none is
+ * not an error: the lanes are still drawn, and the board runs as soon as an agent is named on
+ * one. Review is the lane that reads its agent's answer as a verdict — a fresh board is the one
+ * place that is decided for somebody, and the lane dialog is where it is changed.
  */
 async function seedLanes(tx: typeof db, rows: Project[]) {
   if (!rows.length) return;
-  const roleAgent = async (role: "execute" | "review") => {
+  const roleAgent = async (roleName: string) => {
     const found = await tx
       .select({ id: agents.id })
       .from(agents)
-      .where(and(eq(agents.role, role), eq(agents.enabled, true)))
+      .innerJoin(roles, eq(agents.roleId, roles.id))
+      .where(and(eq(roles.name, roleName), eq(agents.enabled, true)))
       .orderBy(asc(agents.name))
       .limit(1);
     return found[0]?.id ?? null;
   };
-  const executor = await roleAgent("execute");
-  const reviewer = await roleAgent("review");
+  const executor = await roleAgent(EXECUTOR_ROLE);
+  const reviewer = await roleAgent(REVIEWER_ROLE);
 
   for (const project of rows) {
     if (!project?.id) continue;
@@ -153,7 +183,13 @@ async function seedLanes(tx: typeof db, rows: Project[]) {
       .values([
         { projectId: project.id, name: "Backlog", position: 0, intake: true },
         { projectId: project.id, name: "Doing", position: 1, agentId: executor },
-        { projectId: project.id, name: "Review", position: 2, agentId: reviewer },
+        {
+          projectId: project.id,
+          name: "Review",
+          position: 2,
+          agentId: reviewer,
+          readVerdict: true,
+        },
         { projectId: project.id, name: "Done", position: 3 },
       ])
       .returning();
@@ -224,14 +260,30 @@ async function wouldCycle(
  * outright while anything is running: a rare, recoverable no rather than a wrong yes. Throwing
  * here rolls the mutation back before it writes.
  */
+/** The one id a `...Single` write names, where it names one. */
+function whereId(args: unknown): string | undefined {
+  const where = (args as { where?: { id?: { eq?: unknown } } } | undefined)?.where;
+  return typeof where?.id?.eq === "string" ? where.id.eq : undefined;
+}
+
 function refuseWhileRunning(args: unknown, running: Set<string>, message: string) {
   if (running.size === 0) return;
-  const where = (args as { where?: { id?: { eq?: unknown } } } | undefined)?.where;
-  const id = typeof where?.id?.eq === "string" ? where.id.eq : undefined;
+  const id = whereId(args);
   if (id !== undefined && !running.has(id)) return;
   // A plain Error would reach the client as "Internal server error" — the library only lets a
   // GraphQLError of its own through. This one is the client's to act on, so it says why.
   throw new GraphQLError(message, { extensions: { code: "RUN_IN_FLIGHT" } });
+}
+
+/** One card, or the refusal that says which id had nothing behind it. */
+async function cardOrThrow(cardId: string) {
+  const [card] = await db.select().from(cards).where(eq(cards.id, cardId)).limit(1);
+  if (!card) {
+    throw new GraphQLError(`There is no card with id ${cardId}.`, {
+      extensions: { code: "NOT_FOUND" },
+    });
+  }
+  return card;
 }
 
 /** Generated types are keyed by the mapped name; a rename should fail loudly, not silently. */
@@ -416,6 +468,9 @@ async function drawTemplate(tx: Tx, projectId: string, plan: TemplateLane[]) {
         intake: lane.intake,
         agentId: lane.agentId && known.has(lane.agentId) ? lane.agentId : null,
         wipLimit: lane.wipLimit,
+        // Templates saved before stations could judge cards have no such key; a lane that does
+        // not say it reads a verdict does not read one.
+        readVerdict: lane.readVerdict ?? false,
       })),
     )
     .returning();
@@ -642,7 +697,8 @@ export const schema = new GraphQLSchema({
           "Puts a card in a lane, at a position, and renumbers the cards around it so the " +
           "board stays in the order it looks like. Omit `position` to drop it at the end. " +
           "A card that had failed comes back to `idle`, which is what makes dragging one back " +
-          "a retry; a card an agent is working cannot be moved out from under it.",
+          "a retry; a card an agent is working cannot be moved out from under it, and nor can " +
+          "an archived one — `restoreCard` is what puts that back on the board.",
         args: {
           cardId: { type: new GraphQLNonNull(GraphQLString) },
           laneId: { type: new GraphQLNonNull(GraphQLString) },
@@ -657,10 +713,11 @@ export const schema = new GraphQLSchema({
               extensions: { code: "RUN_IN_FLIGHT" },
             });
           }
-          const [card] = await db.select().from(cards).where(eq(cards.id, args.cardId)).limit(1);
-          if (!card) {
-            throw new GraphQLError(`There is no card with id ${args.cardId}.`, {
-              extensions: { code: "NOT_FOUND" },
+          const card = await cardOrThrow(args.cardId);
+          // Moving one would renumber a whole lane around a card nobody can see.
+          if (card.archivedAt) {
+            throw new GraphQLError("This card is archived. Restore it before moving it.", {
+              extensions: { code: "ARCHIVED" },
             });
           }
           const [lane] = await db.select().from(lanes).where(eq(lanes.id, args.laneId)).limit(1);
@@ -730,6 +787,60 @@ export const schema = new GraphQLSchema({
           return card;
         },
       },
+      archiveCard: {
+        type: new GraphQLNonNull(generatedType("Card")),
+        description:
+          "Takes a card off the board without deleting it. It stops being drawn in its lane, " +
+          "stops being picked up by that lane's agent, and stops counting as something other " +
+          "cards are waiting on — but it keeps its lane, its status and its result, and " +
+          "`restoreCard` puts it back. This is what a Done pile is for once it is long enough " +
+          "to be in the way. Read the archive with `cards(where: { archivedAt: { isNotNull: " +
+          "true } })`. Refused while an agent is working the card; archiving one already " +
+          "archived leaves the time it was archived alone.",
+        args: { cardId: { type: new GraphQLNonNull(GraphQLString) } },
+        resolve: async (_source, args: { cardId: string }) => {
+          if (isRunning(args.cardId)) {
+            throw new GraphQLError(
+              "An agent is working this card. Stop it first, then archive it.",
+              { extensions: { code: "RUN_IN_FLIGHT" } },
+            );
+          }
+          const card = await cardOrThrow(args.cardId);
+          if (card.archivedAt) return card;
+          const [archived] = await db
+            .update(cards)
+            .set({ archivedAt: new Date() })
+            .where(eq(cards.id, card.id))
+            .returning();
+          return archived;
+        },
+      },
+      restoreCard: {
+        type: new GraphQLNonNull(generatedType("Card")),
+        description:
+          "Puts an archived card back on the board, at the end of the lane it was archived " +
+          "from. Its status is left as it was found — a card archived as `error` comes back " +
+          "as one, and `retryCard` is still the way to put that back in play — because what " +
+          "the card was is the reason someone archived it. The end of the lane rather than " +
+          "its old position, which the cards added since have long taken.",
+        args: { cardId: { type: new GraphQLNonNull(GraphQLString) } },
+        resolve: async (_source, args: { cardId: string }) => {
+          const card = await cardOrThrow(args.cardId);
+          if (!card.archivedAt) return card;
+          const [last] = await db
+            .select({ position: cards.position })
+            .from(cards)
+            .where(and(eq(cards.laneId, card.laneId), isNull(cards.archivedAt)))
+            .orderBy(desc(cards.position))
+            .limit(1);
+          const [restored] = await db
+            .update(cards)
+            .set({ archivedAt: null, position: (last?.position ?? -1) + 1 })
+            .where(eq(cards.id, card.id))
+            .returning();
+          return restored;
+        },
+      },
       setCardDeps: {
         type: new GraphQLNonNull(new GraphQLList(new GraphQLNonNull(GraphQLString))),
         description:
@@ -747,12 +858,7 @@ export const schema = new GraphQLSchema({
         },
         resolve: async (_source, args: { cardId: string; dependsOn: string[] }) => {
           const wanted = [...new Set(args.dependsOn)];
-          const [card] = await db.select().from(cards).where(eq(cards.id, args.cardId)).limit(1);
-          if (!card) {
-            throw new GraphQLError(`There is no card with id ${args.cardId}.`, {
-              extensions: { code: "NOT_FOUND" },
-            });
-          }
+          const card = await cardOrThrow(args.cardId);
           if (wanted.includes(card.id)) {
             throw new GraphQLError("A card cannot wait on itself.", {
               extensions: { code: "CYCLE" },
@@ -835,6 +941,7 @@ export const schema = new GraphQLSchema({
             intake: lane.intake,
             agentId: lane.agentId,
             wipLimit: lane.wipLimit,
+            readVerdict: lane.readVerdict,
             onSuccess: index.get(lane.onSuccessLaneId ?? "") ?? null,
             onFailure: index.get(lane.onFailureLaneId ?? "") ?? null,
           }));
@@ -852,9 +959,9 @@ export const schema = new GraphQLSchema({
         type: new GraphQLNonNull(new GraphQLList(new GraphQLNonNull(generatedType("Lane")))),
         description:
           "Redraws a project's board from a saved template, and answers with the lanes it " +
-          "wrote. Refused once the board has cards on it: replacing lanes takes their cards " +
-          "with them, so this is for a project that has not started rather than a way to " +
-          "rearrange one that has.",
+          "wrote. Refused once the board has cards on it, archived ones included: replacing " +
+          "lanes takes their cards with them, so this is for a project that has not started " +
+          "rather than a way to rearrange one that has.",
         args: {
           projectId: { type: new GraphQLNonNull(GraphQLString) },
           templateId: { type: new GraphQLNonNull(GraphQLString) },
@@ -877,8 +984,9 @@ export const schema = new GraphQLSchema({
             .limit(1);
           if (held.length) {
             throw new GraphQLError(
-              "That board has cards on it. Applying a template replaces its lanes, and a " +
-                "lane takes its cards with it.",
+              "That board has cards on it — archived ones included, which are not drawn " +
+                "anywhere. Applying a template replaces its lanes, and a lane takes its cards " +
+                "with it.",
               { extensions: { code: "HAS_CARDS" } },
             );
           }

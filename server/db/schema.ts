@@ -53,6 +53,38 @@ const updatedAt = () =>
     .$onUpdateFn(() => new Date());
 
 /**
+ * A named job of work: the prompt, apart from the model that runs it.
+ *
+ * Roles are rows and not an enum because the useful ones are not knowable from here. A board
+ * may want a tester, a security reviewer, a technical writer; each of those is a paragraph of
+ * instruction and nothing else, and none of them should need a migration. What cannot be
+ * invented is `stage`: refining and decomposing answer in JSON that a program parses, so they
+ * are two fixed stations rather than two names in a list.
+ *
+ * An agent points at one of these and may leave `systemPrompt` empty to take the role's — the
+ * same sentinel inheritance every other setting on an agent uses.
+ */
+export const roles = pgTable("roles", {
+  id: id(),
+  name: text().notNull().unique(),
+  /** What this role is for, in one line. Shown where a role is picked; never sent to a model. */
+  description: text().notNull().default(""),
+  /**
+   * Which of the three jobs this role is for. `refine` talks a task into shape and `decompose`
+   * turns an accepted one into cards; both are answered in JSON and neither is a thing to have
+   * two shapes of. `card` is every role a lane can point at, and what one of those is *for* is
+   * only ever its prompt.
+   */
+  stage: text({ enum: ["card", "refine", "decompose"] })
+    .notNull()
+    .default("card"),
+  /** What an agent with this role is told, unless the agent writes its own. */
+  systemPrompt: text().notNull().default(""),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+
+/**
  * A model endpoint, a prompt, and the tools to go with it.
  *
  * Separate rows rather than one set of settings because the four things this server asks a
@@ -62,24 +94,27 @@ const updatedAt = () =>
  * be a local llama.cpp and the next a frontier API without either knowing about the other.
  *
  * Every numeric knob treats zero as "inherit from settings", and `temperature` uses `-1` for it
- * — zero being a temperature someone may genuinely want. Empty strings inherit the same way.
+ * — zero being a temperature someone may genuinely want. Empty strings inherit the same way,
+ * and `systemPrompt` inherits from the agent's role rather than from settings, because a prompt
+ * is what a role is.
  */
 export const agents = pgTable("agents", {
   id: id(),
   name: text().notNull().unique(),
   /**
-   * What this agent is for. `refine` talks to a person about a task, `decompose` turns an
-   * accepted task into cards, `review` and `execute` are what a lane points at.
+   * What this agent is for. `restrict` rather than `set null`: an agent with no role has no
+   * prompt and no stage, which is not a state worth being able to reach by deleting a row.
    */
-  role: text({ enum: ["refine", "decompose", "review", "execute"] })
+  roleId: text()
     .notNull()
-    .default("execute"),
+    .references(() => roles.id, { onDelete: "restrict" }),
   enabled: boolean().notNull().default(true),
   /** Any OpenAI-compatible endpoint. Empty falls back to the one in settings. */
   baseUrl: text().notNull().default(""),
   /** Empty falls back to settings, then to $OPENAI_API_KEY. Never readable over the API. */
   apiKey: text().notNull().default(""),
   model: text().notNull().default(""),
+  /** This agent's own instructions. Empty takes the role's. */
   systemPrompt: text().notNull().default(""),
   maxTokens: integer().notNull().default(0),
   temperature: real().notNull().default(-1),
@@ -199,6 +234,17 @@ export const lanes = pgTable(
     onFailureLaneId: text().references((): AnyPgColumn => lanes.id, { onDelete: "set null" }),
     /** How many cards the worker will run here at once. Zero means one — never unbounded. */
     wipLimit: integer().notNull().default(1),
+    /**
+     * Whether what comes out of this lane is a verdict on the card rather than work on it.
+     *
+     * A reviewing station's agent answers `PASS` or `FAIL` on its first line, and that word —
+     * not whether the run finished — is what sends the card down `onSuccessLaneId` or
+     * `onFailureLaneId`. It is the lane's property and not the agent's because reviewing is
+     * something a station does: the same agent asked to judge a card here can be asked to work
+     * one in the lane before. Ambiguity counts as a pass, so a mumbling reviewer cannot wedge
+     * a board.
+     */
+    readVerdict: boolean().notNull().default(false),
     createdAt: createdAt(),
   },
   (table) => [index("lanes_project_idx").on(table.projectId)],
@@ -257,6 +303,10 @@ export const messages = pgTable(
  * Cards are what the decomposer produces and what the lane agents execute. `acceptance` is
  * kept apart from `body` on purpose: it is what a review agent is asked to check against, and
  * a criterion buried in a paragraph of description is a criterion that gets skipped.
+ *
+ * A card with an `archivedAt` is off the board without being gone: nothing draws it, nothing
+ * runs it, and nothing waits on it, but it is still there to be read or restored. It is the
+ * middle answer between a Done pile that grows forever and a delete that cannot be undone.
  */
 export const cards = pgTable(
   "cards",
@@ -283,6 +333,18 @@ export const cards = pgTable(
     /** What the last agent to work this card had to say about it. */
     result: text().notNull().default(""),
     error: text().notNull().default(""),
+    /**
+     * When this card was put out of the way, or null while it is on the board.
+     *
+     * Archiving is kept apart from `status` because the two say different things: a card is
+     * archived whether it finished, failed or was never picked up, and folding that into the
+     * status would lose the outcome it is being archived with. A timestamp rather than a flag
+     * because an archive is a list, and a list wants an order — most recently put away first.
+     *
+     * It is the lane that a card is missing from, not the project: an archived card keeps its
+     * `laneId`, which is where restoring puts it back.
+     */
+    archivedAt: timestamp({ mode: "date", withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -375,6 +437,8 @@ export interface TemplateLane {
   /** By id, so a template keeps the agents it was drawn with. Missing ones resolve to none. */
   agentId: string | null;
   wipLimit: number;
+  /** Whether this station reads its agent's answer as a PASS/FAIL verdict on the card. */
+  readVerdict: boolean;
   /** Index into the same list, or null for "leave the card where it is". */
   onSuccess: number | null;
   onFailure: number | null;
@@ -424,6 +488,7 @@ export const settings = pgTable("settings", {
 });
 
 export const schema = {
+  roles,
   agents,
   mcpServers,
   agentServers,
@@ -439,7 +504,11 @@ export const schema = {
 };
 
 export const relations = defineRelations(schema, (r) => ({
+  roles: {
+    agents: r.many.agents({ from: r.roles.id, to: r.agents.roleId }),
+  },
   agents: {
+    role: r.one.roles({ from: r.agents.roleId, to: r.roles.id, optional: false }),
     servers: r.many.agentServers({ from: r.agents.id, to: r.agentServers.agentId }),
     lanes: r.many.lanes({ from: r.agents.id, to: r.lanes.agentId }),
     runs: r.many.runs({ from: r.agents.id, to: r.runs.agentId }),
@@ -496,6 +565,7 @@ export const relations = defineRelations(schema, (r) => ({
   },
 }));
 
+export type Role = typeof roles.$inferSelect;
 export type Agent = typeof agents.$inferSelect;
 export type McpServerRow = typeof mcpServers.$inferSelect;
 export type AgentServer = typeof agentServers.$inferSelect;

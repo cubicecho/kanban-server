@@ -75,6 +75,7 @@ test("offers the board tools, and only those", async () => {
     "accept_task",
     "agents",
     "apply_board_template",
+    "archive_card",
     "board_templates",
     "cards",
     "create_card",
@@ -87,7 +88,9 @@ test("offers the board tools, and only those", async () => {
     "move_card",
     "projects",
     "refine_task",
+    "restore_card",
     "retry_card",
+    "roles",
     "run_card",
     "run_events",
     "runs",
@@ -314,7 +317,8 @@ test("marks only the tools that actually destroy something", async () => {
 
   // The updates rewrite a row, the deletes are the real thing, stopping a run throws away what
   // it had done, and the two template calls each replace something that was there — a board's
-  // lanes, or a template of the same name. Starting an agent is none of those: a client that
+  // lanes, or a template of the same name. Starting an agent is none of those, and nor is
+  // archiving: it is the alternative to deleting, and `restore_card` is its undo. A client that
   // gates on this hint should be spending the operator's attention on the deletes.
   expect(flagged("destructiveHint")).toEqual([
     "apply_board_template",
@@ -334,6 +338,7 @@ test("marks only the tools that actually destroy something", async () => {
   const writes = new Set([
     "accept_task",
     "apply_board_template",
+    "archive_card",
     "create_card",
     "create_project",
     "create_task",
@@ -342,6 +347,7 @@ test("marks only the tools that actually destroy something", async () => {
     "delete_task_single",
     "move_card",
     "refine_task",
+    "restore_card",
     "retry_card",
     "run_card",
     "save_board_template",
@@ -355,9 +361,11 @@ test("marks only the tools that actually destroy something", async () => {
   expect(flagged("idempotentHint").filter((name) => writes.has(name))).toEqual([
     "accept_task",
     "apply_board_template",
+    "archive_card",
     "delete_card_single",
     "delete_task_single",
     "move_card",
+    "restore_card",
     "retry_card",
     "save_board_template",
     "set_card_deps",
@@ -371,6 +379,7 @@ test("marks only the tools that actually destroy something", async () => {
     "cards",
     "lanes",
     "projects",
+    "roles",
     "run_events",
     "runs",
     "spend",

@@ -79,8 +79,8 @@ export function ProjectDialog({
   const [templateId, setTemplateId] = useState(SEEDED);
 
   const agents = useQuery({ queryKey: ["agents"], queryFn: () => request(AgentsDocument) });
-  const byRole = (role: string) =>
-    (agents.data?.agents ?? []).filter((agent) => agent.role === role);
+  const byStage = (stage: string) =>
+    (agents.data?.agents ?? []).filter((agent) => agent.role.stage === stage);
 
   // Only offered on a new project: applying one to a board that has cards is refused, and by
   // the time a project is being edited it usually has.
@@ -214,7 +214,7 @@ export function ProjectDialog({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={ANY}>Any enabled refiner</SelectItem>
-                  {byRole("refine").map((agent) => (
+                  {byStage("refine").map((agent) => (
                     <SelectItem key={agent.id} value={agent.id}>
                       {agent.name}
                     </SelectItem>
@@ -233,7 +233,7 @@ export function ProjectDialog({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={ANY}>Any enabled decomposer</SelectItem>
-                  {byRole("decompose").map((agent) => (
+                  {byStage("decompose").map((agent) => (
                     <SelectItem key={agent.id} value={agent.id}>
                       {agent.name}
                     </SelectItem>

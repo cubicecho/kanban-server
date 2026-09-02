@@ -57,6 +57,7 @@ export function LaneDialog({
   const [onFailureLaneId, setOnFailure] = useState(lane?.onFailureLaneId ?? "");
   const [wipLimit, setWipLimit] = useState(lane?.wipLimit ?? 1);
   const [intake, setIntake] = useState(lane?.intake ?? false);
+  const [readVerdict, setReadVerdict] = useState(lane?.readVerdict ?? false);
 
   const agents = useQuery({ queryKey: ["agents"], queryFn: () => request(AgentsDocument) });
   const others = lanes.filter((row) => row.id !== lane?.id);
@@ -70,6 +71,7 @@ export function LaneDialog({
         onFailureLaneId: onFailureLaneId || null,
         wipLimit,
         intake,
+        readVerdict,
       };
       if (!values.name) throw new Error("A lane needs a name.");
       if (lane) await request(UpdateLaneDocument, { id: lane.id, set: values });
@@ -129,11 +131,12 @@ export function LaneDialog({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={NONE}>Nothing runs here</SelectItem>
+                {/* Refining and decomposing are the project's stations, not the board's. */}
                 {(agents.data?.agents ?? [])
-                  .filter((agent) => agent.role === "execute" || agent.role === "review")
+                  .filter((agent) => agent.role.stage === "card")
                   .map((agent) => (
                     <SelectItem key={agent.id} value={agent.id}>
-                      {agent.name} · {agent.role}
+                      {agent.name} · {agent.role.name}
                     </SelectItem>
                   ))}
               </SelectContent>
@@ -174,6 +177,17 @@ export function LaneDialog({
               </div>
               <Switch id="lane-intake" checked={intake} onCheckedChange={setIntake} />
             </div>
+          </div>
+
+          <div className="flex items-center justify-between gap-4 rounded-md border p-3">
+            <div>
+              <Label htmlFor="lane-verdict">Judge, do not work</Label>
+              <p className="mt-1 text-xs text-muted-foreground">
+                The agent here answers PASS or FAIL on its first line, and that word picks the arm.
+                Anything else counts as a pass.
+              </p>
+            </div>
+            <Switch id="lane-verdict" checked={readVerdict} onCheckedChange={setReadVerdict} />
           </div>
         </div>
 

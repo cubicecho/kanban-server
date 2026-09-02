@@ -92,7 +92,9 @@ afterAll(async () => {
 const config = (over: Partial<Resolved> = {}): Resolved => ({
   agentId: "agent-1",
   name: "tester",
-  role: "execute",
+  roleId: "role-executor",
+  roleName: "executor",
+  stage: "card" as const,
   baseUrl,
   apiKey: "",
   model: "fake",

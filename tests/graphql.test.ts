@@ -431,9 +431,14 @@ test("a board saved under a name is drawn onto the next project the same shape",
 });
 
 test("a template names its agents by id, and forgets the ones this server no longer has", async () => {
+  const [role] = await db
+    .select()
+    .from(tables.roles)
+    .where(eq(tables.roles.name, "executor"))
+    .limit(1);
   const [agent] = await db
     .insert(tables.agents)
-    .values({ name: "a passing executor", role: "execute", model: "none", baseUrl: "http://x" })
+    .values({ name: "a passing executor", roleId: role.id, model: "none", baseUrl: "http://x" })
     .returning();
 
   const source = await newProject("staffed");

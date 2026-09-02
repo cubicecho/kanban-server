@@ -34,6 +34,7 @@ const TOOLS = [
   "Query.runs",
   "Query.runEvents",
   "Query.agents",
+  "Query.roles",
   "Query.spend",
   "Query.boardTemplates",
   "Mutation.createProject",
@@ -50,6 +51,8 @@ const TOOLS = [
   "Mutation.setCardDeps",
   "Mutation.moveCard",
   "Mutation.retryCard",
+  "Mutation.archiveCard",
+  "Mutation.restoreCard",
   "Mutation.runCard",
   "Mutation.stopCard",
   "Mutation.stopTask",
@@ -74,12 +77,16 @@ const HINTS: Record<string, string> = {
     "The columns of a board, in `position` order — and its pipeline. A lane with an `agentId` " +
     "is a station: cards there get worked by that agent, and go to `onSuccessLaneId` or " +
     "`onFailureLaneId` afterwards. A lane with no agent is a resting place, which is what a " +
-    "backlog and a done pile are. `wipLimit` caps how many cards it works at once. Filter by " +
-    "`projectId`.",
+    "backlog and a done pile are. `wipLimit` caps how many cards it works at once, and a lane " +
+    "with `readVerdict` judges cards rather than working them: its agent answers PASS or FAIL " +
+    "and that word picks the arm. Filter by `projectId`.",
   cards:
     "The units of work. `status` is `idle`, `running`, `blocked`, `done` or `error`; a finished " +
     "card carries the agent's `result`. `acceptance` is what it will be judged on and `taskId` " +
-    "is the task it was decomposed out of. Filter by `projectId`, or by `laneId` for one column.",
+    "is the task it was decomposed out of. Filter by `projectId`, or by `laneId` for one " +
+    "column. A card with an `archivedAt` has been put away and is not on the board any more, " +
+    "so add `archivedAt: { isNull: true }` to see what the board sees — this query does not " +
+    "filter them out for you.",
   tasks:
     "What people ask for, before it is work. A task is a title and a `brief`, and it becomes " +
     "cards only by being decomposed — `status` walks `draft` → `ready` → `decomposing` → " +
@@ -89,9 +96,12 @@ const HINTS: Record<string, string> = {
     "`running`, `ok`, `error` or `stopped`, and a finished run carries its output, its error, " +
     "the tools it called and what it cost. Order by `startedAt` descending for the latest.",
   agents:
-    "Who does the work: which model on which endpoint, and what for. `role` is `refine`, " +
-    "`decompose`, `review` or `execute`. Read-only here — an agent's endpoint and key are the " +
-    "operator's to set.",
+    "Who does the work: which model on which endpoint, filling which role. Read-only here — an " +
+    "agent's endpoint and key are the operator's to set.",
+  roles:
+    "The jobs an agent can be asked to fill: a name and the prompt that goes with it. `stage` " +
+    "is `refine`, `decompose` or `card`; only a `card` role is one a lane can point at, and " +
+    "there may be as many of those as somebody has written. Read-only here.",
   spend:
     "What a board has cost in tokens, added up from its runs. With a `taskId` it is one task " +
     "instead — its refinement, its decomposition and every run of every card it became. `from` " +
@@ -103,8 +113,9 @@ const HINTS: Record<string, string> = {
     "written as indexes into the same list so it can be drawn onto any project.",
   create_project:
     "Adds a board. It comes with four lanes — Backlog, Doing, Review, Done — already wired to " +
-    "this server's execute and review agents, so it is ready for work as soon as it exists. " +
-    "Set `autoRun: true` for cards to be picked up without being asked.",
+    "this server's executor and reviewer agents, so it is ready for work as soon as it exists. " +
+    "Review is set to read its agent's answer as a PASS/FAIL verdict. Set `autoRun: true` for " +
+    "cards to be picked up without being asked.",
   update_project_single:
     "Edits one board. `set: { autoRun: false }` leaves everything in place but stops agents " +
     "picking up cards, which is the gentle way to pause a project.",
@@ -160,6 +171,15 @@ const HINTS: Record<string, string> = {
     "Puts a failed card back in play where it stands, without running it. A card a reviewer " +
     "rejected keeps its `error` status so the board waits for a person, and this is what " +
     "clears it — after which its lane's agent will pick it up again.",
+  archive_card:
+    "Takes a card off the board without deleting it — the Done pile once it is long enough to " +
+    "be in the way, or the card nobody is going to do. It keeps its lane, its status and its " +
+    "result, stops being picked up, and stops counting as something other cards wait on. " +
+    "Refused while an agent is working it.",
+  restore_card:
+    "Puts an archived card back, at the end of the lane it was archived from. Its status is " +
+    "left as it was — a card archived in `error` comes back in `error`, and `retry_card` is " +
+    "still what puts that back in play.",
   run_card:
     "Works one card now with its lane's agent, answering when the run finishes. The card moves " +
     "on by itself afterwards, to whichever lane its own said to send it.",
@@ -191,7 +211,8 @@ const HINTS: Record<string, string> = {
  * The four that run an agent destroy nothing: each adds a run and waits for it. None is
  * idempotent — decomposing a task twice makes two sets of cards, and refining it twice is two
  * turns of a conversation — so the default is overridden in one direction only. `accept_task`,
- * `move_card` and `retry_card` do the same thing twice running, and none discards anything.
+ * `move_card`, `retry_card`, `archive_card` and `restore_card` do the same thing twice
+ * running, and none discards anything.
  *
  * `stop_card` keeps the destructive mark. Aborting a run discards it: the run is finished as
  * `stopped` with no output, so whatever the agent had done by then is gone and cannot be
@@ -206,6 +227,10 @@ const WRITE_HINTS: Record<string, { destructiveHint?: boolean; idempotentHint?: 
   accept_task: { destructiveHint: false, idempotentHint: true },
   move_card: { destructiveHint: false, idempotentHint: true },
   retry_card: { destructiveHint: false, idempotentHint: true },
+  // Neither loses anything — archiving is the alternative to deleting, and each is the other's
+  // undo — and archiving an archived card leaves the time it was archived alone.
+  archive_card: { destructiveHint: false, idempotentHint: true },
+  restore_card: { destructiveHint: false, idempotentHint: true },
   // A set, not an append: writing the same one twice leaves the same ordering. It does replace
   // what was there, which is the destructive half, and the convention cannot read that off a
   // name that starts with `set`.

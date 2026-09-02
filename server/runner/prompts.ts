@@ -1,7 +1,7 @@
 import type { Card, Project, Task } from "../db/schema.ts";
 
 /**
- * What the four built-in agents are told, and the shape of what they are asked to send back.
+ * What the four built-in roles are told, and the shape of what they are asked to send back.
  *
  * Two of the three jobs here need an answer a program can act on rather than prose, so both
  * ask for JSON and both are parsed forgivingly — see `side-task.ts`. Being strict about the
@@ -59,13 +59,54 @@ Check it against the card's acceptance criteria and nothing else — not style, 
 have done differently. Begin your reply with PASS or FAIL on its own line, then say why in a
 sentence or two. FAIL means a criterion is not met; say which one.`;
 
-/** The agents a fresh install comes with, so the first task has something to run on. */
-export const DEFAULT_AGENTS = [
-  { name: "refiner", role: "refine" as const, systemPrompt: REFINE_SYSTEM },
-  { name: "decomposer", role: "decompose" as const, systemPrompt: DECOMPOSE_SYSTEM },
-  { name: "reviewer", role: "review" as const, systemPrompt: REVIEW_SYSTEM },
-  { name: "executor", role: "execute" as const, systemPrompt: EXECUTE_SYSTEM },
+/**
+ * The roles a fresh install comes with: the four jobs this server knows how to ask for.
+ *
+ * They are ordinary rows and may be edited, renamed or joined by others — a board wanting a
+ * tester writes one. These four are seeded because two of them (`refine` and `decompose`) have
+ * an output contract the server itself parses, and the other two are what `seedLanes` wires a
+ * new board to; a server with none of them draws boards nothing runs on.
+ */
+export const DEFAULT_ROLES = [
+  {
+    name: "refiner",
+    stage: "refine" as const,
+    description: "Talks a rough request into a task worth working on",
+    systemPrompt: REFINE_SYSTEM,
+  },
+  {
+    name: "decomposer",
+    stage: "decompose" as const,
+    description: "Turns an accepted task into the cards that carry it out",
+    systemPrompt: DECOMPOSE_SYSTEM,
+  },
+  {
+    name: "executor",
+    stage: "card" as const,
+    description: "Works a card using the tools it has been given",
+    systemPrompt: EXECUTE_SYSTEM,
+  },
+  {
+    name: "reviewer",
+    stage: "card" as const,
+    description: "Checks a finished card against its acceptance criteria, PASS or FAIL",
+    systemPrompt: REVIEW_SYSTEM,
+  },
 ];
+
+/** The role a lane's Doing station is wired to on a fresh board, and the one Review gets. */
+export const EXECUTOR_ROLE = "executor";
+export const REVIEWER_ROLE = "reviewer";
+
+/**
+ * One agent per seeded role, so the first task has something to run on.
+ *
+ * Each leaves `systemPrompt` empty and takes its role's, which is the whole point of the split:
+ * changing what an executor is told is one edit to one role, not an edit to every agent doing
+ * that job. Every model setting is left inheriting from settings, so configuring one endpoint
+ * configures all four.
+ */
+export const DEFAULT_AGENTS = DEFAULT_ROLES.map((role) => ({ name: role.name, role: role.name }));
 
 /** One card as JSON, before it is a row: what the decomposer is asked for. */
 export interface DecomposedCard {
@@ -94,15 +135,15 @@ export const projectContext = (project: Project): string =>
 export const decomposePrompt = (project: Project, task: Task): string =>
   `${projectContext(project)}\n\nTask: ${task.title || "(untitled)"}\n\n${task.brief}`.trim();
 
-/** What an execute or review agent is given: the project, the card, and its criteria. */
+/** What an agent working a card is given: the project, the card, and its criteria. */
 export const cardPrompt = (project: Project, card: Card): string =>
   [
     projectContext(project),
     `\n\nCard: ${card.title}`,
     card.body ? `\n\n${card.body}` : "",
     card.acceptance ? `\n\nDone when:\n${card.acceptance}` : "",
-    // A review agent is reading the same card the executor just worked, so it needs what came
-    // out of that as well as what went in.
+    // An agent judging a card is reading the same card another just worked, so it needs what
+    // came out of that as well as what went in.
     card.result ? `\n\nWhat the last agent reported:\n${card.result}` : "",
   ]
     .join("")
