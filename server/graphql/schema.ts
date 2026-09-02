@@ -13,12 +13,13 @@ import {
   GraphQLString,
 } from "graphql";
 import { GraphQLJSON } from "graphql-scalars";
-import { errorMessage } from "../../shared/errors.ts";
 import { db } from "../db/client.ts";
+import { recordMove } from "../db/history.ts";
 import {
   agentServers,
   agents,
   boardTemplates,
+  type Card,
   cardDeps,
   cards,
   lanes,
@@ -32,15 +33,17 @@ import {
 import { fold, history, type RunEvent, watch } from "../runner/events.ts";
 import { listModels, loadSettings } from "../runner/llm.ts";
 import { type McpConnection, mcp, probe } from "../runner/mcp.ts";
-import { EXECUTOR_ROLE, REVIEWER_ROLE } from "../runner/prompts.ts";
+import { EXPAND_CONTRACT, VERDICT_CONTRACT, WORK_CONTRACT } from "../runner/prompts.ts";
 import {
-  decomposeTask,
+  blockers,
   isRunning,
+  makeCard,
   refineTask,
   runCard,
   runningRunIds,
   runningSubjectIds,
   stopSubject,
+  submitCard,
 } from "../runner/run.ts";
 
 /**
@@ -61,9 +64,18 @@ const { entities } = buildSchema(db, {
     // an agent did something it did not. Settings is a singleton the migration creates. A
     // board template is a document whose arrows have to line up with its own lanes, so it is
     // written by `saveBoardTemplate` from a board that already works, never by hand.
-    insert: (table) => table !== "runs" && table !== "settings" && table !== "boardTemplates",
-    update: (table) => table !== "runs" && table !== "boardTemplates",
-    delete: (table) => table !== "settings",
+    //
+    // A card's ledger is the same argument carried further: it is readable, and nothing else.
+    // Its whole worth is that it is an account nobody edited — a row that could be written,
+    // corrected or quietly removed answers "why is this card here" no better than the column
+    // it replaced. It is written where the move is made, and it is never written anywhere else.
+    insert: (table) =>
+      table !== "runs" &&
+      table !== "settings" &&
+      table !== "boardTemplates" &&
+      table !== "cardEvents",
+    update: (table) => table !== "runs" && table !== "boardTemplates" && table !== "cardEvents",
+    delete: (table) => table !== "settings" && table !== "cardEvents",
   },
   exclude: {
     // Keys travel one way. They are excluded from the output types, so no client can read one
@@ -87,7 +99,7 @@ const { entities } = buildSchema(db, {
           refuseWhileRunning(
             args,
             runningSubjectIds(),
-            "This task is being refined or decomposed. Stop it first, then delete it.",
+            "This task is being refined. Stop it first, then delete it.",
           );
         }
       },
@@ -99,6 +111,27 @@ const { entities } = buildSchema(db, {
             args,
             runningSubjectIds(),
             "An agent is working this card. Stop it first, then delete it.",
+          );
+        }
+      },
+      // A card's ledger starts where the card does, so that the first line of its history is
+      // it arriving rather than the first thing an agent did to it.
+      //
+      // The lane is read back rather than taken off `rows`, which carry only the columns the
+      // caller asked for: a client selecting `{ id }` would otherwise write an event saying the
+      // card arrived nowhere. On `tx`, like the lane guard above, and for the same reason.
+      after: async ({ operation, rows, tx }) => {
+        if (operation !== "insert" && operation !== "upsert") return;
+        const ids = (rows as Card[]).map((row) => row.id).filter(Boolean);
+        if (!ids.length) return;
+        const written = await (tx as typeof db)
+          .select({ id: cards.id, laneId: cards.laneId })
+          .from(cards)
+          .where(inArray(cards.id, ids));
+        for (const row of written) {
+          await recordMove(
+            { cardId: row.id, toLaneId: row.laneId, actor: "user" },
+            tx as typeof db,
           );
         }
       },
@@ -144,56 +177,72 @@ const { entities } = buildSchema(db, {
 });
 
 /**
- * The board a new project starts with: a backlog, an agent that works cards, an agent that
- * checks the work, and somewhere finished cards go.
+ * The board a new project starts with: a front door that breaks work up, a backlog, an agent
+ * that works cards, an agent that checks the work, and somewhere finished cards go.
  *
  * The lanes are the pipeline — `onSuccessLaneId` and `onFailureLaneId` are the arrows between
- * them — so this is a working board rather than four empty columns. Nothing runs until the
+ * them — so this is a working board rather than five empty columns. Nothing runs until the
  * project is switched to `autoRun`, or someone presses the button on a card.
  *
- * Review sends a card it failed back to Doing rather than round again: the card arrives with
- * its status set to `error`, which the worker will not pick up, so a rejected card waits for a
- * person instead of looping between two agents at whatever a token costs.
+ * Intake is the `intake` lane as well as a station, which is what makes one card dropped
+ * through the front door become the cards that carry the work out: nothing decomposes off the
+ * board any more, so a board with no expanding station is a board where a request stays one
+ * card. That is a legitimate shape — it is just not the one to start somebody off with.
  *
- * The agents are looked up by their role's name rather than created, so a project made on a
- * server whose agents have been renamed or replaced gets that server's agents. Finding none is
- * not an error: the lanes are still drawn, and the board runs as soon as an agent is named on
- * one. Review is the lane that reads its agent's answer as a verdict — a fresh board is the one
- * place that is decided for somebody, and the lane dialog is where it is changed.
+ * Review sends a card it failed back to Doing rather than round again: the card arrives with
+ * its status set to `rejected`, which the worker will not pick up, so a rejected card waits for
+ * a person instead of looping between two agents at whatever a token costs.
+ *
+ * The three staffed lanes are given a kind — the first role with that contract — and the first
+ * enabled agent to staff them with. A role is found by its contract rather than by its name,
+ * because a name is a thing somebody edits; the contract is what the server actually reads.
+ * Finding neither is not an error: the lanes are still drawn, and the board runs as soon as a
+ * role and an agent are named on one. Review judges because it *is* a Review lane, which is the
+ * whole of what used to be a flag on the lane and a second one on its agent.
  */
 async function seedLanes(tx: typeof db, rows: Project[]) {
   if (!rows.length) return;
-  const roleAgent = async (roleName: string) => {
+  const roleFor = async (contract: (typeof roles.contract.enumValues)[number]) => {
     const found = await tx
-      .select({ id: agents.id })
-      .from(agents)
-      .innerJoin(roles, eq(agents.roleId, roles.id))
-      .where(and(eq(roles.name, roleName), eq(agents.enabled, true)))
-      .orderBy(asc(agents.name))
+      .select({ id: roles.id })
+      .from(roles)
+      .where(eq(roles.contract, contract))
+      .orderBy(asc(roles.name))
       .limit(1);
     return found[0]?.id ?? null;
   };
-  const executor = await roleAgent(EXECUTOR_ROLE);
-  const reviewer = await roleAgent(REVIEWER_ROLE);
+  const [worker] = await tx
+    .select({ id: agents.id })
+    .from(agents)
+    .where(eq(agents.enabled, true))
+    .orderBy(asc(agents.name))
+    .limit(1);
+  const agentId = worker?.id ?? null;
+  const doingRole = await roleFor(WORK_CONTRACT);
+  const reviewRole = await roleFor(VERDICT_CONTRACT);
+  const intakeRole = await roleFor(EXPAND_CONTRACT);
 
   for (const project of rows) {
     if (!project?.id) continue;
-    const [, doing, review, done] = await tx
+    const [intake, backlog, doing, review, done] = await tx
       .insert(lanes)
       .values([
-        { projectId: project.id, name: "Backlog", position: 0, intake: true },
-        { projectId: project.id, name: "Doing", position: 1, agentId: executor },
         {
           projectId: project.id,
-          name: "Review",
-          position: 2,
-          agentId: reviewer,
-          readVerdict: true,
+          name: "Intake",
+          position: 0,
+          intake: true,
+          roleId: intakeRole,
+          agentId,
         },
-        { projectId: project.id, name: "Done", position: 3 },
+        { projectId: project.id, name: "Backlog", position: 1 },
+        { projectId: project.id, name: "Doing", position: 2, roleId: doingRole, agentId },
+        { projectId: project.id, name: "Review", position: 3, roleId: reviewRole, agentId },
+        { projectId: project.id, name: "Done", position: 4 },
       ])
       .returning();
-    // Written second because two of the three arrows point at lanes that did not exist yet.
+    // Written second because every arrow points at a lane that did not exist yet.
+    await tx.update(lanes).set({ onSuccessLaneId: backlog.id }).where(eq(lanes.id, intake.id));
     await tx.update(lanes).set({ onSuccessLaneId: review.id }).where(eq(lanes.id, doing.id));
     await tx
       .update(lanes)
@@ -452,12 +501,13 @@ type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
  *
  * The lanes go in first and the arrows second, because a template's arrows are indexes into
  * its own list and half of them point at lanes that do not exist yet — the same two steps
- * `seedLanes` takes, for the same reason. An `agentId` naming an agent this server no longer
- * has resolves to none rather than failing: a template is a shape, and the agents are whoever
- * happens to be here.
+ * `seedLanes` takes, for the same reason. An `agentId` or a `roleId` naming something this
+ * server no longer has resolves to none rather than failing: a template is a shape, and the
+ * agents and the roles are whoever happens to be here.
  */
 async function drawTemplate(tx: Tx, projectId: string, plan: TemplateLane[]) {
   const known = new Set((await tx.select({ id: agents.id }).from(agents)).map((row) => row.id));
+  const kinds = new Set((await tx.select({ id: roles.id }).from(roles)).map((row) => row.id));
   const written = await tx
     .insert(lanes)
     .values(
@@ -466,11 +516,14 @@ async function drawTemplate(tx: Tx, projectId: string, plan: TemplateLane[]) {
         name: lane.name,
         position: index,
         intake: lane.intake,
+        roleId: lane.roleId && kinds.has(lane.roleId) ? lane.roleId : null,
         agentId: lane.agentId && known.has(lane.agentId) ? lane.agentId : null,
         wipLimit: lane.wipLimit,
-        // Templates saved before stations could judge cards have no such key; a lane that does
-        // not say it reads a verdict does not read one.
-        readVerdict: lane.readVerdict ?? false,
+        // Templates saved before a lane carried its own job have neither key; a lane with no
+        // kind is a resting place, and one with nothing to add adds nothing. Nor does one that
+        // does not say how many times it will put a card back put one back at all.
+        prompt: lane.prompt ?? "",
+        maxAttempts: lane.maxAttempts ?? 0,
       })),
     )
     .returning();
@@ -512,6 +565,18 @@ export const schema = new GraphQLSchema({
           "list that agent can actually choose from.",
         args: { agentId: { type: GraphQLString } },
         resolve: (_source, args: { agentId?: string | null }) => listModels(args.agentId),
+      },
+      blockers: {
+        type: new GraphQLNonNull(new GraphQLList(new GraphQLNonNull(generatedType("Card")))),
+        description:
+          "The cards this one is waiting on that are not finished yet — the reason a card sits " +
+          "in a lane its agent never picks it up from. Empty means nothing is in its way. " +
+          "Worked out from the cards as they stand every time it is asked, rather than read " +
+          "off the card, because the answer changes when some other card finishes and nothing " +
+          "would go back to rewrite it. An archived dependency is not in the way: taking one " +
+          "off the board is a decision that it does not have to happen.",
+        args: { cardId: { type: new GraphQLNonNull(GraphQLString) } },
+        resolve: (_source, args: { cardId: string }) => blockers(args.cardId),
       },
       mcpStatus: {
         type: new GraphQLNonNull(new GraphQLList(new GraphQLNonNull(McpServerStatusType))),
@@ -584,7 +649,8 @@ export const schema = new GraphQLSchema({
           "One turn of talking a task into shape: says something to the refining agent and " +
           "resolves once it has answered. The answer is appended to the task's messages and " +
           "the task's title and brief are rewritten from it, so read the task back after this " +
-          "to see where the brief has got to. Only a `draft` task can be refined.",
+          "to see where the brief has got to. A task can be talked about for as long as you " +
+          "like; `makeCard` is what ends the conversation by putting it on the board.",
         args: {
           taskId: { type: new GraphQLNonNull(GraphQLString) },
           message: { type: new GraphQLNonNull(GraphQLString) },
@@ -592,73 +658,38 @@ export const schema = new GraphQLSchema({
         resolve: (_source, args: { taskId: string; message: string }) =>
           refineTask(args.taskId, args.message),
       },
-      acceptTask: {
-        type: new GraphQLNonNull(generatedType("Task")),
+      makeCard: {
+        type: new GraphQLNonNull(generatedType("Card")),
         description:
-          "Marks a refined task ready for the decomposer, without running it. `decomposeTask` " +
-          "is the next step, and is what actually produces cards.",
+          "Ends a refining conversation by putting it on the board: writes the task's title " +
+          "and brief as one card in the project's intake lane, linked back to the task. It is " +
+          "one card and not many — breaking work up is a station on the board now, so a card " +
+          "landing in a lane that expands is what turns it into the cards that carry it out. " +
+          "The conversation is left exactly where it is and can go on afterwards.",
         args: { taskId: { type: new GraphQLNonNull(GraphQLString) } },
         resolve: async (_source, args: { taskId: string }) => {
-          const task = await taskOrThrow(args.taskId);
-          if (!task.brief.trim()) {
-            throw new GraphQLError("This task has no brief yet — there is nothing to accept.", {
-              extensions: { code: "BAD_TASK" },
-            });
-          }
-          const [updated] = await db
-            .update(tasks)
-            .set({ status: "ready", error: "" })
-            .where(eq(tasks.id, task.id))
-            .returning();
-          return updated;
+          await taskOrThrow(args.taskId);
+          return makeCard(args.taskId);
         },
       },
-      decomposeTask: {
-        type: new GraphQLNonNull(generatedType("Run")),
+      submitCard: {
+        type: new GraphQLNonNull(generatedType("Card")),
         description:
-          "Breaks a task into cards and puts them in the project's intake lane, resolving with " +
-          "the finished run — which means it does not answer until the decomposer is done. " +
-          "The cards it wrote are the ones with this `taskId`. A decomposition that produced " +
-          "nothing readable fails, and says so on the task as well as in the run.",
-        args: { taskId: { type: new GraphQLNonNull(GraphQLString) } },
-        resolve: (_source, args: { taskId: string }) => decomposeTask(args.taskId),
-      },
-      submitTask: {
-        type: new GraphQLNonNull(generatedType("Task")),
-        description:
-          "The short way in, for a caller that already knows what it wants: writes the task and " +
-          "decomposes it in one call, resolving with the task once its cards are on the board. " +
-          "Skips refinement entirely. A decomposition that fails leaves the task in `error` " +
-          "with the reason on it rather than throwing, so the task is still there to retry.",
+          "The way onto a board for a caller that has no lane ids: writes one card at the " +
+          "project's front door — the lane marked `intake`, else the leftmost — and answers " +
+          "with it. Use this rather than `create_card` unless you know exactly which lane you " +
+          "mean. If that lane is a station that expands, the card becomes the cards that carry " +
+          "the work out as soon as it is worked.",
         args: {
           projectId: { type: new GraphQLNonNull(GraphQLString) },
           title: { type: new GraphQLNonNull(GraphQLString) },
-          brief: {
+          body: {
             type: new GraphQLNonNull(GraphQLString),
-            description: "What is wanted, in as much detail as you have. The decomposer reads it.",
+            description: "What is wanted, in as much detail as you have. An agent reads it.",
           },
         },
-        resolve: async (_source, args: { projectId: string; title: string; brief: string }) => {
-          const [task] = await db
-            .insert(tasks)
-            .values({
-              projectId: args.projectId,
-              title: args.title,
-              brief: args.brief,
-              status: "ready",
-            })
-            .returning();
-          // The task is kept whatever happens next. A decomposition that cannot even start —
-          // no decomposer defined, an endpoint that will not answer — is written onto the task
-          // rather than thrown, so the caller is left with something to look at and retry.
-          await decomposeTask(task.id).catch(async (error: unknown) => {
-            await db
-              .update(tasks)
-              .set({ status: "error", error: errorMessage(error) })
-              .where(eq(tasks.id, task.id));
-          });
-          return taskOrThrow(task.id);
-        },
+        resolve: (_source, args: { projectId: string; title: string; body: string }) =>
+          submitCard(args.projectId, args.title, args.body),
       },
       runCard: {
         type: new GraphQLNonNull(generatedType("Run")),
@@ -686,8 +717,7 @@ export const schema = new GraphQLSchema({
       },
       stopTask: {
         type: new GraphQLNonNull(GraphQLBoolean),
-        description:
-          "Calls off a refinement or decomposition in flight. False means none was running.",
+        description: "Calls off a refinement in flight. False means none was running.",
         args: { taskId: { type: new GraphQLNonNull(GraphQLString) } },
         resolve: (_source, args: { taskId: string }) => stopSubject(args.taskId),
       },
@@ -696,17 +726,21 @@ export const schema = new GraphQLSchema({
         description:
           "Puts a card in a lane, at a position, and renumbers the cards around it so the " +
           "board stays in the order it looks like. Omit `position` to drop it at the end. " +
-          "A card that had failed comes back to `idle`, which is what makes dragging one back " +
-          "a retry; a card an agent is working cannot be moved out from under it, and nor can " +
-          "an archived one — `restoreCard` is what puts that back on the board.",
+          "A card that had failed comes back to `idle` with its attempts forgiven, which is " +
+          "what makes dragging one back a retry; a card an agent is working cannot be moved " +
+          "out from under it, and nor can an archived one — `restoreCard` is what puts that " +
+          "back on the board. Say why in `note` and the agent that picks the card up is told " +
+          "it, the same way a reviewer's rejection reaches one: moving a card back without " +
+          "saying what was wrong with it buys a second attempt identical to the first.",
         args: {
           cardId: { type: new GraphQLNonNull(GraphQLString) },
           laneId: { type: new GraphQLNonNull(GraphQLString) },
           position: { type: GraphQLInt },
+          note: { type: GraphQLString },
         },
         resolve: async (
           _source,
-          args: { cardId: string; laneId: string; position?: number | null },
+          args: { cardId: string; laneId: string; position?: number | null; note?: string | null },
         ) => {
           if (isRunning(args.cardId)) {
             throw new GraphQLError("An agent is working this card. Stop it first, then move it.", {
@@ -747,11 +781,24 @@ export const schema = new GraphQLSchema({
                         laneId: args.laneId,
                         status: card.status === "done" ? "done" : ("idle" as const),
                         error: "",
+                        // Somebody moving a card by hand is somebody starting it over, so the
+                        // rework budget its next station spends is a fresh one.
+                        attempts: 0,
                       }
                     : {}),
                 })
                 .where(eq(cards.id, id));
             }
+            await recordMove(
+              {
+                cardId: card.id,
+                fromLaneId: card.laneId,
+                toLaneId: args.laneId,
+                note: args.note ?? "",
+                actor: "user",
+              },
+              tx,
+            );
           });
 
           const [moved] = await db.select().from(cards).where(eq(cards.id, card.id)).limit(1);
@@ -761,13 +808,13 @@ export const schema = new GraphQLSchema({
       retryCard: {
         type: new GraphQLNonNull(generatedType("Card")),
         description:
-          "Puts a card back in play where it stands: clears its error and returns it to " +
-          "`idle`, which is the status a lane's agent will pick up. This is the way back for " +
-          "a card a reviewer rejected — those stay `error` on purpose, so the board waits for " +
-          "a person rather than looping — and for one interrupted by a restart. It does not " +
-          "run anything itself; `runCard` does that, and `autoRun` does it unasked. Refused " +
-          "while an agent is working the card, and on an archived one — `restoreCard` puts " +
-          "that back on the board first.",
+          "Puts a card back in play where it stands: clears its error, empties the count of " +
+          "failed attempts against it, and returns it to `idle`, which is the status a lane's " +
+          "agent will pick up. This is the way back for a card that stopped at `error` — one " +
+          "a reviewer rejected once its lane had no attempts left to spend, or one whose lane " +
+          "spends none. It does not run anything itself; `runCard` does that, and `autoRun` " +
+          "does it unasked. Refused while an agent is working the card, and on an archived " +
+          "one — `restoreCard` puts that back on the board first.",
         args: { cardId: { type: new GraphQLNonNull(GraphQLString) } },
         resolve: async (_source, args: { cardId: string }) => {
           if (isRunning(args.cardId)) {
@@ -785,9 +832,19 @@ export const schema = new GraphQLSchema({
           }
           const [retried] = await db
             .update(cards)
-            .set({ status: "idle", error: "" })
+            .set({ status: "idle", error: "", attempts: 0 })
             .where(eq(cards.id, card.id))
             .returning();
+          // Recorded rather than tidied away: putting a card back in play is a thing a person
+          // did to it, and the ledger is the account of what has been done to it. The note is
+          // left empty on purpose, so the reason the card came back is still the last one
+          // given — a retry is trying again knowing that, not forgetting it.
+          await recordMove({
+            cardId: card.id,
+            fromLaneId: card.laneId,
+            toLaneId: card.laneId,
+            actor: "user",
+          });
           return retried;
         },
       },
@@ -816,6 +873,9 @@ export const schema = new GraphQLSchema({
             .set({ archivedAt: new Date() })
             .where(eq(cards.id, card.id))
             .returning();
+          // No `to`: the archive is not a lane. The card keeps its `laneId` all the same, which
+          // is where restoring puts it back.
+          await recordMove({ cardId: card.id, fromLaneId: card.laneId, actor: "user" });
           return archived;
         },
       },
@@ -842,6 +902,7 @@ export const schema = new GraphQLSchema({
             .set({ archivedAt: null, position: (last?.position ?? -1) + 1 })
             .where(eq(cards.id, card.id))
             .returning();
+          await recordMove({ cardId: card.id, toLaneId: card.laneId, actor: "user" });
           return restored;
         },
       },
@@ -943,9 +1004,11 @@ export const schema = new GraphQLSchema({
             name: lane.name,
             position,
             intake: lane.intake,
+            roleId: lane.roleId,
+            prompt: lane.prompt,
             agentId: lane.agentId,
             wipLimit: lane.wipLimit,
-            readVerdict: lane.readVerdict,
+            maxAttempts: lane.maxAttempts,
             onSuccess: index.get(lane.onSuccessLaneId ?? "") ?? null,
             onFailure: index.get(lane.onFailureLaneId ?? "") ?? null,
           }));

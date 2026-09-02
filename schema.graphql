@@ -2,8 +2,8 @@ type Role {
   id: String!
   name: String!
   description: String!
-  stage: RolesStageEnum!
-  systemPrompt: String!
+  contract: RolesContractEnum!
+  prompt: String!
   createdAt: DateTime!
   updatedAt: DateTime!
 
@@ -11,9 +11,9 @@ type Role {
   Opaque cursor of this row's position in the query's ordering. Pass it as `after` to resume from here. Only set on rows returned by a list query.
   """
   cursor: String
-  agents(
-    where: AgentFilters
-    orderBy: AgentOrderBy
+  lanes(
+    where: LaneFilters
+    orderBy: LaneOrderBy
     offset: Int
     limit: Int
 
@@ -21,20 +21,20 @@ type Role {
     Keyset pagination: only return related rows strictly after this cursor (a row's `cursor` field from a previous page of this relation, under the same orderBy).
     """
     after: String
-    distinct: [AgentDistinctColumn!]
-  ): [Agent!]!
-  agentsAggregate(where: AgentFilters): AgentAggregate!
+    distinct: [LaneDistinctColumn!]
+  ): [Lane!]!
+  lanesAggregate(where: LaneFilters): LaneAggregate!
 }
 
-enum RolesStageEnum {
-  """Value: card"""
-  card
+enum RolesContractEnum {
+  """Value: work"""
+  work
 
-  """Value: refine"""
-  refine
+  """Value: verdict"""
+  verdict
 
-  """Value: decompose"""
-  decompose
+  """Value: expand"""
+  expand
 }
 
 """
@@ -42,23 +42,21 @@ A date-time string at UTC, such as 2007-12-03T10:15:30Z, compliant with the `dat
 """
 scalar DateTime
 
-"""Columns of Agent that a query can be made distinct on"""
-enum AgentDistinctColumn {
+"""Columns of Lane that a query can be made distinct on"""
+enum LaneDistinctColumn {
   id
+  projectId
   name
+  position
+  intake
   roleId
-  enabled
-  baseUrl
-  model
-  systemPrompt
-  maxTokens
-  temperature
-  maxToolIterations
-  toolDiscovery
-  requestTimeoutSeconds
-  maxRetries
+  prompt
+  agentId
+  onSuccessLaneId
+  onFailureLaneId
+  wipLimit
+  maxAttempts
   createdAt
-  updatedAt
 }
 
 type RoleAggregate {
@@ -73,8 +71,8 @@ type RoleMinAggregate {
   id: String
   name: String
   description: String
-  stage: RolesStageEnum
-  systemPrompt: String
+  contract: RolesContractEnum
+  prompt: String
   createdAt: DateTime
   updatedAt: DateTime
 }
@@ -83,8 +81,8 @@ type RoleMaxAggregate {
   id: String
   name: String
   description: String
-  stage: RolesStageEnum
-  systemPrompt: String
+  contract: RolesContractEnum
+  prompt: String
   createdAt: DateTime
   updatedAt: DateTime
 }
@@ -93,8 +91,8 @@ type RoleCountNonNullAggregate {
   id: Int!
   name: Int!
   description: Int!
-  stage: Int!
-  systemPrompt: Int!
+  contract: Int!
+  prompt: Int!
   createdAt: Int!
   updatedAt: Int!
 }
@@ -103,8 +101,8 @@ type RoleCountDistinctAggregate {
   id: Int!
   name: Int!
   description: Int!
-  stage: Int!
-  systemPrompt: Int!
+  contract: Int!
+  prompt: Int!
   createdAt: Int!
   updatedAt: Int!
 }
@@ -125,8 +123,8 @@ type RoleGroupKeys {
   id: String
   name: String
   description: String
-  stage: RolesStageEnum
-  systemPrompt: String
+  contract: RolesContractEnum
+  prompt: String
   createdAt: DateTime
   updatedAt: DateTime
 }
@@ -134,7 +132,6 @@ type RoleGroupKeys {
 type Agent {
   id: String!
   name: String!
-  roleId: String!
   enabled: Boolean!
   baseUrl: String!
   model: String!
@@ -152,7 +149,6 @@ type Agent {
   Opaque cursor of this row's position in the query's ordering. Pass it as `after` to resume from here. Only set on rows returned by a list query.
   """
   cursor: String
-  role(where: RoleFilters): Role!
   servers(
     where: AgentServerFilters
     orderBy: AgentServerOrderBy
@@ -212,21 +208,6 @@ enum AgentServerDistinctColumn {
   serverId
 }
 
-"""Columns of Lane that a query can be made distinct on"""
-enum LaneDistinctColumn {
-  id
-  projectId
-  name
-  position
-  intake
-  agentId
-  onSuccessLaneId
-  onFailureLaneId
-  wipLimit
-  readVerdict
-  createdAt
-}
-
 """Columns of Run that a query can be made distinct on"""
 enum RunDistinctColumn {
   id
@@ -237,6 +218,7 @@ enum RunDistinctColumn {
   cardId
   laneId
   status
+  verdict
   startedAt
   finishedAt
   output
@@ -276,7 +258,6 @@ type AgentSumAggregate {
 type AgentMinAggregate {
   id: String
   name: String
-  roleId: String
   baseUrl: String
   model: String
   systemPrompt: String
@@ -293,7 +274,6 @@ type AgentMinAggregate {
 type AgentMaxAggregate {
   id: String
   name: String
-  roleId: String
   baseUrl: String
   model: String
   systemPrompt: String
@@ -310,7 +290,6 @@ type AgentMaxAggregate {
 type AgentCountNonNullAggregate {
   id: Int!
   name: Int!
-  roleId: Int!
   enabled: Int!
   baseUrl: Int!
   model: Int!
@@ -328,7 +307,6 @@ type AgentCountNonNullAggregate {
 type AgentCountDistinctAggregate {
   id: Int!
   name: Int!
-  roleId: Int!
   baseUrl: Int!
   model: Int!
   systemPrompt: Int!
@@ -359,7 +337,6 @@ The grouped column values of one Agent group. A column the query did not group b
 type AgentGroupKeys {
   id: String
   name: String
-  roleId: String
   baseUrl: String
   model: String
   systemPrompt: String
@@ -558,7 +535,6 @@ type Project {
   context: String!
   autoRun: Boolean!
   refineAgentId: String
-  decomposeAgentId: String
   createdAt: DateTime!
   updatedAt: DateTime!
 
@@ -619,7 +595,6 @@ type Project {
   ): [Run!]!
   runsAggregate(where: RunFilters): RunAggregate!
   refineAgent(where: AgentFilters): Agent
-  decomposeAgent(where: AgentFilters): Agent
 }
 
 """Columns of Task that a query can be made distinct on"""
@@ -628,8 +603,6 @@ enum TaskDistinctColumn {
   projectId
   title
   brief
-  status
-  error
   createdAt
   updatedAt
 }
@@ -639,6 +612,7 @@ enum CardDistinctColumn {
   id
   projectId
   taskId
+  parentId
   laneId
   title
   body
@@ -647,6 +621,7 @@ enum CardDistinctColumn {
   status
   result
   error
+  attempts
   archivedAt
   createdAt
   updatedAt
@@ -666,7 +641,6 @@ type ProjectMinAggregate {
   description: String
   context: String
   refineAgentId: String
-  decomposeAgentId: String
   createdAt: DateTime
   updatedAt: DateTime
 }
@@ -677,7 +651,6 @@ type ProjectMaxAggregate {
   description: String
   context: String
   refineAgentId: String
-  decomposeAgentId: String
   createdAt: DateTime
   updatedAt: DateTime
 }
@@ -689,7 +662,6 @@ type ProjectCountNonNullAggregate {
   context: Int!
   autoRun: Int!
   refineAgentId: Int!
-  decomposeAgentId: Int!
   createdAt: Int!
   updatedAt: Int!
 }
@@ -700,7 +672,6 @@ type ProjectCountDistinctAggregate {
   description: Int!
   context: Int!
   refineAgentId: Int!
-  decomposeAgentId: Int!
   createdAt: Int!
   updatedAt: Int!
 }
@@ -723,7 +694,6 @@ type ProjectGroupKeys {
   description: String
   context: String
   refineAgentId: String
-  decomposeAgentId: String
   createdAt: DateTime
   updatedAt: DateTime
   autoRun: Boolean
@@ -735,11 +705,13 @@ type Lane {
   name: String!
   position: Int!
   intake: Boolean!
+  roleId: String
+  prompt: String!
   agentId: String
   onSuccessLaneId: String
   onFailureLaneId: String
   wipLimit: Int!
-  readVerdict: Boolean!
+  maxAttempts: Int!
   createdAt: DateTime!
 
   """
@@ -747,6 +719,7 @@ type Lane {
   """
   cursor: String
   project(where: ProjectFilters): Project!
+  role(where: RoleFilters): Role
   agent(where: AgentFilters): Agent
   cards(
     where: CardFilters
@@ -776,11 +749,13 @@ type LaneAggregate {
 type LaneAvgAggregate {
   position: Float
   wipLimit: Float
+  maxAttempts: Float
 }
 
 type LaneSumAggregate {
   position: Float
   wipLimit: Float
+  maxAttempts: Float
 }
 
 type LaneMinAggregate {
@@ -788,10 +763,13 @@ type LaneMinAggregate {
   projectId: String
   name: String
   position: Int
+  roleId: String
+  prompt: String
   agentId: String
   onSuccessLaneId: String
   onFailureLaneId: String
   wipLimit: Int
+  maxAttempts: Int
   createdAt: DateTime
 }
 
@@ -800,10 +778,13 @@ type LaneMaxAggregate {
   projectId: String
   name: String
   position: Int
+  roleId: String
+  prompt: String
   agentId: String
   onSuccessLaneId: String
   onFailureLaneId: String
   wipLimit: Int
+  maxAttempts: Int
   createdAt: DateTime
 }
 
@@ -813,11 +794,13 @@ type LaneCountNonNullAggregate {
   name: Int!
   position: Int!
   intake: Int!
+  roleId: Int!
+  prompt: Int!
   agentId: Int!
   onSuccessLaneId: Int!
   onFailureLaneId: Int!
   wipLimit: Int!
-  readVerdict: Int!
+  maxAttempts: Int!
   createdAt: Int!
 }
 
@@ -826,10 +809,13 @@ type LaneCountDistinctAggregate {
   projectId: Int!
   name: Int!
   position: Int!
+  roleId: Int!
+  prompt: Int!
   agentId: Int!
   onSuccessLaneId: Int!
   onFailureLaneId: Int!
   wipLimit: Int!
+  maxAttempts: Int!
   createdAt: Int!
 }
 
@@ -852,13 +838,15 @@ type LaneGroupKeys {
   projectId: String
   name: String
   position: Int
+  roleId: String
+  prompt: String
   agentId: String
   onSuccessLaneId: String
   onFailureLaneId: String
   wipLimit: Int
+  maxAttempts: Int
   createdAt: DateTime
   intake: Boolean
-  readVerdict: Boolean
 }
 
 type Task {
@@ -866,8 +854,6 @@ type Task {
   projectId: String!
   title: String!
   brief: String!
-  status: TasksStatusEnum!
-  error: String!
   createdAt: DateTime!
   updatedAt: DateTime!
 
@@ -904,23 +890,6 @@ type Task {
   cardsAggregate(where: CardFilters): CardAggregate!
 }
 
-enum TasksStatusEnum {
-  """Value: draft"""
-  draft
-
-  """Value: ready"""
-  ready
-
-  """Value: decomposing"""
-  decomposing
-
-  """Value: decomposed"""
-  decomposed
-
-  """Value: error"""
-  error
-}
-
 """Columns of Message that a query can be made distinct on"""
 enum MessageDistinctColumn {
   id
@@ -943,8 +912,6 @@ type TaskMinAggregate {
   projectId: String
   title: String
   brief: String
-  status: TasksStatusEnum
-  error: String
   createdAt: DateTime
   updatedAt: DateTime
 }
@@ -954,8 +921,6 @@ type TaskMaxAggregate {
   projectId: String
   title: String
   brief: String
-  status: TasksStatusEnum
-  error: String
   createdAt: DateTime
   updatedAt: DateTime
 }
@@ -965,8 +930,6 @@ type TaskCountNonNullAggregate {
   projectId: Int!
   title: Int!
   brief: Int!
-  status: Int!
-  error: Int!
   createdAt: Int!
   updatedAt: Int!
 }
@@ -976,8 +939,6 @@ type TaskCountDistinctAggregate {
   projectId: Int!
   title: Int!
   brief: Int!
-  status: Int!
-  error: Int!
   createdAt: Int!
   updatedAt: Int!
 }
@@ -999,8 +960,6 @@ type TaskGroupKeys {
   projectId: String
   title: String
   brief: String
-  status: TasksStatusEnum
-  error: String
   createdAt: DateTime
   updatedAt: DateTime
 }
@@ -1091,6 +1050,7 @@ type Card {
   id: String!
   projectId: String!
   taskId: String
+  parentId: String
   laneId: String!
   title: String!
   body: String!
@@ -1099,6 +1059,7 @@ type Card {
   status: CardsStatusEnum!
   result: String!
   error: String!
+  attempts: Int!
   archivedAt: DateTime
   createdAt: DateTime!
   updatedAt: DateTime!
@@ -1123,6 +1084,19 @@ type Card {
     distinct: [CardDepDistinctColumn!]
   ): [CardDep!]!
   depsAggregate(where: CardDepFilters): CardDepAggregate!
+  blocks(
+    where: CardDepFilters
+    orderBy: CardDepOrderBy
+    offset: Int
+    limit: Int
+
+    """
+    Keyset pagination: only return related rows strictly after this cursor (a row's `cursor` field from a previous page of this relation, under the same orderBy).
+    """
+    after: String
+    distinct: [CardDepDistinctColumn!]
+  ): [CardDep!]!
+  blocksAggregate(where: CardDepFilters): CardDepAggregate!
   runs(
     where: RunFilters
     orderBy: RunOrderBy
@@ -1136,6 +1110,19 @@ type Card {
     distinct: [RunDistinctColumn!]
   ): [Run!]!
   runsAggregate(where: RunFilters): RunAggregate!
+  events(
+    where: CardEventFilters
+    orderBy: CardEventOrderBy
+    offset: Int
+    limit: Int
+
+    """
+    Keyset pagination: only return related rows strictly after this cursor (a row's `cursor` field from a previous page of this relation, under the same orderBy).
+    """
+    after: String
+    distinct: [CardEventDistinctColumn!]
+  ): [CardEvent!]!
+  eventsAggregate(where: CardEventFilters): CardEventAggregate!
 }
 
 enum CardsStatusEnum {
@@ -1145,11 +1132,11 @@ enum CardsStatusEnum {
   """Value: running"""
   running
 
-  """Value: blocked"""
-  blocked
-
   """Value: done"""
   done
+
+  """Value: rejected"""
+  rejected
 
   """Value: error"""
   error
@@ -1160,6 +1147,18 @@ enum CardDepDistinctColumn {
   id
   cardId
   dependsOnCardId
+}
+
+"""Columns of CardEvent that a query can be made distinct on"""
+enum CardEventDistinctColumn {
+  id
+  cardId
+  runId
+  fromLaneId
+  toLaneId
+  note
+  actor
+  createdAt
 }
 
 type CardAggregate {
@@ -1174,16 +1173,19 @@ type CardAggregate {
 
 type CardAvgAggregate {
   position: Float
+  attempts: Float
 }
 
 type CardSumAggregate {
   position: Float
+  attempts: Float
 }
 
 type CardMinAggregate {
   id: String
   projectId: String
   taskId: String
+  parentId: String
   laneId: String
   title: String
   body: String
@@ -1192,6 +1194,7 @@ type CardMinAggregate {
   status: CardsStatusEnum
   result: String
   error: String
+  attempts: Int
   archivedAt: DateTime
   createdAt: DateTime
   updatedAt: DateTime
@@ -1201,6 +1204,7 @@ type CardMaxAggregate {
   id: String
   projectId: String
   taskId: String
+  parentId: String
   laneId: String
   title: String
   body: String
@@ -1209,6 +1213,7 @@ type CardMaxAggregate {
   status: CardsStatusEnum
   result: String
   error: String
+  attempts: Int
   archivedAt: DateTime
   createdAt: DateTime
   updatedAt: DateTime
@@ -1218,6 +1223,7 @@ type CardCountNonNullAggregate {
   id: Int!
   projectId: Int!
   taskId: Int!
+  parentId: Int!
   laneId: Int!
   title: Int!
   body: Int!
@@ -1226,6 +1232,7 @@ type CardCountNonNullAggregate {
   status: Int!
   result: Int!
   error: Int!
+  attempts: Int!
   archivedAt: Int!
   createdAt: Int!
   updatedAt: Int!
@@ -1235,6 +1242,7 @@ type CardCountDistinctAggregate {
   id: Int!
   projectId: Int!
   taskId: Int!
+  parentId: Int!
   laneId: Int!
   title: Int!
   body: Int!
@@ -1243,6 +1251,7 @@ type CardCountDistinctAggregate {
   status: Int!
   result: Int!
   error: Int!
+  attempts: Int!
   archivedAt: Int!
   createdAt: Int!
   updatedAt: Int!
@@ -1266,6 +1275,7 @@ type CardGroupKeys {
   id: String
   projectId: String
   taskId: String
+  parentId: String
   laneId: String
   title: String
   body: String
@@ -1274,6 +1284,7 @@ type CardGroupKeys {
   status: CardsStatusEnum
   result: String
   error: String
+  attempts: Int
   archivedAt: DateTime
   createdAt: DateTime
   updatedAt: DateTime
@@ -1289,6 +1300,7 @@ type CardDep {
   """
   cursor: String
   card(where: CardFilters): Card!
+  dependsOn(where: CardFilters): Card!
 }
 
 type CardDepAggregate {
@@ -1341,6 +1353,112 @@ type CardDepGroupKeys {
   dependsOnCardId: String
 }
 
+type CardEvent {
+  id: String!
+  cardId: String!
+  runId: String
+  fromLaneId: String
+  toLaneId: String
+  note: String!
+  actor: CardEventsActorEnum!
+  createdAt: DateTime!
+
+  """
+  Opaque cursor of this row's position in the query's ordering. Pass it as `after` to resume from here. Only set on rows returned by a list query.
+  """
+  cursor: String
+  card(where: CardFilters): Card!
+  run(where: RunFilters): Run
+  fromLane(where: LaneFilters): Lane
+  toLane(where: LaneFilters): Lane
+}
+
+enum CardEventsActorEnum {
+  """Value: agent"""
+  agent
+
+  """Value: user"""
+  user
+
+  """Value: system"""
+  system
+}
+
+type CardEventAggregate {
+  count: Int!
+  min: CardEventMinAggregate
+  max: CardEventMaxAggregate
+  countNonNull: CardEventCountNonNullAggregate
+  countDistinct: CardEventCountDistinctAggregate
+}
+
+type CardEventMinAggregate {
+  id: String
+  cardId: String
+  runId: String
+  fromLaneId: String
+  toLaneId: String
+  note: String
+  actor: CardEventsActorEnum
+  createdAt: DateTime
+}
+
+type CardEventMaxAggregate {
+  id: String
+  cardId: String
+  runId: String
+  fromLaneId: String
+  toLaneId: String
+  note: String
+  actor: CardEventsActorEnum
+  createdAt: DateTime
+}
+
+type CardEventCountNonNullAggregate {
+  id: Int!
+  cardId: Int!
+  runId: Int!
+  fromLaneId: Int!
+  toLaneId: Int!
+  note: Int!
+  actor: Int!
+  createdAt: Int!
+}
+
+type CardEventCountDistinctAggregate {
+  id: Int!
+  cardId: Int!
+  runId: Int!
+  fromLaneId: Int!
+  toLaneId: Int!
+  note: Int!
+  actor: Int!
+  createdAt: Int!
+}
+
+type CardEventGroupBy {
+  group: CardEventGroupKeys!
+  count: Int!
+  min: CardEventMinAggregate
+  max: CardEventMaxAggregate
+  countNonNull: CardEventCountNonNullAggregate
+  countDistinct: CardEventCountDistinctAggregate
+}
+
+"""
+The grouped column values of one CardEvent group. A column the query did not group by is null.
+"""
+type CardEventGroupKeys {
+  id: String
+  cardId: String
+  runId: String
+  fromLaneId: String
+  toLaneId: String
+  note: String
+  actor: CardEventsActorEnum
+  createdAt: DateTime
+}
+
 type Run {
   id: String!
   projectId: String!
@@ -1350,6 +1468,7 @@ type Run {
   cardId: String
   laneId: String
   status: RunsStatusEnum!
+  verdict: RunsVerdictEnum!
   startedAt: DateTime!
   finishedAt: DateTime
   output: String!
@@ -1367,6 +1486,7 @@ type Run {
   agent(where: AgentFilters): Agent
   task(where: TaskFilters): Task
   card(where: CardFilters): Card
+  lane(where: LaneFilters): Lane
 }
 
 enum RunsKindEnum {
@@ -1392,6 +1512,17 @@ enum RunsStatusEnum {
 
   """Value: stopped"""
   stopped
+}
+
+enum RunsVerdictEnum {
+  """Value: none"""
+  none
+
+  """Value: pass"""
+  pass
+
+  """Value: fail"""
+  fail
 }
 
 type RunAggregate {
@@ -1425,6 +1556,7 @@ type RunMinAggregate {
   cardId: String
   laneId: String
   status: RunsStatusEnum
+  verdict: RunsVerdictEnum
   startedAt: DateTime
   finishedAt: DateTime
   output: String
@@ -1443,6 +1575,7 @@ type RunMaxAggregate {
   cardId: String
   laneId: String
   status: RunsStatusEnum
+  verdict: RunsVerdictEnum
   startedAt: DateTime
   finishedAt: DateTime
   output: String
@@ -1461,6 +1594,7 @@ type RunCountNonNullAggregate {
   cardId: Int!
   laneId: Int!
   status: Int!
+  verdict: Int!
   startedAt: Int!
   finishedAt: Int!
   output: Int!
@@ -1480,6 +1614,7 @@ type RunCountDistinctAggregate {
   cardId: Int!
   laneId: Int!
   status: Int!
+  verdict: Int!
   startedAt: Int!
   finishedAt: Int!
   output: Int!
@@ -1512,6 +1647,7 @@ type RunGroupKeys {
   cardId: String
   laneId: String
   status: RunsStatusEnum
+  verdict: RunsVerdictEnum
   startedAt: DateTime
   finishedAt: DateTime
   output: String
@@ -1603,6 +1739,8 @@ type Setting {
   maxRetries: Int!
   runRetentionDays: Int!
   workerIntervalSeconds: Int!
+  refineAgentId: String
+  refinePrompt: String!
 
   """
   Opaque cursor of this row's position in the query's ordering. Pass it as `after` to resume from here. Only set on rows returned by a list query.
@@ -1661,6 +1799,8 @@ type SettingMinAggregate {
   maxRetries: Int
   runRetentionDays: Int
   workerIntervalSeconds: Int
+  refineAgentId: String
+  refinePrompt: String
 }
 
 type SettingMaxAggregate {
@@ -1676,6 +1816,8 @@ type SettingMaxAggregate {
   maxRetries: Int
   runRetentionDays: Int
   workerIntervalSeconds: Int
+  refineAgentId: String
+  refinePrompt: String
 }
 
 type SettingCountNonNullAggregate {
@@ -1691,6 +1833,8 @@ type SettingCountNonNullAggregate {
   maxRetries: Int!
   runRetentionDays: Int!
   workerIntervalSeconds: Int!
+  refineAgentId: Int!
+  refinePrompt: Int!
 }
 
 type SettingCountDistinctAggregate {
@@ -1706,6 +1850,8 @@ type SettingCountDistinctAggregate {
   maxRetries: Int!
   runRetentionDays: Int!
   workerIntervalSeconds: Int!
+  refineAgentId: Int!
+  refinePrompt: Int!
 }
 
 type SettingGroupBy {
@@ -1735,14 +1881,16 @@ type SettingGroupKeys {
   maxRetries: Int
   runRetentionDays: Int
   workerIntervalSeconds: Int
+  refineAgentId: String
+  refinePrompt: String
 }
 
 input CreateRoleInput {
   id: String
   name: String!
   description: String
-  stage: RolesStageEnum
-  systemPrompt: String
+  contract: RolesContractEnum
+  prompt: String
   createdAt: DateTime
   updatedAt: DateTime
 }
@@ -1751,8 +1899,8 @@ input UpdateRoleInput {
   id: String
   name: String
   description: String
-  stage: RolesStageEnum
-  systemPrompt: String
+  contract: RolesContractEnum
+  prompt: String
   createdAt: DateTime
   updatedAt: DateTime
 }
@@ -1770,11 +1918,11 @@ input RoleFilters {
   id: StringFilter
   name: StringFilter
   description: StringFilter
-  stage: RolesStageEnumFilter
-  systemPrompt: StringFilter
+  contract: RolesContractEnumFilter
+  prompt: StringFilter
   createdAt: DateTimeFilter
   updatedAt: DateTimeFilter
-  agents: AgentListRelationFilter
+  lanes: LaneListRelationFilter
 
   """At least one branch matches; ANDed with any sibling fields"""
   OR: [RoleFilters!]
@@ -1860,24 +2008,24 @@ input StringFilter {
   NOT: StringFilter
 }
 
-input RolesStageEnumFilter {
+input RolesContractEnumFilter {
   """Equal to"""
-  eq: RolesStageEnum
+  eq: RolesContractEnum
 
   """Not equal to"""
-  ne: RolesStageEnum
+  ne: RolesContractEnum
 
   """Less than"""
-  lt: RolesStageEnum
+  lt: RolesContractEnum
 
   """Less than or equal to"""
-  lte: RolesStageEnum
+  lte: RolesContractEnum
 
   """Greater than"""
-  gt: RolesStageEnum
+  gt: RolesContractEnum
 
   """Greater than or equal to"""
-  gte: RolesStageEnum
+  gte: RolesContractEnum
   like: String
   notLike: String
   ilike: String
@@ -1913,10 +2061,10 @@ input RolesStageEnumFilter {
   insensitive: Boolean
 
   """Matches any one of these values (SQL `IN`)"""
-  inArray: [RolesStageEnum!]
+  inArray: [RolesContractEnum!]
 
   """Matches none of these values (SQL `NOT IN`)"""
-  notInArray: [RolesStageEnum!]
+  notInArray: [RolesContractEnum!]
 
   """When true, matches rows where the column is NULL"""
   isNull: Boolean
@@ -1925,13 +2073,13 @@ input RolesStageEnumFilter {
   isNotNull: Boolean
 
   """At least one branch matches; ANDed with any sibling operators"""
-  OR: [RolesStageEnumFilter!]
+  OR: [RolesContractEnumFilter!]
 
   """Every branch matches"""
-  AND: [RolesStageEnumFilter!]
+  AND: [RolesContractEnumFilter!]
 
   """Negates the nested operators"""
-  NOT: RolesStageEnumFilter
+  NOT: RolesContractEnumFilter
 }
 
 input DateTimeFilter {
@@ -2008,23 +2156,23 @@ input DateTimeFilter {
   NOT: DateTimeFilter
 }
 
-input AgentListRelationFilter {
+input LaneListRelationFilter {
   """At least one related row matches"""
-  some: AgentFilters
+  some: LaneFilters
 
   """No related row matches"""
-  none: AgentFilters
+  none: LaneFilters
 
   """Every related row matches"""
-  every: AgentFilters
+  every: LaneFilters
 }
 
 input RoleOrderBy {
   id: InnerOrder
   name: InnerOrder
   description: InnerOrder
-  stage: InnerOrder
-  systemPrompt: InnerOrder
+  contract: InnerOrder
+  prompt: InnerOrder
   createdAt: InnerOrder
   updatedAt: InnerOrder
 }
@@ -2088,8 +2236,8 @@ input RoleCountNonNullHaving {
   id: AggregateNumberFilter
   name: AggregateNumberFilter
   description: AggregateNumberFilter
-  stage: AggregateNumberFilter
-  systemPrompt: AggregateNumberFilter
+  contract: AggregateNumberFilter
+  prompt: AggregateNumberFilter
   createdAt: AggregateNumberFilter
   updatedAt: AggregateNumberFilter
 }
@@ -2098,8 +2246,8 @@ input RoleCountDistinctHaving {
   id: AggregateNumberFilter
   name: AggregateNumberFilter
   description: AggregateNumberFilter
-  stage: AggregateNumberFilter
-  systemPrompt: AggregateNumberFilter
+  contract: AggregateNumberFilter
+  prompt: AggregateNumberFilter
   createdAt: AggregateNumberFilter
   updatedAt: AggregateNumberFilter
 }
@@ -2107,7 +2255,6 @@ input RoleCountDistinctHaving {
 input CreateAgentInput {
   id: String
   name: String!
-  roleId: String!
   enabled: Boolean
   baseUrl: String
   model: String
@@ -2125,7 +2272,6 @@ input CreateAgentInput {
 input UpdateAgentInput {
   id: String
   name: String
-  roleId: String
   enabled: Boolean
   baseUrl: String
   model: String
@@ -2152,7 +2298,6 @@ input UpdateAgentManyInput {
 input AgentFilters {
   id: StringFilter
   name: StringFilter
-  roleId: StringFilter
   enabled: BooleanFilter
   baseUrl: StringFilter
   model: StringFilter
@@ -2165,9 +2310,6 @@ input AgentFilters {
   maxRetries: IntFilter
   createdAt: DateTimeFilter
   updatedAt: DateTimeFilter
-
-  """Matches rows whose role matches these filters"""
-  role: RoleFilters
   servers: AgentServerListRelationFilter
   lanes: LaneListRelationFilter
   runs: RunListRelationFilter
@@ -2423,17 +2565,6 @@ input AgentServerListRelationFilter {
   every: AgentServerFilters
 }
 
-input LaneListRelationFilter {
-  """At least one related row matches"""
-  some: LaneFilters
-
-  """No related row matches"""
-  none: LaneFilters
-
-  """Every related row matches"""
-  every: LaneFilters
-}
-
 input RunListRelationFilter {
   """At least one related row matches"""
   some: RunFilters
@@ -2448,7 +2579,6 @@ input RunListRelationFilter {
 input AgentOrderBy {
   id: InnerOrder
   name: InnerOrder
-  roleId: InnerOrder
   enabled: InnerOrder
   baseUrl: InnerOrder
   model: InnerOrder
@@ -2461,9 +2591,6 @@ input AgentOrderBy {
   maxRetries: InnerOrder
   createdAt: InnerOrder
   updatedAt: InnerOrder
-
-  """Order by columns of the related role row"""
-  role: RoleOrderBy
 }
 
 """Filters Agent groups by their aggregated values"""
@@ -2513,7 +2640,6 @@ input AgentMaxHaving {
 input AgentCountNonNullHaving {
   id: AggregateNumberFilter
   name: AggregateNumberFilter
-  roleId: AggregateNumberFilter
   enabled: AggregateNumberFilter
   baseUrl: AggregateNumberFilter
   model: AggregateNumberFilter
@@ -2531,7 +2657,6 @@ input AgentCountNonNullHaving {
 input AgentCountDistinctHaving {
   id: AggregateNumberFilter
   name: AggregateNumberFilter
-  roleId: AggregateNumberFilter
   baseUrl: AggregateNumberFilter
   model: AggregateNumberFilter
   systemPrompt: AggregateNumberFilter
@@ -2900,7 +3025,6 @@ input CreateProjectInput {
   context: String
   autoRun: Boolean
   refineAgentId: String
-  decomposeAgentId: String
   createdAt: DateTime
   updatedAt: DateTime
 }
@@ -2912,7 +3036,6 @@ input UpdateProjectInput {
   context: String
   autoRun: Boolean
   refineAgentId: String
-  decomposeAgentId: String
   createdAt: DateTime
   updatedAt: DateTime
 }
@@ -2933,7 +3056,6 @@ input ProjectFilters {
   context: StringFilter
   autoRun: BooleanFilter
   refineAgentId: StringFilter
-  decomposeAgentId: StringFilter
   createdAt: DateTimeFilter
   updatedAt: DateTimeFilter
   lanes: LaneListRelationFilter
@@ -2943,9 +3065,6 @@ input ProjectFilters {
 
   """Matches rows whose refineAgent matches these filters"""
   refineAgent: AgentFilters
-
-  """Matches rows whose decomposeAgent matches these filters"""
-  decomposeAgent: AgentFilters
 
   """At least one branch matches; ANDed with any sibling fields"""
   OR: [ProjectFilters!]
@@ -2986,15 +3105,11 @@ input ProjectOrderBy {
   context: InnerOrder
   autoRun: InnerOrder
   refineAgentId: InnerOrder
-  decomposeAgentId: InnerOrder
   createdAt: InnerOrder
   updatedAt: InnerOrder
 
   """Order by columns of the related refineAgent row"""
   refineAgent: AgentOrderBy
-
-  """Order by columns of the related decomposeAgent row"""
-  decomposeAgent: AgentOrderBy
 }
 
 """Filters Project groups by their aggregated values"""
@@ -3012,7 +3127,6 @@ input ProjectCountNonNullHaving {
   context: AggregateNumberFilter
   autoRun: AggregateNumberFilter
   refineAgentId: AggregateNumberFilter
-  decomposeAgentId: AggregateNumberFilter
   createdAt: AggregateNumberFilter
   updatedAt: AggregateNumberFilter
 }
@@ -3023,7 +3137,6 @@ input ProjectCountDistinctHaving {
   description: AggregateNumberFilter
   context: AggregateNumberFilter
   refineAgentId: AggregateNumberFilter
-  decomposeAgentId: AggregateNumberFilter
   createdAt: AggregateNumberFilter
   updatedAt: AggregateNumberFilter
 }
@@ -3034,11 +3147,13 @@ input CreateLaneInput {
   name: String!
   position: Int
   intake: Boolean
+  roleId: String
+  prompt: String
   agentId: String
   onSuccessLaneId: String
   onFailureLaneId: String
   wipLimit: Int
-  readVerdict: Boolean
+  maxAttempts: Int
   createdAt: DateTime
 }
 
@@ -3048,11 +3163,13 @@ input UpdateLaneInput {
   name: String
   position: Int
   intake: Boolean
+  roleId: String
+  prompt: String
   agentId: String
   onSuccessLaneId: String
   onFailureLaneId: String
   wipLimit: Int
-  readVerdict: Boolean
+  maxAttempts: Int
   createdAt: DateTime
 }
 
@@ -3071,15 +3188,20 @@ input LaneFilters {
   name: StringFilter
   position: IntFilter
   intake: BooleanFilter
+  roleId: StringFilter
+  prompt: StringFilter
   agentId: StringFilter
   onSuccessLaneId: StringFilter
   onFailureLaneId: StringFilter
   wipLimit: IntFilter
-  readVerdict: BooleanFilter
+  maxAttempts: IntFilter
   createdAt: DateTimeFilter
 
   """Matches rows whose project matches these filters"""
   project: ProjectFilters
+
+  """Matches rows whose role matches these filters"""
+  role: RoleFilters
 
   """Matches rows whose agent matches these filters"""
   agent: AgentFilters
@@ -3101,15 +3223,20 @@ input LaneOrderBy {
   name: InnerOrder
   position: InnerOrder
   intake: InnerOrder
+  roleId: InnerOrder
+  prompt: InnerOrder
   agentId: InnerOrder
   onSuccessLaneId: InnerOrder
   onFailureLaneId: InnerOrder
   wipLimit: InnerOrder
-  readVerdict: InnerOrder
+  maxAttempts: InnerOrder
   createdAt: InnerOrder
 
   """Order by columns of the related project row"""
   project: ProjectOrderBy
+
+  """Order by columns of the related role row"""
+  role: RoleOrderBy
 
   """Order by columns of the related agent row"""
   agent: AgentOrderBy
@@ -3130,21 +3257,25 @@ input LaneHaving {
 input LaneAvgHaving {
   position: AggregateNumberFilter
   wipLimit: AggregateNumberFilter
+  maxAttempts: AggregateNumberFilter
 }
 
 input LaneSumHaving {
   position: AggregateNumberFilter
   wipLimit: AggregateNumberFilter
+  maxAttempts: AggregateNumberFilter
 }
 
 input LaneMinHaving {
   position: AggregateNumberFilter
   wipLimit: AggregateNumberFilter
+  maxAttempts: AggregateNumberFilter
 }
 
 input LaneMaxHaving {
   position: AggregateNumberFilter
   wipLimit: AggregateNumberFilter
+  maxAttempts: AggregateNumberFilter
 }
 
 input LaneCountNonNullHaving {
@@ -3153,11 +3284,13 @@ input LaneCountNonNullHaving {
   name: AggregateNumberFilter
   position: AggregateNumberFilter
   intake: AggregateNumberFilter
+  roleId: AggregateNumberFilter
+  prompt: AggregateNumberFilter
   agentId: AggregateNumberFilter
   onSuccessLaneId: AggregateNumberFilter
   onFailureLaneId: AggregateNumberFilter
   wipLimit: AggregateNumberFilter
-  readVerdict: AggregateNumberFilter
+  maxAttempts: AggregateNumberFilter
   createdAt: AggregateNumberFilter
 }
 
@@ -3166,10 +3299,13 @@ input LaneCountDistinctHaving {
   projectId: AggregateNumberFilter
   name: AggregateNumberFilter
   position: AggregateNumberFilter
+  roleId: AggregateNumberFilter
+  prompt: AggregateNumberFilter
   agentId: AggregateNumberFilter
   onSuccessLaneId: AggregateNumberFilter
   onFailureLaneId: AggregateNumberFilter
   wipLimit: AggregateNumberFilter
+  maxAttempts: AggregateNumberFilter
   createdAt: AggregateNumberFilter
 }
 
@@ -3178,8 +3314,6 @@ input CreateTaskInput {
   projectId: String!
   title: String
   brief: String
-  status: TasksStatusEnum
-  error: String
   createdAt: DateTime
   updatedAt: DateTime
 }
@@ -3189,8 +3323,6 @@ input UpdateTaskInput {
   projectId: String
   title: String
   brief: String
-  status: TasksStatusEnum
-  error: String
   createdAt: DateTime
   updatedAt: DateTime
 }
@@ -3209,8 +3341,6 @@ input TaskFilters {
   projectId: StringFilter
   title: StringFilter
   brief: StringFilter
-  status: TasksStatusEnumFilter
-  error: StringFilter
   createdAt: DateTimeFilter
   updatedAt: DateTimeFilter
 
@@ -3229,80 +3359,6 @@ input TaskFilters {
   NOT: TaskFilters
 }
 
-input TasksStatusEnumFilter {
-  """Equal to"""
-  eq: TasksStatusEnum
-
-  """Not equal to"""
-  ne: TasksStatusEnum
-
-  """Less than"""
-  lt: TasksStatusEnum
-
-  """Less than or equal to"""
-  lte: TasksStatusEnum
-
-  """Greater than"""
-  gt: TasksStatusEnum
-
-  """Greater than or equal to"""
-  gte: TasksStatusEnum
-  like: String
-  notLike: String
-  ilike: String
-  notIlike: String
-
-  """
-  Matches values starting with the given string. `%`, `_` and `\` are matched literally.
-  """
-  startsWith: String
-
-  """
-  Matches values ending with the given string. `%`, `_` and `\` are matched literally.
-  """
-  endsWith: String
-
-  """
-  Matches values containing the given string. `%`, `_` and `\` are matched literally.
-  """
-  contains: String
-
-  """Case-insensitive `startsWith`."""
-  iStartsWith: String
-
-  """Case-insensitive `endsWith`."""
-  iEndsWith: String
-
-  """Case-insensitive `contains`."""
-  iContains: String
-
-  """
-  When true, every comparison operator in this object matches case-insensitively — `eq`, `ne`, the ordering operators, `inArray`/`notInArray` and the pattern operators all compare `lower(column)` against `lower(operand)`. Applies only to the operators beside it; a nested `AND`/`OR`/`NOT` branch sets its own.
-  """
-  insensitive: Boolean
-
-  """Matches any one of these values (SQL `IN`)"""
-  inArray: [TasksStatusEnum!]
-
-  """Matches none of these values (SQL `NOT IN`)"""
-  notInArray: [TasksStatusEnum!]
-
-  """When true, matches rows where the column is NULL"""
-  isNull: Boolean
-
-  """When true, matches rows where the column is not NULL"""
-  isNotNull: Boolean
-
-  """At least one branch matches; ANDed with any sibling operators"""
-  OR: [TasksStatusEnumFilter!]
-
-  """Every branch matches"""
-  AND: [TasksStatusEnumFilter!]
-
-  """Negates the nested operators"""
-  NOT: TasksStatusEnumFilter
-}
-
 input MessageListRelationFilter {
   """At least one related row matches"""
   some: MessageFilters
@@ -3319,8 +3375,6 @@ input TaskOrderBy {
   projectId: InnerOrder
   title: InnerOrder
   brief: InnerOrder
-  status: InnerOrder
-  error: InnerOrder
   createdAt: InnerOrder
   updatedAt: InnerOrder
 
@@ -3341,8 +3395,6 @@ input TaskCountNonNullHaving {
   projectId: AggregateNumberFilter
   title: AggregateNumberFilter
   brief: AggregateNumberFilter
-  status: AggregateNumberFilter
-  error: AggregateNumberFilter
   createdAt: AggregateNumberFilter
   updatedAt: AggregateNumberFilter
 }
@@ -3352,8 +3404,6 @@ input TaskCountDistinctHaving {
   projectId: AggregateNumberFilter
   title: AggregateNumberFilter
   brief: AggregateNumberFilter
-  status: AggregateNumberFilter
-  error: AggregateNumberFilter
   createdAt: AggregateNumberFilter
   updatedAt: AggregateNumberFilter
 }
@@ -3516,6 +3566,7 @@ input CreateCardInput {
   id: String
   projectId: String!
   taskId: String
+  parentId: String
   laneId: String!
   title: String!
   body: String
@@ -3524,6 +3575,7 @@ input CreateCardInput {
   status: CardsStatusEnum
   result: String
   error: String
+  attempts: Int
   archivedAt: DateTime
   createdAt: DateTime
   updatedAt: DateTime
@@ -3533,6 +3585,7 @@ input UpdateCardInput {
   id: String
   projectId: String
   taskId: String
+  parentId: String
   laneId: String
   title: String
   body: String
@@ -3541,6 +3594,7 @@ input UpdateCardInput {
   status: CardsStatusEnum
   result: String
   error: String
+  attempts: Int
   archivedAt: DateTime
   createdAt: DateTime
   updatedAt: DateTime
@@ -3559,6 +3613,7 @@ input CardFilters {
   id: StringFilter
   projectId: StringFilter
   taskId: StringFilter
+  parentId: StringFilter
   laneId: StringFilter
   title: StringFilter
   body: StringFilter
@@ -3567,6 +3622,7 @@ input CardFilters {
   status: CardsStatusEnumFilter
   result: StringFilter
   error: StringFilter
+  attempts: IntFilter
   archivedAt: DateTimeFilter
   createdAt: DateTimeFilter
   updatedAt: DateTimeFilter
@@ -3580,7 +3636,9 @@ input CardFilters {
   """Matches rows whose task matches these filters"""
   task: TaskFilters
   deps: CardDepListRelationFilter
+  blocks: CardDepListRelationFilter
   runs: RunListRelationFilter
+  events: CardEventListRelationFilter
 
   """At least one branch matches; ANDed with any sibling fields"""
   OR: [CardFilters!]
@@ -3677,10 +3735,22 @@ input CardDepListRelationFilter {
   every: CardDepFilters
 }
 
+input CardEventListRelationFilter {
+  """At least one related row matches"""
+  some: CardEventFilters
+
+  """No related row matches"""
+  none: CardEventFilters
+
+  """Every related row matches"""
+  every: CardEventFilters
+}
+
 input CardOrderBy {
   id: InnerOrder
   projectId: InnerOrder
   taskId: InnerOrder
+  parentId: InnerOrder
   laneId: InnerOrder
   title: InnerOrder
   body: InnerOrder
@@ -3689,6 +3759,7 @@ input CardOrderBy {
   status: InnerOrder
   result: InnerOrder
   error: InnerOrder
+  attempts: InnerOrder
   archivedAt: InnerOrder
   createdAt: InnerOrder
   updatedAt: InnerOrder
@@ -3717,24 +3788,29 @@ input CardHaving {
 
 input CardAvgHaving {
   position: AggregateNumberFilter
+  attempts: AggregateNumberFilter
 }
 
 input CardSumHaving {
   position: AggregateNumberFilter
+  attempts: AggregateNumberFilter
 }
 
 input CardMinHaving {
   position: AggregateNumberFilter
+  attempts: AggregateNumberFilter
 }
 
 input CardMaxHaving {
   position: AggregateNumberFilter
+  attempts: AggregateNumberFilter
 }
 
 input CardCountNonNullHaving {
   id: AggregateNumberFilter
   projectId: AggregateNumberFilter
   taskId: AggregateNumberFilter
+  parentId: AggregateNumberFilter
   laneId: AggregateNumberFilter
   title: AggregateNumberFilter
   body: AggregateNumberFilter
@@ -3743,6 +3819,7 @@ input CardCountNonNullHaving {
   status: AggregateNumberFilter
   result: AggregateNumberFilter
   error: AggregateNumberFilter
+  attempts: AggregateNumberFilter
   archivedAt: AggregateNumberFilter
   createdAt: AggregateNumberFilter
   updatedAt: AggregateNumberFilter
@@ -3752,6 +3829,7 @@ input CardCountDistinctHaving {
   id: AggregateNumberFilter
   projectId: AggregateNumberFilter
   taskId: AggregateNumberFilter
+  parentId: AggregateNumberFilter
   laneId: AggregateNumberFilter
   title: AggregateNumberFilter
   body: AggregateNumberFilter
@@ -3760,6 +3838,7 @@ input CardCountDistinctHaving {
   status: AggregateNumberFilter
   result: AggregateNumberFilter
   error: AggregateNumberFilter
+  attempts: AggregateNumberFilter
   archivedAt: AggregateNumberFilter
   createdAt: AggregateNumberFilter
   updatedAt: AggregateNumberFilter
@@ -3794,6 +3873,9 @@ input CardDepFilters {
   """Matches rows whose card matches these filters"""
   card: CardFilters
 
+  """Matches rows whose dependsOn matches these filters"""
+  dependsOn: CardFilters
+
   """At least one branch matches; ANDed with any sibling fields"""
   OR: [CardDepFilters!]
 
@@ -3811,6 +3893,9 @@ input CardDepOrderBy {
 
   """Order by columns of the related card row"""
   card: CardOrderBy
+
+  """Order by columns of the related dependsOn row"""
+  dependsOn: CardOrderBy
 }
 
 """Filters CardDep groups by their aggregated values"""
@@ -3833,6 +3918,165 @@ input CardDepCountDistinctHaving {
   dependsOnCardId: AggregateNumberFilter
 }
 
+input CardEventFilters {
+  id: StringFilter
+  cardId: StringFilter
+  runId: StringFilter
+  fromLaneId: StringFilter
+  toLaneId: StringFilter
+  note: StringFilter
+  actor: CardEventsActorEnumFilter
+  createdAt: DateTimeFilter
+
+  """Matches rows whose card matches these filters"""
+  card: CardFilters
+
+  """Matches rows whose run matches these filters"""
+  run: RunFilters
+
+  """Matches rows whose fromLane matches these filters"""
+  fromLane: LaneFilters
+
+  """Matches rows whose toLane matches these filters"""
+  toLane: LaneFilters
+
+  """At least one branch matches; ANDed with any sibling fields"""
+  OR: [CardEventFilters!]
+
+  """Every branch matches"""
+  AND: [CardEventFilters!]
+
+  """Negates the nested filters"""
+  NOT: CardEventFilters
+}
+
+input CardEventsActorEnumFilter {
+  """Equal to"""
+  eq: CardEventsActorEnum
+
+  """Not equal to"""
+  ne: CardEventsActorEnum
+
+  """Less than"""
+  lt: CardEventsActorEnum
+
+  """Less than or equal to"""
+  lte: CardEventsActorEnum
+
+  """Greater than"""
+  gt: CardEventsActorEnum
+
+  """Greater than or equal to"""
+  gte: CardEventsActorEnum
+  like: String
+  notLike: String
+  ilike: String
+  notIlike: String
+
+  """
+  Matches values starting with the given string. `%`, `_` and `\` are matched literally.
+  """
+  startsWith: String
+
+  """
+  Matches values ending with the given string. `%`, `_` and `\` are matched literally.
+  """
+  endsWith: String
+
+  """
+  Matches values containing the given string. `%`, `_` and `\` are matched literally.
+  """
+  contains: String
+
+  """Case-insensitive `startsWith`."""
+  iStartsWith: String
+
+  """Case-insensitive `endsWith`."""
+  iEndsWith: String
+
+  """Case-insensitive `contains`."""
+  iContains: String
+
+  """
+  When true, every comparison operator in this object matches case-insensitively — `eq`, `ne`, the ordering operators, `inArray`/`notInArray` and the pattern operators all compare `lower(column)` against `lower(operand)`. Applies only to the operators beside it; a nested `AND`/`OR`/`NOT` branch sets its own.
+  """
+  insensitive: Boolean
+
+  """Matches any one of these values (SQL `IN`)"""
+  inArray: [CardEventsActorEnum!]
+
+  """Matches none of these values (SQL `NOT IN`)"""
+  notInArray: [CardEventsActorEnum!]
+
+  """When true, matches rows where the column is NULL"""
+  isNull: Boolean
+
+  """When true, matches rows where the column is not NULL"""
+  isNotNull: Boolean
+
+  """At least one branch matches; ANDed with any sibling operators"""
+  OR: [CardEventsActorEnumFilter!]
+
+  """Every branch matches"""
+  AND: [CardEventsActorEnumFilter!]
+
+  """Negates the nested operators"""
+  NOT: CardEventsActorEnumFilter
+}
+
+input CardEventOrderBy {
+  id: InnerOrder
+  cardId: InnerOrder
+  runId: InnerOrder
+  fromLaneId: InnerOrder
+  toLaneId: InnerOrder
+  note: InnerOrder
+  actor: InnerOrder
+  createdAt: InnerOrder
+
+  """Order by columns of the related card row"""
+  card: CardOrderBy
+
+  """Order by columns of the related run row"""
+  run: RunOrderBy
+
+  """Order by columns of the related fromLane row"""
+  fromLane: LaneOrderBy
+
+  """Order by columns of the related toLane row"""
+  toLane: LaneOrderBy
+}
+
+"""Filters CardEvent groups by their aggregated values"""
+input CardEventHaving {
+  """Filters groups by how many rows they contain"""
+  count: AggregateNumberFilter
+  countNonNull: CardEventCountNonNullHaving
+  countDistinct: CardEventCountDistinctHaving
+}
+
+input CardEventCountNonNullHaving {
+  id: AggregateNumberFilter
+  cardId: AggregateNumberFilter
+  runId: AggregateNumberFilter
+  fromLaneId: AggregateNumberFilter
+  toLaneId: AggregateNumberFilter
+  note: AggregateNumberFilter
+  actor: AggregateNumberFilter
+  createdAt: AggregateNumberFilter
+}
+
+input CardEventCountDistinctHaving {
+  id: AggregateNumberFilter
+  cardId: AggregateNumberFilter
+  runId: AggregateNumberFilter
+  fromLaneId: AggregateNumberFilter
+  toLaneId: AggregateNumberFilter
+  note: AggregateNumberFilter
+  actor: AggregateNumberFilter
+  createdAt: AggregateNumberFilter
+}
+
 input RunFilters {
   id: StringFilter
   projectId: StringFilter
@@ -3842,6 +4086,7 @@ input RunFilters {
   cardId: StringFilter
   laneId: StringFilter
   status: RunsStatusEnumFilter
+  verdict: RunsVerdictEnumFilter
   startedAt: DateTimeFilter
   finishedAt: DateTimeFilter
   output: StringFilter
@@ -3862,6 +4107,9 @@ input RunFilters {
 
   """Matches rows whose card matches these filters"""
   card: CardFilters
+
+  """Matches rows whose lane matches these filters"""
+  lane: LaneFilters
 
   """At least one branch matches; ANDed with any sibling fields"""
   OR: [RunFilters!]
@@ -4021,6 +4269,80 @@ input RunsStatusEnumFilter {
   NOT: RunsStatusEnumFilter
 }
 
+input RunsVerdictEnumFilter {
+  """Equal to"""
+  eq: RunsVerdictEnum
+
+  """Not equal to"""
+  ne: RunsVerdictEnum
+
+  """Less than"""
+  lt: RunsVerdictEnum
+
+  """Less than or equal to"""
+  lte: RunsVerdictEnum
+
+  """Greater than"""
+  gt: RunsVerdictEnum
+
+  """Greater than or equal to"""
+  gte: RunsVerdictEnum
+  like: String
+  notLike: String
+  ilike: String
+  notIlike: String
+
+  """
+  Matches values starting with the given string. `%`, `_` and `\` are matched literally.
+  """
+  startsWith: String
+
+  """
+  Matches values ending with the given string. `%`, `_` and `\` are matched literally.
+  """
+  endsWith: String
+
+  """
+  Matches values containing the given string. `%`, `_` and `\` are matched literally.
+  """
+  contains: String
+
+  """Case-insensitive `startsWith`."""
+  iStartsWith: String
+
+  """Case-insensitive `endsWith`."""
+  iEndsWith: String
+
+  """Case-insensitive `contains`."""
+  iContains: String
+
+  """
+  When true, every comparison operator in this object matches case-insensitively — `eq`, `ne`, the ordering operators, `inArray`/`notInArray` and the pattern operators all compare `lower(column)` against `lower(operand)`. Applies only to the operators beside it; a nested `AND`/`OR`/`NOT` branch sets its own.
+  """
+  insensitive: Boolean
+
+  """Matches any one of these values (SQL `IN`)"""
+  inArray: [RunsVerdictEnum!]
+
+  """Matches none of these values (SQL `NOT IN`)"""
+  notInArray: [RunsVerdictEnum!]
+
+  """When true, matches rows where the column is NULL"""
+  isNull: Boolean
+
+  """When true, matches rows where the column is not NULL"""
+  isNotNull: Boolean
+
+  """At least one branch matches; ANDed with any sibling operators"""
+  OR: [RunsVerdictEnumFilter!]
+
+  """Every branch matches"""
+  AND: [RunsVerdictEnumFilter!]
+
+  """Negates the nested operators"""
+  NOT: RunsVerdictEnumFilter
+}
+
 input RunOrderBy {
   id: InnerOrder
   projectId: InnerOrder
@@ -4030,6 +4352,7 @@ input RunOrderBy {
   cardId: InnerOrder
   laneId: InnerOrder
   status: InnerOrder
+  verdict: InnerOrder
   startedAt: InnerOrder
   finishedAt: InnerOrder
   output: InnerOrder
@@ -4050,6 +4373,9 @@ input RunOrderBy {
 
   """Order by columns of the related card row"""
   card: CardOrderBy
+
+  """Order by columns of the related lane row"""
+  lane: LaneOrderBy
 }
 
 """Filters Run groups by their aggregated values"""
@@ -4097,6 +4423,7 @@ input RunCountNonNullHaving {
   cardId: AggregateNumberFilter
   laneId: AggregateNumberFilter
   status: AggregateNumberFilter
+  verdict: AggregateNumberFilter
   startedAt: AggregateNumberFilter
   finishedAt: AggregateNumberFilter
   output: AggregateNumberFilter
@@ -4116,6 +4443,7 @@ input RunCountDistinctHaving {
   cardId: AggregateNumberFilter
   laneId: AggregateNumberFilter
   status: AggregateNumberFilter
+  verdict: AggregateNumberFilter
   startedAt: AggregateNumberFilter
   finishedAt: AggregateNumberFilter
   output: AggregateNumberFilter
@@ -4186,6 +4514,8 @@ input UpdateSettingInput {
   maxRetries: Int
   runRetentionDays: Int
   workerIntervalSeconds: Int
+  refineAgentId: String
+  refinePrompt: String
 }
 
 """
@@ -4210,6 +4540,8 @@ input SettingFilters {
   maxRetries: IntFilter
   runRetentionDays: IntFilter
   workerIntervalSeconds: IntFilter
+  refineAgentId: StringFilter
+  refinePrompt: StringFilter
 
   """At least one branch matches; ANDed with any sibling fields"""
   OR: [SettingFilters!]
@@ -4308,6 +4640,8 @@ input SettingOrderBy {
   maxRetries: InnerOrder
   runRetentionDays: InnerOrder
   workerIntervalSeconds: InnerOrder
+  refineAgentId: InnerOrder
+  refinePrompt: InnerOrder
 }
 
 """Filters Setting groups by their aggregated values"""
@@ -4375,6 +4709,8 @@ input SettingCountNonNullHaving {
   maxRetries: AggregateNumberFilter
   runRetentionDays: AggregateNumberFilter
   workerIntervalSeconds: AggregateNumberFilter
+  refineAgentId: AggregateNumberFilter
+  refinePrompt: AggregateNumberFilter
 }
 
 input SettingCountDistinctHaving {
@@ -4390,6 +4726,8 @@ input SettingCountDistinctHaving {
   maxRetries: AggregateNumberFilter
   runRetentionDays: AggregateNumberFilter
   workerIntervalSeconds: AggregateNumberFilter
+  refineAgentId: AggregateNumberFilter
+  refinePrompt: AggregateNumberFilter
 }
 
 type Query {
@@ -4653,6 +4991,32 @@ type Query {
     """Filters the groups after they are aggregated."""
     having: CardDepHaving
   ): [CardDepGroupBy!]!
+  cardEvents(
+    offset: Int
+    limit: Int
+    orderBy: CardEventOrderBy
+    where: CardEventFilters
+
+    """
+    Keyset pagination: only return rows strictly after this cursor (a row's `cursor` field from a previous page, under the same orderBy).
+    """
+    after: String
+    distinct: [CardEventDistinctColumn!]
+  ): [CardEvent!]!
+  cardEvent(offset: Int, orderBy: CardEventOrderBy, where: CardEventFilters): CardEvent
+  cardEventsAggregate(where: CardEventFilters): CardEventAggregate!
+  cardEventsGroupBy(
+    """
+    Columns to group by. One result row per distinct combination of their values.
+    """
+    groupBy: [CardEventGroupByColumn!]!
+
+    """Filters the rows before they are grouped."""
+    where: CardEventFilters
+
+    """Filters the groups after they are aggregated."""
+    having: CardEventHaving
+  ): [CardEventGroupBy!]!
   runs(
     offset: Int
     limit: Int
@@ -4738,6 +5102,11 @@ type Query {
   models(agentId: String): [String!]!
 
   """
+  The cards this one is waiting on that are not finished yet — the reason a card sits in a lane its agent never picks it up from. Empty means nothing is in its way. Worked out from the cards as they stand every time it is asked, rather than read off the card, because the answer changes when some other card finishes and nothing would go back to rewrite it. An archived dependency is not in the way: taking one off the board is a decision that it does not have to happen.
+  """
+  blockers(cardId: String!): [Card!]!
+
+  """
   Which of the configured MCP servers this one actually reached, and the tools it found on each. A server that is enabled but absent here failed to connect, and its tools are not offered to any agent linked to it.
   """
   mcpStatus: [McpServerStatus!]!
@@ -4776,8 +5145,8 @@ enum RoleDistinctColumn {
   id
   name
   description
-  stage
-  systemPrompt
+  contract
+  prompt
   createdAt
   updatedAt
 }
@@ -4787,8 +5156,26 @@ enum RoleGroupByColumn {
   id
   name
   description
-  stage
+  contract
+  prompt
+  createdAt
+  updatedAt
+}
+
+"""Columns of Agent that a query can be made distinct on"""
+enum AgentDistinctColumn {
+  id
+  name
+  enabled
+  baseUrl
+  model
   systemPrompt
+  maxTokens
+  temperature
+  maxToolIterations
+  toolDiscovery
+  requestTimeoutSeconds
+  maxRetries
   createdAt
   updatedAt
 }
@@ -4797,7 +5184,6 @@ enum RoleGroupByColumn {
 enum AgentGroupByColumn {
   id
   name
-  roleId
   enabled
   baseUrl
   model
@@ -4852,7 +5238,6 @@ enum ProjectDistinctColumn {
   context
   autoRun
   refineAgentId
-  decomposeAgentId
   createdAt
   updatedAt
 }
@@ -4865,7 +5250,6 @@ enum ProjectGroupByColumn {
   context
   autoRun
   refineAgentId
-  decomposeAgentId
   createdAt
   updatedAt
 }
@@ -4877,11 +5261,13 @@ enum LaneGroupByColumn {
   name
   position
   intake
+  roleId
+  prompt
   agentId
   onSuccessLaneId
   onFailureLaneId
   wipLimit
-  readVerdict
+  maxAttempts
   createdAt
 }
 
@@ -4891,8 +5277,6 @@ enum TaskGroupByColumn {
   projectId
   title
   brief
-  status
-  error
   createdAt
   updatedAt
 }
@@ -4911,6 +5295,7 @@ enum CardGroupByColumn {
   id
   projectId
   taskId
+  parentId
   laneId
   title
   body
@@ -4919,6 +5304,7 @@ enum CardGroupByColumn {
   status
   result
   error
+  attempts
   archivedAt
   createdAt
   updatedAt
@@ -4931,6 +5317,18 @@ enum CardDepGroupByColumn {
   dependsOnCardId
 }
 
+"""Columns of CardEvent that a query can group by"""
+enum CardEventGroupByColumn {
+  id
+  cardId
+  runId
+  fromLaneId
+  toLaneId
+  note
+  actor
+  createdAt
+}
+
 """Columns of Run that a query can group by"""
 enum RunGroupByColumn {
   id
@@ -4941,6 +5339,7 @@ enum RunGroupByColumn {
   cardId
   laneId
   status
+  verdict
   startedAt
   finishedAt
   output
@@ -4981,6 +5380,8 @@ enum SettingDistinctColumn {
   maxRetries
   runRetentionDays
   workerIntervalSeconds
+  refineAgentId
+  refinePrompt
 }
 
 """Columns of Setting that a query can group by"""
@@ -4997,6 +5398,8 @@ enum SettingGroupByColumn {
   maxRetries
   runRetentionDays
   workerIntervalSeconds
+  refineAgentId
+  refinePrompt
 }
 
 """
@@ -5183,32 +5586,25 @@ type Mutation {
   updateSettingSingle(set: UpdateSettingInput!, where: SettingFilters!): Setting
 
   """
-  One turn of talking a task into shape: says something to the refining agent and resolves once it has answered. The answer is appended to the task's messages and the task's title and brief are rewritten from it, so read the task back after this to see where the brief has got to. Only a `draft` task can be refined.
+  One turn of talking a task into shape: says something to the refining agent and resolves once it has answered. The answer is appended to the task's messages and the task's title and brief are rewritten from it, so read the task back after this to see where the brief has got to. A task can be talked about for as long as you like; `makeCard` is what ends the conversation by putting it on the board.
   """
   refineTask(taskId: String!, message: String!): Run!
 
   """
-  Marks a refined task ready for the decomposer, without running it. `decomposeTask` is the next step, and is what actually produces cards.
+  Ends a refining conversation by putting it on the board: writes the task's title and brief as one card in the project's intake lane, linked back to the task. It is one card and not many — breaking work up is a station on the board now, so a card landing in a lane that expands is what turns it into the cards that carry it out. The conversation is left exactly where it is and can go on afterwards.
   """
-  acceptTask(taskId: String!): Task!
+  makeCard(taskId: String!): Card!
 
   """
-  Breaks a task into cards and puts them in the project's intake lane, resolving with the finished run — which means it does not answer until the decomposer is done. The cards it wrote are the ones with this `taskId`. A decomposition that produced nothing readable fails, and says so on the task as well as in the run.
+  The way onto a board for a caller that has no lane ids: writes one card at the project's front door — the lane marked `intake`, else the leftmost — and answers with it. Use this rather than `create_card` unless you know exactly which lane you mean. If that lane is a station that expands, the card becomes the cards that carry the work out as soon as it is worked.
   """
-  decomposeTask(taskId: String!): Run!
-
-  """
-  The short way in, for a caller that already knows what it wants: writes the task and decomposes it in one call, resolving with the task once its cards are on the board. Skips refinement entirely. A decomposition that fails leaves the task in `error` with the reason on it rather than throwing, so the task is still there to retry.
-  """
-  submitTask(
+  submitCard(
     projectId: String!
     title: String!
 
-    """
-    What is wanted, in as much detail as you have. The decomposer reads it.
-    """
-    brief: String!
-  ): Task!
+    """What is wanted, in as much detail as you have. An agent reads it."""
+    body: String!
+  ): Card!
 
   """
   Works one card now, with its lane's agent unless `agentId` names another, and resolves with the finished run — a long call for a long card. Read `runEvents` meanwhile to watch it, or `stopCard` to call it off. The card moves on afterwards exactly as it would have under `autoRun`, following its lane's success and failure arrows. Refused for a card waiting on unfinished dependencies.
@@ -5220,18 +5616,16 @@ type Mutation {
   """
   stopCard(cardId: String!): Boolean!
 
-  """
-  Calls off a refinement or decomposition in flight. False means none was running.
-  """
+  """Calls off a refinement in flight. False means none was running."""
   stopTask(taskId: String!): Boolean!
 
   """
-  Puts a card in a lane, at a position, and renumbers the cards around it so the board stays in the order it looks like. Omit `position` to drop it at the end. A card that had failed comes back to `idle`, which is what makes dragging one back a retry; a card an agent is working cannot be moved out from under it, and nor can an archived one — `restoreCard` is what puts that back on the board.
+  Puts a card in a lane, at a position, and renumbers the cards around it so the board stays in the order it looks like. Omit `position` to drop it at the end. A card that had failed comes back to `idle` with its attempts forgiven, which is what makes dragging one back a retry; a card an agent is working cannot be moved out from under it, and nor can an archived one — `restoreCard` is what puts that back on the board. Say why in `note` and the agent that picks the card up is told it, the same way a reviewer's rejection reaches one: moving a card back without saying what was wrong with it buys a second attempt identical to the first.
   """
-  moveCard(cardId: String!, laneId: String!, position: Int): Card!
+  moveCard(cardId: String!, laneId: String!, position: Int, note: String): Card!
 
   """
-  Puts a card back in play where it stands: clears its error and returns it to `idle`, which is the status a lane's agent will pick up. This is the way back for a card a reviewer rejected — those stay `error` on purpose, so the board waits for a person rather than looping — and for one interrupted by a restart. It does not run anything itself; `runCard` does that, and `autoRun` does it unasked. Refused while an agent is working the card, and on an archived one — `restoreCard` puts that back on the board first.
+  Puts a card back in play where it stands: clears its error, empties the count of failed attempts against it, and returns it to `idle`, which is the status a lane's agent will pick up. This is the way back for a card that stopped at `error` — one a reviewer rejected once its lane had no attempts left to spend, or one whose lane spends none. It does not run anything itself; `runCard` does that, and `autoRun` does it unasked. Refused while an agent is working the card, and on an archived one — `restoreCard` puts that back on the board first.
   """
   retryCard(cardId: String!): Card!
 

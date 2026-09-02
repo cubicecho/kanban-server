@@ -146,6 +146,9 @@ export function BoardRoute() {
     queryClient.invalidateQueries({ queryKey: ["board", projectId] });
     queryClient.invalidateQueries({ queryKey: ["active-runs", projectId] });
     queryClient.invalidateQueries({ queryKey: ["spend"] });
+    // A card's dialog may be open over the board it is on, and a run or a move it did not
+    // start is exactly what its history is for showing.
+    queryClient.invalidateQueries({ queryKey: ["card-runs"] });
   };
   const onError = (error: Error) => toast.error(error.message);
 
@@ -222,7 +225,11 @@ export function BoardRoute() {
 
   const lanes = board.data?.lanes ?? [];
   const cards = board.data?.cards ?? [];
-  const title = (cardId: string) => cards.find((card) => card.id === cardId)?.title ?? "";
+  // The board draws only the cards on it, so a dependency that has been archived is not in
+  // this list — and dropping it silently told a card it was waiting on nothing when it was
+  // waiting on something nobody can see. Named rather than omitted.
+  const title = (cardId: string) =>
+    cards.find((card) => card.id === cardId)?.title ?? "an archived card";
 
   const dragged = cards.find((card) => card.id === dragging);
   // A few pixels of slop before a drag begins, so that pressing a button on a card is still
@@ -277,6 +284,17 @@ export function BoardRoute() {
         </div>
       }
     >
+      {/* The front door is a guess when nobody has marked one: `submitCard` and `makeCard` fall
+          back to the leftmost lane so nothing throws, and a guess that works silently is a guess
+          nobody ever corrects. Say it on the board, where the lane it would pick is visible. */}
+      {lanes.length && !lanes.some((lane) => lane.intake) ? (
+        <p className="rounded-md border border-dashed px-3 py-2 text-xs text-muted-foreground">
+          No lane is marked <span className="font-medium">intake</span>, so work arriving without a
+          lane lands in <span className="font-medium">{lanes[0].name}</span> — whichever column
+          happens to be leftmost. Mark the one you meant.
+        </p>
+      ) : null}
+
       <DndContext
         sensors={sensors}
         collisionDetection={closestCorners}
@@ -344,9 +362,7 @@ export function BoardRoute() {
                         previous={previous}
                         next={next}
                         agentLabel={agentName(lane.agentId)}
-                        waitingOn={card.deps
-                          .map((dep) => title(dep.dependsOnCardId))
-                          .filter(Boolean)}
+                        waitingOn={card.deps.map((dep) => title(dep.dependsOnCardId))}
                         watching={watching === card.id}
                         runId={runFor(card.id)}
                         busy={{
@@ -388,6 +404,7 @@ export function BoardRoute() {
         <CardDialog
           card={editingCard.card}
           cards={cards}
+          lanes={lanes}
           projectId={projectId}
           laneId={editingCard.laneId}
           onClose={() => setEditingCard(null)}

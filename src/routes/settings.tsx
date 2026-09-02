@@ -15,7 +15,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import {
+  AgentsDocument,
   SetApiKeyDocument,
   SettingsDocument,
   SettingsToolDiscoveryEnum,
@@ -46,6 +48,9 @@ const MCP_JSON = `{
 }`;
 
 const CLAUDE_CLI = `claude mcp add --transport http kanban ${ENDPOINT}`;
+
+/** No agent named: whichever enabled one comes first by name. */
+const ANY = "__any__";
 
 /**
  * The old way to copy, for the pages that cannot use the new one: `navigator.clipboard` exists
@@ -104,6 +109,8 @@ interface Form {
   maxRetries: number;
   runRetentionDays: number;
   workerIntervalSeconds: number;
+  refineAgentId: string;
+  refinePrompt: string;
 }
 
 export function SettingsRoute() {
@@ -113,6 +120,11 @@ export function SettingsRoute() {
 
   const settings = useQuery({ queryKey: ["settings"], queryFn: () => request(SettingsDocument) });
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["settings"] });
+
+  // Every enabled agent, for both off-board jobs: an agent is a model, and neither of those
+  // jobs is a thing any particular agent has been minted for.
+  const agents = useQuery({ queryKey: ["agents"], queryFn: () => request(AgentsDocument) });
+  const enabled = (agents.data?.agents ?? []).filter((agent) => agent.enabled);
 
   // The row is the source of truth; the form is a copy taken once it has loaded.
   const loaded = settings.data?.settings[0];
@@ -131,6 +143,9 @@ export function SettingsRoute() {
         maxRetries: loaded.maxRetries,
         runRetentionDays: loaded.runRetentionDays,
         workerIntervalSeconds: loaded.workerIntervalSeconds,
+        // Nulls become the empty string the pickers speak, and go back as null on save.
+        refineAgentId: loaded.refineAgentId ?? "",
+        refinePrompt: loaded.refinePrompt,
       });
     }
   }, [loaded, form]);
@@ -150,7 +165,13 @@ export function SettingsRoute() {
       ] as const) {
         if (!Number.isFinite(form[key])) throw new Error(`${key} must be a number.`);
       }
-      await request(UpdateSettingsDocument, { set: form });
+      await request(UpdateSettingsDocument, {
+        // An unnamed agent is no row, not a row with an empty id.
+        set: {
+          ...form,
+          refineAgentId: form.refineAgentId || null,
+        },
+      });
       // The key travels on its own mutation because it is write-only — it is excluded from
       // the Setting type, so it can never be read back out of the API.
       if (apiKey) await request(SetApiKeyDocument, { apiKey });
@@ -342,6 +363,56 @@ export function SettingsRoute() {
               Guesses which tools a run needs before it starts, so on-demand loading usually costs
               no round trip at all. A small fast model is enough. Unused unless discovery is on
               demand.
+            </p>
+          </div>
+        </Card>
+      ) : null}
+
+      {form ? (
+        <Card className="gap-4 p-4">
+          <div>
+            <h2 className="font-medium">Off the board</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Talking a task over happens nowhere on a board, so no lane can say who does it —
+              everything else an agent does, a lane names. A project may name its own refiner; this
+              is what it falls back to.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex flex-col gap-2">
+              <Label>Refining agent</Label>
+              <Select
+                value={form.refineAgentId || ANY}
+                onValueChange={(value) => field("refineAgentId", value === ANY ? "" : value)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ANY}>The first enabled agent</SelectItem>
+                  {enabled.map((agent) => (
+                    <SelectItem key={agent.id} value={agent.id}>
+                      {agent.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="refinePrompt">Refining prompt</Label>
+            <Textarea
+              id="refinePrompt"
+              rows={6}
+              value={form.refinePrompt}
+              onChange={(event) => field("refinePrompt", event.target.value)}
+              placeholder="empty — the built-in one, which asks questions until the task is worth working on"
+            />
+            <p className="text-xs text-muted-foreground">
+              Refinement is a conversation rather than a kind of lane, so it has no role to keep
+              this on. Empty uses the prompt built in.
             </p>
           </div>
         </Card>

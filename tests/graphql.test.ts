@@ -49,7 +49,7 @@ const board = async (projectId: string) => {
   const { lanes } = await run(
     `query Board($projectId: String!) {
        lanes(where: { projectId: { eq: $projectId } }, orderBy: { position: { direction: asc, priority: 1 } }) {
-         id name position intake wipLimit onSuccessLaneId onFailureLaneId agentId
+         id name position intake wipLimit maxAttempts onSuccessLaneId onFailureLaneId agentId
        }
      }`,
     { projectId },
@@ -60,6 +60,7 @@ const board = async (projectId: string) => {
     position: number;
     intake: boolean;
     wipLimit: number;
+    maxAttempts: number;
     onSuccessLaneId: string | null;
     onFailureLaneId: string | null;
     agentId: string | null;
@@ -70,11 +71,17 @@ test("a new project comes with a board already wired up", async () => {
   const project = await newProject("wired");
   const lanes = await board(project.id);
 
-  expect(lanes.map((lane) => lane.name)).toEqual(["Backlog", "Doing", "Review", "Done"]);
-  const [backlog, doing, review, done] = lanes;
+  expect(lanes.map((lane) => lane.name)).toEqual(["Intake", "Backlog", "Doing", "Review", "Done"]);
+  const [intake, backlog, doing, review, done] = lanes;
 
-  // Cards land in the backlog and nothing runs there — that is what a backlog is.
-  expect(backlog.intake).toBe(true);
+  // Work arriving without a lane lands at the front door, and the front door is a station:
+  // one card in becomes the cards that carry it out, in the backlog behind it.
+  expect(intake.intake).toBe(true);
+  expect(intake.agentId).not.toBeNull();
+  expect(intake.onSuccessLaneId).toBe(backlog.id);
+
+  // Nothing runs in the backlog — that is what a backlog is.
+  expect(backlog.intake).toBe(false);
   expect(backlog.agentId).toBeNull();
 
   // Work flows Doing → Review → Done, and a rejected card goes back to Doing.
@@ -88,14 +95,14 @@ test("the lanes are seeded per project, not shared between them", async () => {
   const first = await newProject("one");
   const second = await newProject("two");
   const [a, b] = [await board(first.id), await board(second.id)];
-  expect(a).toHaveLength(4);
-  expect(b).toHaveLength(4);
+  expect(a).toHaveLength(5);
+  expect(b).toHaveLength(5);
   expect(a.map((lane) => lane.id)).not.toEqual(b.map((lane) => lane.id));
 });
 
 test("moveCard renumbers the lane it lands in and puts the card back to idle", async () => {
   const project = await newProject("moving");
-  const [backlog, doing] = await board(project.id);
+  const [, backlog, doing] = await board(project.id);
 
   const make = async (title: string, laneId: string, position: number) =>
     (
@@ -135,23 +142,29 @@ test("moveCard renumbers the lane it lands in and puts the card back to idle", a
 
 test("retryCard puts a rejected card back in play where it stands", async () => {
   const project = await newProject("retrying");
-  const [, doing] = await board(project.id);
+  const [, , doing] = await board(project.id);
 
   const { createCard } = await run(
     `mutation Make($values: CreateCardInput!) { createCard(values: $values) { id } }`,
     { values: { projectId: project.id, laneId: doing.id, title: "rejected", position: 0 } },
   );
-  // What a reviewer's FAIL leaves behind: back in Doing, holding the reason, and in a status
-  // the worker will not pick up.
+  // What a reviewer's FAIL leaves behind: back in Doing, out of budget, and in a status the
+  // worker will not pick up. Nothing on the card says why — the reason is on the move that
+  // brought it here, which is why a retry can clear the status without erasing the feedback.
   await run(
     `mutation Fail($id: String!) {
-       updateCardSingle(where: { id: { eq: $id } }, set: { status: error, error: "no test" }) { id }
+       updateCardSingle(
+         where: { id: { eq: $id } }
+         set: { status: rejected, attempts: 3 }
+       ) { id }
      }`,
     { id: createCard.id },
   );
 
   const { retryCard } = await run(
-    `mutation Retry($cardId: String!) { retryCard(cardId: $cardId) { id laneId status error } }`,
+    `mutation Retry($cardId: String!) {
+       retryCard(cardId: $cardId) { id laneId status error attempts }
+     }`,
     { cardId: createCard.id },
   );
   expect(retryCard).toMatchObject({
@@ -159,9 +172,84 @@ test("retryCard puts a rejected card back in play where it stands", async () => 
     laneId: doing.id,
     status: "idle",
     error: "",
+    // A person putting a card back in play is a fresh start, budget and all: otherwise a card
+    // that had used up its lane's attempts would come straight back to the same standstill.
+    attempts: 0,
   });
 
+  // The other thing a person retries is a card that broke rather than one that was turned
+  // down, and that one has a fault written on it for the retry to clear.
+  const { createCard: crashed } = await run(
+    `mutation Make($values: CreateCardInput!) { createCard(values: $values) { id } }`,
+    { values: { projectId: project.id, laneId: doing.id, title: "crashed", position: 1 } },
+  );
+  await run(
+    `mutation Break($id: String!) {
+       updateCardSingle(
+         where: { id: { eq: $id } }
+         set: { status: error, error: "ECONNREFUSED" }
+       ) { id }
+     }`,
+    { id: crashed.id },
+  );
+  const retried = await run(
+    `mutation Retry($cardId: String!) { retryCard(cardId: $cardId) { status error } }`,
+    { cardId: crashed.id },
+  );
+  expect(retried.retryCard).toMatchObject({ status: "idle", error: "" });
+
   expect(await fails(`mutation { retryCard(cardId: "nope") { id } }`)).toMatch(/no card with id/);
+});
+
+test("blockers names what a card is waiting on, and stops naming it when it stops", async () => {
+  const project = await newProject("waiting");
+  const [backlog] = await board(project.id);
+
+  const make = async (title: string) =>
+    (
+      await run(`mutation Make($values: CreateCardInput!) { createCard(values: $values) { id } }`, {
+        values: { projectId: project.id, laneId: backlog.id, title },
+      })
+    ).createCard as { id: string };
+
+  const migration = await make("write the migration");
+  const endpoint = await make("read it from the endpoint");
+  const page = await make("call it from the page");
+
+  await run(
+    `mutation Set($cardId: String!, $dependsOn: [String!]!) { setCardDeps(cardId: $cardId, dependsOn: $dependsOn) }`,
+    { cardId: page.id, dependsOn: [migration.id, endpoint.id] },
+  );
+
+  const waitingOn = async (cardId: string) =>
+    (
+      (await run(`query B($cardId: String!) { blockers(cardId: $cardId) { title } }`, { cardId }))
+        .blockers as { title: string }[]
+    )
+      .map((card) => card.title)
+      .sort();
+
+  expect(await waitingOn(page.id)).toEqual(["read it from the endpoint", "write the migration"]);
+  // A card nothing is ordered against waits on nothing — not on an empty answer meaning
+  // "unknown", which is what a stored `waiting on: …` string decayed into.
+  expect(await waitingOn(migration.id)).toEqual([]);
+
+  await run(
+    `mutation Done($id: String!) {
+       updateCardSingle(where: { id: { eq: $id } }, set: { status: done }) { id }
+     }`,
+    { id: migration.id },
+  );
+  // Nothing was rewritten anywhere for this to change: the answer is worked out when it is
+  // asked for, so it is right the moment the card it is about finishes.
+  expect(await waitingOn(page.id)).toEqual(["read it from the endpoint"]);
+
+  // And an archived card is not in the way. It is off the board, and a dependent waiting on
+  // one nobody can find would wait for good.
+  await run(`mutation Archive($cardId: String!) { archiveCard(cardId: $cardId) { id } }`, {
+    cardId: endpoint.id,
+  });
+  expect(await waitingOn(page.id)).toEqual([]);
 });
 
 test("setCardDeps writes an ordering as a set, and refuses one that closes a loop", async () => {
@@ -250,19 +338,60 @@ test("runs are the server's own record: nothing outside it may write one", async
   );
 });
 
-test("submitting a task with no decomposer says so rather than leaving a task in limbo", async () => {
-  const project = await newProject("no agents");
-  const { submitTask } = await run(
+test("a card submitted with no lane id lands at the front door", async () => {
+  const project = await newProject("the front door");
+  const { submitCard } = await run(
     `mutation Submit($projectId: String!) {
-       submitTask(projectId: $projectId, title: "ship it", brief: "make the thing") {
-         id status error
+       submitCard(projectId: $projectId, title: "ship it", body: "make the thing") {
+         id laneId status
        }
      }`,
     { projectId: project.id },
   );
-  // Kept, not thrown away: the task is there to retry once an agent exists, and it says why.
-  expect(submitTask.status).toBe("error");
-  expect(submitTask.error).toMatch(/decompose/i);
+
+  // No agent is asked anything: putting work on a board is a write, and what becomes of the
+  // card is the station's business rather than the submitter's.
+  const [intake] = await board(project.id);
+  expect(submitCard.laneId).toBe(intake.id);
+  expect(submitCard.status).toBe("idle");
+  expect(await db.select().from(tables.runs)).toHaveLength(0);
+});
+
+test("a conversation becomes one card, carrying the task it came from", async () => {
+  const project = await newProject("talked over");
+  const [task] = await db
+    .insert(tables.tasks)
+    .values({ projectId: project.id, title: "ship it", brief: "make the thing" })
+    .returning();
+
+  const { makeCard } = await run(
+    `mutation Make($taskId: String!) { makeCard(taskId: $taskId) { id title body taskId laneId } }`,
+    { taskId: task.id },
+  );
+
+  const [intake] = await board(project.id);
+  expect(makeCard).toMatchObject({
+    title: "ship it",
+    body: "make the thing",
+    taskId: task.id,
+    laneId: intake.id,
+  });
+
+  // The thread is left exactly where it is: a task has no status to advance, and it can be
+  // talked about further afterwards.
+  const [after] = await db.select().from(tables.tasks).where(eq(tables.tasks.id, task.id));
+  expect(after.brief).toBe("make the thing");
+
+  // A conversation with nothing in it has nothing to put on a board.
+  const [empty] = await db
+    .insert(tables.tasks)
+    .values({ projectId: project.id, title: "", brief: "" })
+    .returning();
+  expect(
+    await fails(`mutation Make($taskId: String!) { makeCard(taskId: $taskId) { id } }`, {
+      taskId: empty.id,
+    }),
+  ).toMatch(/nothing in it/i);
 });
 
 test("spend adds up the runs behind it, and says how far back they go", async () => {
@@ -356,20 +485,27 @@ test("a board saved under a name is drawn onto the next project the same shape",
   const source = await newProject("the one worth keeping");
   const drawn = await board(source.id);
 
-  // A shape worth saving is one somebody changed: a fifth lane, a cap, and an arrow home.
-  const [, doing, , done] = drawn;
+  // A shape worth saving is one somebody changed: a sixth lane, a cap, a rework budget, and an
+  // arrow home.
+  const [, , doing, review, done] = drawn;
   await run(
     `mutation Widen($id: String!) {
        updateLaneSingle(where: { id: { eq: $id } }, set: { wipLimit: 3 }) { id }
      }`,
     { id: doing.id },
   );
+  await run(
+    `mutation Budget($id: String!) {
+       updateLaneSingle(where: { id: { eq: $id } }, set: { maxAttempts: 2 }) { id }
+     }`,
+    { id: review.id },
+  );
   const [parked] = await db
     .insert(tables.lanes)
     .values({
       projectId: source.id,
       name: "Parked",
-      position: 4,
+      position: 5,
       onSuccessLaneId: done.id,
       // An agent that will not be here when the template is drawn again.
       agentId: null,
@@ -397,6 +533,7 @@ test("a board saved under a name is drawn onto the next project the same shape",
     { projectId: target.id, templateId: saveBoardTemplate.id },
   );
   expect(applyBoardTemplate.map((lane: { name: string }) => lane.name)).toEqual([
+    "Intake",
     "Backlog",
     "Doing",
     "Review",
@@ -406,13 +543,16 @@ test("a board saved under a name is drawn onto the next project the same shape",
 
   // The arrows are the point: saved as indexes, they come back pointing at the new lanes.
   const redrawn = await board(target.id);
-  const [newBacklog, newDoing, newReview, newDone, newParked] = redrawn;
+  const [newIntake, , newDoing, newReview, newDone, newParked] = redrawn;
   expect(newDoing.onSuccessLaneId).toBe(newReview.id);
   expect(newReview.onFailureLaneId).toBe(newDoing.id);
   expect(newParked.onSuccessLaneId).toBe(newDone.id);
   expect(newDone.onSuccessLaneId).toBeNull();
-  expect(newBacklog.intake).toBe(true);
+  expect(newIntake.intake).toBe(true);
   expect(newDoing.wipLimit).toBe(3);
+  expect(newReview.maxAttempts).toBe(2);
+  // A lane nobody gave a budget to has none, not the one next door.
+  expect(newDoing.maxAttempts).toBe(0);
   // Nothing of the board it came from: different project, different lanes.
   expect(redrawn.map((lane) => lane.id)).not.toContain(parked.id);
 
@@ -431,18 +571,13 @@ test("a board saved under a name is drawn onto the next project the same shape",
 });
 
 test("a template names its agents by id, and forgets the ones this server no longer has", async () => {
-  const [role] = await db
-    .select()
-    .from(tables.roles)
-    .where(eq(tables.roles.name, "executor"))
-    .limit(1);
   const [agent] = await db
     .insert(tables.agents)
-    .values({ name: "a passing executor", roleId: role.id, model: "none", baseUrl: "http://x" })
+    .values({ name: "a passing worker", model: "none", baseUrl: "http://x" })
     .returning();
 
   const source = await newProject("staffed");
-  const [, doing] = await board(source.id);
+  const [, , doing] = await board(source.id);
   await db.update(tables.lanes).set({ agentId: agent.id }).where(eq(tables.lanes.id, doing.id));
 
   const { saveBoardTemplate } = await run(
@@ -460,7 +595,7 @@ test("a template names its agents by id, and forgets the ones this server no lon
      }`,
     { projectId: kept.id, templateId: saveBoardTemplate.id },
   );
-  expect((await board(kept.id))[1].agentId).toBe(agent.id);
+  expect((await board(kept.id))[2].agentId).toBe(agent.id);
 
   // Gone, and the lane comes back without one rather than the whole template failing.
   await db.delete(tables.agents).where(eq(tables.agents.id, agent.id));
@@ -472,8 +607,8 @@ test("a template names its agents by id, and forgets the ones this server no lon
     { projectId: after.id, templateId: saveBoardTemplate.id },
   );
   const lanes = await board(after.id);
-  expect(lanes).toHaveLength(4);
-  expect(lanes[1].agentId).toBeNull();
+  expect(lanes).toHaveLength(5);
+  expect(lanes[2].agentId).toBeNull();
 });
 
 test("a template is refused on a board with cards, because lanes take their cards with them", async () => {
@@ -486,7 +621,7 @@ test("a template is refused on a board with cards, because lanes take their card
   );
 
   const started = await newProject("already going");
-  const [backlog] = await board(started.id);
+  const [, backlog] = await board(started.id);
   await db
     .insert(tables.cards)
     .values({ projectId: started.id, laneId: backlog.id, title: "work in hand" });
@@ -499,7 +634,7 @@ test("a template is refused on a board with cards, because lanes take their card
   );
   expect(message).toMatch(/cards on it/i);
   // And the board it refused is untouched, not half-redrawn.
-  expect(await board(started.id)).toHaveLength(4);
+  expect(await board(started.id)).toHaveLength(5);
 
   // A project with no lanes at all has no shape to save.
   const bare = await newProject("about to be stripped");

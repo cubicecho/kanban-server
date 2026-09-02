@@ -8,10 +8,22 @@ import { schema } from "./graphql/schema.ts";
 import { mcpHandler, mountMcp } from "./mcp-endpoint.ts";
 import { PORT, ROOT } from "./paths.ts";
 import { mcp } from "./runner/mcp.ts";
+import { reconcile } from "./runner/run.ts";
 import * as cleanup from "./scheduler/cleanup.ts";
 import * as worker from "./worker/loop.ts";
 
 await ensureSchema();
+
+// A run lives only as long as the process that started it, so anything the tables still call
+// running was interrupted by the last shutdown. Put back before a request or the worker can
+// read it — a card left `running` counts against its lane's WIP limit for good. See `reconcile`.
+const interrupted = await reconcile();
+if (interrupted.runs) {
+  console.log(
+    `[kanban-server] a restart interrupted ${interrupted.runs} run(s): ` +
+      `${interrupted.cards} card(s) back in play`,
+  );
+}
 
 // The GraphQL schema comes from the tables, so a column added upstairs changes the API here.
 // In dev that is regenerated into `schema.graphql` and `src/gql/graphql.ts` on boot; the

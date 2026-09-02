@@ -72,19 +72,20 @@ test("offers the board tools, and only those", async () => {
   // snake_case: the driver renames after it filters, so `include` names the GraphQL field and
   // this names the tool.
   expect(names).toEqual([
-    "accept_task",
     "agents",
     "apply_board_template",
     "archive_card",
+    "blockers",
     "board_templates",
+    "card_events",
     "cards",
     "create_card",
     "create_project",
     "create_task",
-    "decompose_task",
     "delete_card_single",
     "delete_task_single",
     "lanes",
+    "make_card",
     "move_card",
     "projects",
     "refine_task",
@@ -99,7 +100,7 @@ test("offers the board tools, and only those", async () => {
     "spend",
     "stop_card",
     "stop_task",
-    "submit_task",
+    "submit_card",
     "tasks",
     "update_card_single",
     "update_project_single",
@@ -155,7 +156,7 @@ test("renders a prompt, arguments and all", async () => {
 
   // The guide exists to say the things the generated tool descriptions structurally cannot.
   expect(text).toContain("A task is not a card");
-  expect(text).toContain("submit_task");
+  expect(text).toContain("submit_card");
   expect(text).toContain("onSuccessLaneId");
 
   const triage = await client.getPrompt({
@@ -197,13 +198,13 @@ test("makes a project, hands it a task, and reads the board back", async () => {
     "Backlog",
     "Doing",
     "Done",
+    "Intake",
     "Review",
   ]);
 
   const task = (await call("create_task", {
     values: { projectId, title: "written elsewhere", brief: "do the thing" },
-  })) as { createTask: { id: string; status: string } };
-  expect(task.createTask.status).toBe("draft");
+  })) as { createTask: { id: string } };
 
   const listed = (await call("tasks", { where: { projectId: { eq: projectId } } })) as {
     tasks: { id: string; brief: string }[];
@@ -336,15 +337,14 @@ test("marks only the tools that actually destroy something", async () => {
   // the deletes, and the three that describe a state rather than an action. Decomposing a task
   // twice makes two sets of cards, and refining it twice is two turns, so neither is among them.
   const writes = new Set([
-    "accept_task",
     "apply_board_template",
     "archive_card",
     "create_card",
     "create_project",
     "create_task",
-    "decompose_task",
     "delete_card_single",
     "delete_task_single",
+    "make_card",
     "move_card",
     "refine_task",
     "restore_card",
@@ -354,12 +354,11 @@ test("marks only the tools that actually destroy something", async () => {
     "set_card_deps",
     "stop_card",
     "stop_task",
-    "submit_task",
+    "submit_card",
     "update_card_single",
     "update_project_single",
   ]);
   expect(flagged("idempotentHint").filter((name) => writes.has(name))).toEqual([
-    "accept_task",
     "apply_board_template",
     "archive_card",
     "delete_card_single",
@@ -375,7 +374,9 @@ test("marks only the tools that actually destroy something", async () => {
   // And every read is marked as one, which is what lets a client re-ask without asking anyone.
   expect(flagged("idempotentHint").filter((name) => !writes.has(name))).toEqual([
     "agents",
+    "blockers",
     "board_templates",
+    "card_events",
     "cards",
     "lanes",
     "projects",
@@ -394,8 +395,11 @@ test("says what a card is, for a client that has only ever seen a task", async (
   // The generated tools describe themselves as "the `cards` query" and nothing more, which
   // leaves a visiting agent no way to learn the one distinction the whole server turns on.
   expect(described("cards")).toMatch(/units of work/i);
-  expect(described("tasks")).toMatch(/decomposed/i);
-  expect(described("submit_task")).toMatch(/brief/i);
+  expect(described("tasks")).toMatch(/no status and no pipeline/i);
+  // And the two front doors have to say they are one: a client that has only ever made tasks
+  // will otherwise expect one of them to produce the several cards the work needs.
+  expect(described("make_card")).toMatch(/one card, not many/i);
+  expect(described("submit_card")).toMatch(/front door/i);
   // A client that has only ever made tasks needs telling that this one lands nowhere by itself.
   expect(described("create_card")).toMatch(/laneId/);
   // A total is only as old as the runs behind it, and retention deletes runs.

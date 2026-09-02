@@ -1,12 +1,13 @@
 # AGENTS.md — kanban-server
 
 A kanban board that works itself. A **project** is a body of work; its **lanes** are the
-board's columns, and a lane that names an **agent** is a station — cards there get worked and
-then moved on. An agent is a **role** — a job of work, which is a prompt and nothing else —
-pointed at a model endpoint. A **task** is what a person asks for in their own words, refined over a
-**message** thread until they accept it; a decompose agent turns the one task into many
-**cards**, which are the units an agent executes. Every time an agent is asked to do anything
-— refine, decompose, or work a card — that is one **run**. The same API is served three ways
+board's columns, and a lane that names a **role** and an **agent** is a station — cards there get
+worked and then moved on. A role is a *kind of lane*: a prompt and the shape of the answer it
+expects. An agent is only a model endpoint. A **task** is a conversation about what a person
+wants, in their own words, refined over a **message** thread; its one exit is a **card**, and a
+station whose role is to expand turns that one card into the many that carry the work out. Cards
+are the units an agent executes. Every time an agent is asked to do anything — refine a task, or
+work a card — that is one **run**. The same API is served three ways
 from one process: GraphQL at `/graphql`, MCP tools at `/mcp`, and the built React app on
 everything else.
 
@@ -93,27 +94,62 @@ one, takes over a lock whose holder is gone, and does nothing at all for a `post
 `./data` with a host process is still on its own — that case is what `DATABASE_URL` is for.
 
 **A task is not a card, and the distinction is the point.** A task is the unit a person thinks
-in; a card is the unit an agent executes; the decomposer exists because those two are different
-sizes. `submitTask` is the one-shot path — create, accept and decompose in a single call, for
-an MCP client that has nothing to refine — and it records a failed decomposition on the task
-rather than throwing, so the task survives to be retried.
+in; a card is the unit an agent executes; the `expand` contract exists because those two are
+different sizes. A task is a conversation and has no state of its own — no status, no error, no
+pipeline — because whether it ever became work is `cards.taskId`, which already points the right
+way; storing it a second time is how `blocked` and `readVerdict` went stale. `makeCard` is its
+one exit and writes exactly one card at the front door; `submitCard` is the same door for a
+caller with no conversation behind it, and the door is where a lane says `intake`, else the
+leftmost lane. What becomes of that card is the board's business rather than the submitter's:
+neither mutation runs an agent, and a front door that is not a station is a card sitting in a
+column, which is a board somebody drew that way.
 
-**A lane is a station, and the board is the pipeline.** `agentId` says what runs on the cards
-in a lane; `onSuccessLaneId` and `onFailureLaneId` say where they go afterwards; `wipLimit`
-caps how many run at once; `readVerdict` says this station judges cards rather than working
-them. That is the whole of the automation — there is no workflow engine, and the shape of the
-pipeline is the shape of the board someone drew. A lane with no agent is a resting place, which
-is what a backlog and a done pile are.
+**Breaking work up is a station, not a stage.** A lane whose role's contract is `expand` reads
+one card and writes the cards it becomes down its *pass* arrow, each carrying `parentId`, and
+archives the one it read — the parent is not a card anybody works, and leaving it on the board
+would say otherwise. `writeCards` is shared with nothing else now but is still its own function,
+because the half worth keeping is resolving `dependsOn` by title within the batch: a title outside
+the batch is dropped rather than failing it, on the same principle a board template's missing
+`agentId` resolves to none. Two run-time guards, both the class of the rework guard: an `expand`
+lane with no pass arrow is refused before it runs, its children having nowhere to land, and an
+expansion nobody could read a card out of is an `error` rather than an empty success — a card the
+agent could not break up is exactly the case a person needs told about.
 
-**A role is the job; an agent is the job plus a model.** `roles` is a table, not an enum, because
-the useful ones are not knowable from here — a tester, a security reviewer, a technical writer are
-each a paragraph of instruction and none should need a migration. What cannot be invented is
-`stage`: `refine` and `decompose` answer in JSON the server itself parses, so they are two fixed
-stations, and `card` is every role a lane may point at. `resolveStage` is how the refiner and the
-decomposer are found; `seedLanes` finds the executor and the reviewer by their role's name.
-An agent's empty `systemPrompt` inherits the role's, which is why editing what every executor is
-told is one edit rather than one per agent, and why a card run no longer starts with an empty
-system message when somebody made an agent by hand.
+**A lane is a station, and the board is the pipeline.** `roleId` says what kind of lane it is
+and `prompt` is anything this board adds to that; `agentId` says which model works the cards
+there; `onSuccessLaneId` and `onFailureLaneId` say where they go afterwards; `wipLimit`
+caps how many run at once; `maxAttempts` is how many failures it will put back in play before
+stopping. That is the whole of the automation — there is no workflow engine, and the shape of the
+pipeline is the shape of the board someone drew. A lane with no role or no agent is a resting
+place, which is what a backlog and a done pile are.
+
+**A role is a kind of lane; an agent is a model. They meet only at a lane.** Neither table
+references the other. `roles` is a table, not an enum, because the useful kinds are not knowable
+from here — a tester, a security reviewer, a technical writer are each a paragraph of instruction
+and none should need a migration. What cannot be invented is `contract`, the shape of the answer:
+`work` reports on the card, `verdict` rules `PASS`/`FAIL` on it, `expand` breaks it into more
+cards. That is the only part of a role anything reads, and `seedLanes` finds the three it draws
+by contract rather than by name, a name being a thing somebody edits.
+
+The prompt a run starts with is composed by `systemPromptFor`, in layers: the project's context
+says where you are, the agent's `systemPrompt` says who it is, the role's `prompt` says what
+happens here, and the lane's own `prompt` adds whatever is true of this board only. The lane
+speaks last, and a composition of the lower three that comes out empty is refused at run time —
+which is the one guard replacing both a `notNull` on the agent and the worry about a run starting
+with an empty system message. The project's background is asked for separately so that it cannot
+satisfy that guard: a system prompt made only of background is a lane with no job. Editing what
+every Review lane is told is one edit rather than one per board, which is why a lane points at a
+role instead of carrying a copy of its prompt.
+
+`projectContext` is standing context and lives in that first layer alone. `cardPrompt` says what
+to do and never where — the same paragraph in both would be sent twice on every run of the board,
+and it is what the on-demand tool preselector reads to guess which tools a card needs.
+
+Refining has no contract, because refinement is not something a lane does — it is a conversation
+with a person, and there is no card for it to happen to. Its prompt is `settings.refinePrompt`
+(empty meaning `REFINE_SYSTEM`), and `resolveRefineAgent` reads the project's agent, else
+Settings', else the first enabled agent by name. It is the only agent named anywhere but a lane,
+and the only one that has to be, which is the whole of what "off the board" now means.
 
 **The optimistic board and the server agree by construction.** A drop rewrites the board cache
 before the request goes out, and `src/lib/board-order.ts` holds the pure functions that decide
@@ -130,22 +166,107 @@ lane would shuffle every other card twice, once each way — and it is safe agai
 arithmetic only because a running card is not a drop target, so nothing is ever dropped onto the
 card whose drawn place and `position` disagree.
 
+**A dependency you cannot see is a dependency you will lose.** The `Board` query filters archived
+cards out, so a card's `deps` as the board carries them are only the visible half — and a dialog
+seeded from that half writes the short list back on the next save, quietly forgetting whichever
+dependency got archived. `CardDeps` in `src/graphql/board.graphql` asks for one card's real edges,
+archived ones included, and `card-dialog.tsx` holds the picker empty until that answer lands rather
+than seeding from the board and correcting itself: the window between the two is a save that drops
+work. It is its own query rather than a field on `Board` because `Board` polls every three seconds
+over as many as five hundred cards, and this is one card's answer, wanted once, when a dialog
+opens. The reverse direction — what waits on *this* card — comes back with it and is drawn
+read-only: editing another card's list from inside this one is a change with no visible cause.
+
+`cyclingCards` in `src/lib/cards.ts` is the same bargain `board-order.ts` strikes, in the other
+direction: it walks the board's edges to find the cards that already lead back to this one, and the
+picker draws those rows disabled with the reason on them. `setCardDeps` stays the authority — it
+reads every card in the project, archived ones included, and names the loop — so the two can only
+differ on a chain running through an archived card the board's graph does not carry, which is a row
+offered and then refused rather than one refused and then allowed. `tests/card-deps.test.ts` asks
+both of them about the same board card for card. The dialog writes `setCardDeps` **before**
+`updateCard` for the same reason: a refusal after the card is written leaves half the dialog saved.
+
 **A board template stores indexes, not ids.** `saveBoardTemplate` snapshots a project's lanes
 into `board_templates.lanes`, turning `onSuccessLaneId`/`onFailureLaneId` into positions in the
 template's own list — a lane id belongs to one project and means nothing in another. Applying
 one writes the lanes first and the arrows second, in a single transaction, which is the same
 two steps `seedLanes` takes and for the same reason. An `agentId` that no longer exists
-resolves to none rather than failing: a template is a shape, and the agents are whoever happens
-to be on this server. `readVerdict` is read back with `?? false`, because a template saved before
-stations could judge cards has no such key and a lane that does not say it reads a verdict does
-not read one. Applying is refused on a board with cards, because deleting a lane takes its cards
+resolves to none rather than failing, and a `roleId` is treated exactly the same way: a template
+is a shape, and the agents and the roles are whoever happens to be on this server. `prompt` is
+read back with `?? ""` and `maxAttempts` with `?? 0`, because a template saved before a lane
+carried its own job or spent attempts has no such key, and a lane that says it adds nothing adds
+nothing. Applying is refused on a board with cards, because deleting a lane takes its cards
 with it.
 
 **`done` means nothing further will happen.** A card that passes into a lane that has an agent
 of its own is not finished — it is waiting for that lane's turn — so it goes back to `idle`,
 because `readyCards` only picks up `idle`. `done` is for a card that stayed put, or landed
-where no agent runs. A card a reviewer rejected stays `error`, so the Doing↔Review loop cannot
-spin on its own; `retryCard` is the way back, and clears the error where the card stands.
+where no agent runs. A card a reviewer rejected stays `rejected` unless the rejecting station has
+a budget left to spend on it, so the Doing↔Review loop cannot spin on its own; `retryCard` is the
+way back by hand, and puts the card back in play where it stands.
+
+**The rework loop is a budget, and the budget is the lane's.** `lanes.maxAttempts` is how many
+times a station will put a card it failed back in play; `cards.attempts` counts the failures
+against it. Zero — the default, and what every board did before this — stops at the first
+failure and waits for a person. The budget belongs to the lane that *failed* the card rather
+than the one it goes back to, because how many times a thing is worth rejecting is the judging
+station's call. `attempts` is not reset by a pass: a Doing↔Review loop that refilled its budget
+every time round would never terminate. Only a person resets it — `retryCard` and `moveCard`,
+both being somebody deciding to start the card over. A stopped run and a restart cost nothing
+and move nothing, being nobody's verdict on the work: a called-off review leaves the card in
+Review rather than dropping it down the failure arm as though it had been turned down. Rework needs the landing lane to have an agent, or an `idle`
+card in a resting place would just be lost; the passing arm still asks after the *success* lane's
+agent, since a card that passes with nowhere to go must not re-run where it stands.
+
+**A verdict is not an account of the work.** A station whose role has the `verdict` contract
+leaves `cards.result` alone — overwriting the executor's report with the word `PASS` would lose the one thing the next
+agent round the loop has to read. The verdict lands on the *move* it caused, as the `note` on a
+`card_events` row, and `cardPrompt` appends that as "Why this came back", because a second
+attempt without the reason for the first is the first attempt again. A pass records its reasons
+the same way: why a card was let through outlives the run that said so.
+
+**A rejection is not an error, and neither is a wait.** `cards.status` has five values and they
+divide the ways a card can be stopped by what a person has to do about it: `rejected` is a
+reviewer saying no, which wants a decision, and `error` is something that broke — a crash, a
+timeout, a run a restart interrupted — which wants looking at. `cards.error` therefore holds
+faults and only faults, and `cardPrompt` deliberately does not read it: handing an agent a stack
+trace under the heading "why this came back" was how a reset connection came to read as a review.
+
+There is no `blocked`. A card waiting on a dependency is `idle`, and `blockers` works out what it
+waits on when it is asked. The stored answer was written once and never revisited, so a card sat
+saying "waiting on X" long after X was done — the same staleness `lanes.readVerdict` had as a
+second place to say a thing the rows already knew. Nothing stores what the rows around it say.
+
+**A card's history is a ledger of its moves.** `card_events` records every move a card makes —
+from, to, why, and who — because "why is this card here?" is a question about the move that
+brought it, not about the card. A column on the card could only ever hold the most recent reason
+and lost the one before it; the ledger also catches a person dragging a card back, which no run
+ever records. `server/db/history.ts` is the only writer: `recordMove` takes the transaction it
+belongs to, so a card that moved and the row saying so commit together. `lastMoveNote` reads
+backwards from the newest event and stops at the one that brought the card to this lane —
+anything older happened somewhere else — skipping note-less events on the way, so a person
+hitting retry does not quietly delete the reason the card came back. Moving a card onwards is
+what clears a rejection, which is what stops it following the card around the board for good.
+
+The ledger is written by hand rather than generated, and `features` refuses insert, update and
+delete on it through GraphQL: its whole worth is that it is an account nobody edited. Nothing
+prunes it either — it is small, and it is the durable answer to a question the runs behind it
+stop being able to answer as soon as `runRetentionDays` deletes them.
+
+`runs.verdict` carries the same ruling on the run that made it, because a judging station whose
+failure arm goes nowhere moves nothing and would otherwise leave no trace of having ruled. A run
+that crashed has `none`: a reviewer whose connection dropped ruled on nothing, whatever half a
+sentence made it out before the stream died.
+
+**A restart puts back what it interrupted.** `inFlight` is memory, so a process that dies leaves
+`running` rows that nothing will ever finish: a run `runRetentionDays` will not prune and `spend`
+keeps counting, and a card that holds a place against its lane's WIP limit for good. `reconcile()`
+in `server/runner/run.ts` runs once from `server/index.ts` after `ensureSchema`, and closes
+whatever this process does not genuinely have in flight — runs to `error`, cards back to `idle`.
+A conversation is not something a restart can interrupt, so there is nothing to put back on a
+task. `error` rather than `stopped`: nobody called these off. It costs a card no attempt, and writes nothing to
+the ledger — a restart is not a ruling, and the story of a card is what became of it rather than
+what the process it was running in did.
 
 **Archiving is off the board, not gone, and it is not a status.** `cards.archivedAt` is a
 timestamp rather than a flag because an archive is a list and a list wants an order; it is kept
@@ -162,25 +283,28 @@ matters is the one for what you cannot see.
 **A review verdict is a property of the output, not of the run — and reading one is a property
 of the lane.** A reviewer that answers `FAIL` has still run fine, so the run is `ok` and the card
 is what fails. Ambiguity counts as a pass: a mumbling reviewer must not be able to wedge a board.
-`lanes.readVerdict` is what decides whether that first word is read at all, because judging is
+The lane's role is what decides whether that first word is read at all, because judging is
 something a station does: the same agent can work cards in Doing and rule on them in Review, and
-a board may have two reviewing stations or none. Nothing in a card run branches on which role its
-agent fills.
+a board may have two reviewing stations or none. Nothing in a card run knows anything about the
+agent beyond which endpoint it is.
 
 **Automation is opt-in per project.** `projects.autoRun` gates the worker; `server/worker/loop.ts`
 polls rather than waking on writes, because the things that make a card runnable are not all
 writes — a dependency finishing, an agent switched back on, a run stopped.
 
 **Hand-written GraphQL fields go in `server/graphql/`**, beside the generated entities:
-`models`, `mcpStatus`, `runEvents`, `spend` on the query side; `refineTask`, `acceptTask`,
-`decomposeTask`, `submitTask`, `runCard`, `stopCard`, `stopTask`, `moveCard`, `retryCard`,
+`models`, `mcpStatus`, `runEvents`, `blockers`, `spend` on the query side; `refineTask`,
+`makeCard`, `submitCard`, `runCard`, `stopCard`, `stopTask`, `moveCard`, `retryCard`,
 `archiveCard`, `restoreCard`, `setCardDeps`, `setAgentServers`,
 `testMcpServer`, `reconnectMcp`, `setApiKey`, `setAgentApiKey` on the mutation side. Give every
 one of them a `description` — it is what an agent on `/mcp` reads to decide whether to call it.
 
-**Writes go through `onWrite` hooks.** Creating a project seeds its four lanes and their
-success/failure wiring in the same transaction (`payload.tx`), and an edited MCP server
-reconciles the connection pool without a restart. A write that should change either of those
+**Writes go through `onWrite` hooks.** Creating a project seeds its five lanes and their
+success/failure wiring in the same transaction (`payload.tx`); a created card gets the first row
+of its ledger; and an edited MCP server reconciles the connection pool without a restart. That
+hook reads the card's lane back from the database rather than off the rows it is handed, which
+carry only the columns the caller selected — a client asking for `{ id }` would otherwise record
+a card arriving nowhere. A write that should change either of those
 belongs in a hook, not in a route handler.
 
 **The API key is never readable.** `exclude.columns` drops `apiKey` from both `settings` and
@@ -188,9 +312,9 @@ belongs in a hook, not in a route handler.
 tests hold that line.
 
 **The `/mcp` surface is curated, not the whole schema.** `server/mcp-endpoint.ts` lists the
-thirty-one tools an outside client gets. Nothing that empties a table in one call, nothing that
+thirty-two tools an outside client gets. Nothing that empties a table in one call, nothing that
 reads or writes the API key, and no editing of agents, roles or MCP servers — a visiting client can
-see which agents and roles exist, because a lane points at one, but which model runs where and on
+see which agents and roles exist, because a lane points at each, but which model runs where and on
 whose key is the operator's business. A new tool goes in that list deliberately,
 with a `HINTS` entry if the generated description does not say enough. The driver renames after
 it filters, so the `include` list names GraphQL fields in camelCase while `HINTS` — and the
@@ -223,13 +347,13 @@ is unrepeatable, so a failure after that propagates. `requestTimeoutSeconds` is 
 watchdog that rearms on every chunk, not a deadline on the request, and an aborted stream ends
 its iteration rather than throwing — hence the `throwIfAborted()` after the loop.
 
-**Agents inherit from Settings by sentinel — and from their role for the prompt.** Every numeric
-knob treats `0` as "inherit",
+**Agents inherit from Settings by sentinel.** Every numeric knob treats `0` as "inherit",
 except `temperature` and `maxRetries`, which use `-1` because `0` is a value someone may
 genuinely want; empty strings inherit the same way, and `toolDiscovery` uses the word
 `"inherit"` rather than an empty string, because a nameless enum member reads as a bug in the
-API. `systemPrompt` is the one that inherits from the agent's role instead, a prompt being what a
-role *is*. `server/runner/llm.ts` is the only place any of that resolution happens.
+API. `systemPrompt` inherits from nothing: it is the agent's own word about itself, expected
+empty, and what to do comes from the lane. `server/runner/llm.ts` is the only place any of that
+resolution happens.
 
 **Run events are debugging output and are not persisted.** They live in an in-memory bus for a
 minute after the run ends, folded so consecutive output tokens arrive as one entry. Anything

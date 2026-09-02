@@ -27,28 +27,26 @@ export async function ensureSchema() {
   // can load. Column defaults fill the rest in.
   await db.insert(settings).values({ id: "default" }).onConflictDoNothing();
 
-  // A server with no agents cannot refine, decompose or execute anything, and the four it
-  // needs differ only by their prompt — so they are seeded rather than left as four forms to
-  // fill in before the first task. `onConflictDoNothing` on the unique name means an edited
-  // role or agent survives the next boot.
-  //
-  // Roles first: an agent without one will not insert, which is the FK doing what it is for.
+  // A server with no roles draws boards that nothing runs on, so the three kinds of station are
+  // seeded. `onConflictDoNothing` on the unique name means an edited role survives the boot.
   for (const role of DEFAULT_ROLES) {
     await db.insert(roles).values(role).onConflictDoNothing();
     // The migration that turned the role enum into rows could not carry the prompts with it —
-    // they live here, in TypeScript — so it wrote the four rows empty and left this to fill
-    // them. An edited prompt is not empty and is not touched.
+    // they live here, in TypeScript — so it wrote the rows empty and left this to fill them.
+    // An edited prompt is not empty and is not touched.
     await db
       .update(roles)
-      .set({ systemPrompt: role.systemPrompt })
-      .where(and(eq(roles.name, role.name), eq(roles.systemPrompt, "")));
+      .set({ prompt: role.prompt })
+      .where(and(eq(roles.name, role.name), eq(roles.prompt, "")));
   }
-  const seeded = new Map((await db.select().from(roles)).map((role) => [role.name, role.id]));
-  for (const agent of DEFAULT_AGENTS) {
-    const roleId = seeded.get(agent.role);
-    if (!roleId) continue;
-    await db.insert(agents).values({ name: agent.name, roleId }).onConflictDoNothing();
-  }
+
+  // One agent, and only where there is none. An agent is a model endpoint; a fresh install
+  // still needs something for the first card to run on, but a server that has agents already
+  // keeps them — including the four a version before this one seeded, whose names have simply
+  // stopped meaning anything.
+  const [anyAgent] = await db.select({ id: agents.id }).from(agents).limit(1);
+  if (!anyAgent)
+    for (const agent of DEFAULT_AGENTS) await db.insert(agents).values(agent).onConflictDoNothing();
 
   // A run left `running` by a crash is never going to finish; nothing would ever clear it, and
   // the card it was working would sit `running` for good with no process behind it.

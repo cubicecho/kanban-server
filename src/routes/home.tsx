@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { Plus, Send, Settings2, Sparkles } from "lucide-react";
+import { Plus, Send, Settings2, SquarePlus } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Page } from "@/components/app-shell";
@@ -14,14 +14,13 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  AcceptTaskDocument,
   ActiveRunsDocument,
   CreateTaskDocument,
-  DecomposeTaskDocument,
+  MakeCardDocument,
   ProjectsDocument,
   type ProjectsQuery,
   RefineTaskDocument,
-  SubmitTaskDocument,
+  SubmitCardDocument,
   TasksDocument,
   type TasksQuery,
 } from "@/gql/graphql";
@@ -32,12 +31,13 @@ type Task = TasksQuery["tasks"][number];
 type Project = ProjectsQuery["projects"][number];
 
 /**
- * The way in: describe something, and it becomes cards on a board.
+ * The way in: describe something, and it becomes a card at the project's front door.
  *
- * Two ways, really, and they are the same pipeline entered at different points. Talking it over
- * with the refining agent is for when you know what you want but not yet what it means; the
- * straight form is for when you do, and every turn of conversation would only be you telling an
- * agent what you already wrote down. Both end at the decomposer.
+ * Two ways, and they are the same door entered from different sides. Talking it over with the
+ * refining agent is for when you know what you want but not yet what it means; the straight form
+ * is for when you do, and every turn of conversation would only be you telling an agent what you
+ * already wrote down. Both end at one card in intake, and what becomes of it is the board's
+ * business — a lane that expands is what turns it into the cards that carry the work out.
  */
 export function HomeRoute() {
   const projectId = useProjectId();
@@ -50,7 +50,7 @@ export function HomeRoute() {
   return (
     <Page
       title="New task"
-      description="Say what you want. The decomposer turns it into cards."
+      description="Say what you want. It lands as a card at the front of the board."
       actions={
         <div className="flex gap-2">
           {project ? (
@@ -106,10 +106,12 @@ function TaskComposer({ project }: { project: Project }) {
     queryClient.invalidateQueries({ queryKey: ["board", project.id] });
   };
 
-  // The draft in hand: the one this page started, or — on a reload — the latest one still open.
+  // The conversation in hand: the one this page started, or — on a reload — the most recent one
+  // that never reached the board. A task has no status to ask; whether it produced work is the
+  // card pointing back at it, so a task with no cards is one still being talked about.
   const draft: Task | undefined = draftId
     ? tasks.data?.tasks.find((task) => task.id === draftId)
-    : tasks.data?.tasks.find((task) => task.status === "draft");
+    : tasks.data?.tasks.find((task) => task.cards.length === 0);
 
   const say = useMutation({
     mutationFn: async (text: string) => {
@@ -131,42 +133,33 @@ function TaskComposer({ project }: { project: Project }) {
     onError: (error: Error) => toast.error(error.message),
   });
 
-  const decompose = useMutation({
-    mutationFn: async (taskId: string) => {
-      await request(AcceptTaskDocument, { taskId });
-      return request(DecomposeTaskDocument, { taskId });
-    },
-    onSuccess: (run) => {
-      if (run.decomposeTask.status === "ok") {
-        toast.success("On the board");
-        setDraftId(null);
-        navigate({ to: "/board" });
-      } else {
-        toast.error(run.decomposeTask.error || "The decomposer failed.");
-      }
+  // Ending the conversation is a write, not a run: one card in intake, and nothing to wait for.
+  // The chat is left where it is — a brief can be talked about further and made again.
+  const make = useMutation({
+    mutationFn: (taskId: string) => request(MakeCardDocument, { taskId }),
+    onSuccess: () => {
+      toast.success("On the board");
+      setDraftId(null);
       refresh();
+      navigate({ to: "/board" });
     },
     onError: (error: Error) => toast.error(error.message),
   });
 
   const submit = useMutation({
-    mutationFn: () => request(SubmitTaskDocument, { projectId: project.id, title, brief }),
-    onSuccess: (result) => {
-      if (result.submitTask.status === "decomposed") {
-        toast.success("On the board");
-        setTitle("");
-        setBrief("");
-        navigate({ to: "/board" });
-      } else {
-        toast.error(result.submitTask.error || "The decomposer failed.");
-      }
+    mutationFn: () => request(SubmitCardDocument, { projectId: project.id, title, body: brief }),
+    onSuccess: () => {
+      toast.success("On the board");
+      setTitle("");
+      setBrief("");
       refresh();
+      navigate({ to: "/board" });
     },
     onError: (error: Error) => toast.error(error.message),
   });
 
-  const working = say.isPending || decompose.isPending || submit.isPending;
-  const talking = say.isPending || decompose.isPending;
+  const working = say.isPending || make.isPending || submit.isPending;
+  const talking = say.isPending;
 
   // A refining model that takes twenty seconds to answer should not spend them saying nothing.
   // The mutation only resolves at the end of the turn, so the run is found by the task it is
@@ -244,15 +237,17 @@ function TaskComposer({ project }: { project: Project }) {
               <div className="min-w-0">
                 <h2 className="truncate font-medium">{draft.title || "Untitled task"}</h2>
                 <Badge variant="outline" className="mt-1">
-                  {draft.status}
+                  {draft.cards.length
+                    ? `${draft.cards.length} card${draft.cards.length === 1 ? "" : "s"}`
+                    : "being talked about"}
                 </Badge>
               </div>
               <Button
                 disabled={working || !draft.brief.trim()}
-                onClick={() => decompose.mutate(draft.id)}
+                onClick={() => make.mutate(draft.id)}
               >
-                <Sparkles className="size-4" />
-                {decompose.isPending ? "Decomposing…" : "Accept and decompose"}
+                <SquarePlus className="size-4" />
+                {make.isPending ? "Making…" : "Make a card"}
               </Button>
             </div>
             <p className="text-sm whitespace-pre-wrap text-muted-foreground">
@@ -280,7 +275,7 @@ function TaskComposer({ project }: { project: Project }) {
               rows={8}
               value={brief}
               onChange={(event) => setBrief(event.target.value)}
-              placeholder="Everything the decomposer should know. It gets this and the project's context, and nothing else."
+              placeholder="Everything the first agent should know. It gets this and the project's context, and nothing else."
             />
           </div>
           <Button
@@ -288,8 +283,8 @@ function TaskComposer({ project }: { project: Project }) {
             disabled={working || !title.trim() || !brief.trim()}
             onClick={() => submit.mutate()}
           >
-            <Sparkles className="size-4" />
-            {submit.isPending ? "Decomposing…" : "Decompose"}
+            <SquarePlus className="size-4" />
+            {submit.isPending ? "Adding…" : "Put it on the board"}
           </Button>
         </Card>
       </TabsContent>

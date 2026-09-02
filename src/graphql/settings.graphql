@@ -12,6 +12,8 @@ query Settings {
     maxRetries
     runRetentionDays
     workerIntervalSeconds
+    refineAgentId
+    refinePrompt
   }
 }
 

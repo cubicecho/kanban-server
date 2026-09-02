@@ -2,13 +2,6 @@ query Agents {
   agents(orderBy: { name: { direction: asc, priority: 1 } }) {
     id
     name
-    roleId
-    role {
-      id
-      name
-      stage
-      systemPrompt
-    }
     enabled
     baseUrl
     model
@@ -22,13 +15,6 @@ query Agents {
     servers {
       serverId
     }
-  }
-  roles(orderBy: { name: { direction: asc, priority: 1 } }) {
-    id
-    name
-    description
-    stage
-    systemPrompt
   }
   mcpServers(orderBy: { slug: { direction: asc, priority: 1 } }) {
     id
@@ -66,22 +52,4 @@ mutation SetAgentServers($agentId: String!, $serverIds: [String!]!) {
 
 mutation SetAgentApiKey($agentId: String!, $apiKey: String!) {
   setAgentApiKey(agentId: $agentId, apiKey: $apiKey)
-}
-
-mutation CreateRole($values: CreateRoleInput!) {
-  createRole(values: $values) {
-    id
-  }
-}
-
-mutation UpdateRole($id: String!, $set: UpdateRoleInput!) {
-  updateRoleSingle(where: { id: { eq: $id } }, set: $set) {
-    id
-  }
-}
-
-mutation DeleteRole($id: String!) {
-  deleteRoleSingle(where: { id: { eq: $id } }) {
-    id
-  }
 }

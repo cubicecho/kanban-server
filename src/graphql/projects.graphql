@@ -6,7 +6,6 @@ query Projects {
     context
     autoRun
     refineAgentId
-    decomposeAgentId
   }
 }
 
