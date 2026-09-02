@@ -98,12 +98,8 @@ beforeEach(async () => {
   await db.delete(tables.lanes);
   await db.delete(tables.projects);
   await db.delete(tables.agents);
-  const roles = await db.select().from(tables.roles);
-  for (const name of ["executor", "reviewer"] as const) {
-    const role = roles.find((row) => row.name === name);
-    if (!role) throw new Error(`the ${name} role was not seeded`);
-    await db.insert(tables.agents).values({ name, roleId: role.id, baseUrl, model: "fake" });
-  }
+  // One agent for every station on the board — what each one does is its lane's business.
+  await db.insert(tables.agents).values({ name: "worker", baseUrl, model: "fake" });
 });
 
 test("a board that is not on auto is left alone", async () => {

@@ -1,9 +1,9 @@
 # AGENTS.md — kanban-server
 
 A kanban board that works itself. A **project** is a body of work; its **lanes** are the
-board's columns, and a lane that names an **agent** is a station — cards there get worked and
-then moved on. An agent is a **role** — a job of work, which is a prompt and nothing else —
-pointed at a model endpoint. A **task** is what a person asks for in their own words, refined over a
+board's columns, and a lane that names a **role** and an **agent** is a station — cards there get
+worked and then moved on. A role is a *kind of lane*: a prompt and the shape of the answer it
+expects. An agent is only a model endpoint. A **task** is what a person asks for in their own words, refined over a
 **message** thread until they accept it; a decompose agent turns the one task into many
 **cards**, which are the units an agent executes. Every time an agent is asked to do anything
 — refine, decompose, or work a card — that is one **run**. The same API is served three ways
@@ -98,23 +98,33 @@ sizes. `submitTask` is the one-shot path — create, accept and decompose in a s
 an MCP client that has nothing to refine — and it records a failed decomposition on the task
 rather than throwing, so the task survives to be retried.
 
-**A lane is a station, and the board is the pipeline.** `agentId` says what runs on the cards
-in a lane; `onSuccessLaneId` and `onFailureLaneId` say where they go afterwards; `wipLimit`
-caps how many run at once; `readVerdict` says this station judges cards rather than working
-them; `maxAttempts` is how many failures it will put back in play before stopping. That is the
-whole of the automation — there is no workflow engine, and the shape of the
-pipeline is the shape of the board someone drew. A lane with no agent is a resting place, which
-is what a backlog and a done pile are.
+**A lane is a station, and the board is the pipeline.** `roleId` says what kind of lane it is
+and `prompt` is anything this board adds to that; `agentId` says which model works the cards
+there; `onSuccessLaneId` and `onFailureLaneId` say where they go afterwards; `wipLimit`
+caps how many run at once; `maxAttempts` is how many failures it will put back in play before
+stopping. That is the whole of the automation — there is no workflow engine, and the shape of the
+pipeline is the shape of the board someone drew. A lane with no role or no agent is a resting
+place, which is what a backlog and a done pile are.
 
-**A role is the job; an agent is the job plus a model.** `roles` is a table, not an enum, because
-the useful ones are not knowable from here — a tester, a security reviewer, a technical writer are
-each a paragraph of instruction and none should need a migration. What cannot be invented is
-`stage`: `refine` and `decompose` answer in JSON the server itself parses, so they are two fixed
-stations, and `card` is every role a lane may point at. `resolveStage` is how the refiner and the
-decomposer are found; `seedLanes` finds the executor and the reviewer by their role's name.
-An agent's empty `systemPrompt` inherits the role's, which is why editing what every executor is
-told is one edit rather than one per agent, and why a card run no longer starts with an empty
-system message when somebody made an agent by hand.
+**A role is a kind of lane; an agent is a model. They meet only at a lane.** Neither table
+references the other. `roles` is a table, not an enum, because the useful kinds are not knowable
+from here — a tester, a security reviewer, a technical writer are each a paragraph of instruction
+and none should need a migration. What cannot be invented is `contract`, the shape of the answer:
+`work` reports on the card, `verdict` rules `PASS`/`FAIL` on it, `expand` breaks it into more
+cards. That is the only part of a role anything reads, and `seedLanes` finds the two it draws by
+contract rather than by name, a name being a thing somebody edits.
+
+The prompt a run starts with is composed by `systemPromptFor`, in layers: the agent's
+`systemPrompt` says who it is, the role's `prompt` says what happens here, and the lane's own
+`prompt` adds whatever is true of this board only. The lane speaks last, and a composition that
+comes out empty is refused at run time — which is the one guard replacing both a `notNull` on the
+agent and the worry about a run starting with an empty system message. Editing what every Review
+lane is told is one edit rather than one per board, which is why a lane points at a role instead
+of carrying a copy of its prompt.
+
+Refining has no contract, because refinement is not something a lane does. Its prompt is
+`settings.refinePrompt` (empty meaning `REFINE_SYSTEM`), and `resolveJobAgent` finds an agent for
+it and for decomposition from `settings`, falling back to the first enabled agent by name.
 
 **The optimistic board and the server agree by construction.** A drop rewrites the board cache
 before the request goes out, and `src/lib/board-order.ts` holds the pure functions that decide
@@ -136,10 +146,11 @@ into `board_templates.lanes`, turning `onSuccessLaneId`/`onFailureLaneId` into p
 template's own list — a lane id belongs to one project and means nothing in another. Applying
 one writes the lanes first and the arrows second, in a single transaction, which is the same
 two steps `seedLanes` takes and for the same reason. An `agentId` that no longer exists
-resolves to none rather than failing: a template is a shape, and the agents are whoever happens
-to be on this server. `readVerdict` is read back with `?? false` and `maxAttempts` with `?? 0`,
-because a template saved before stations could judge cards or spend attempts has no such key, and
-a lane that does not say it reads a verdict does not read one. Applying is refused on a board with cards, because deleting a lane takes its cards
+resolves to none rather than failing, and a `roleId` is treated exactly the same way: a template
+is a shape, and the agents and the roles are whoever happens to be on this server. `prompt` is
+read back with `?? ""` and `maxAttempts` with `?? 0`, because a template saved before a lane
+carried its own job or spent attempts has no such key, and a lane that says it adds nothing adds
+nothing. Applying is refused on a board with cards, because deleting a lane takes its cards
 with it.
 
 **`done` means nothing further will happen.** A card that passes into a lane that has an agent
@@ -162,8 +173,8 @@ Review rather than dropping it down the failure arm as though it had been turned
 card in a resting place would just be lost; the passing arm still asks after the *success* lane's
 agent, since a card that passes with nowhere to go must not re-run where it stands.
 
-**A verdict is not an account of the work.** A station with `readVerdict` leaves `cards.result`
-alone — overwriting the executor's report with the word `PASS` would lose the one thing the next
+**A verdict is not an account of the work.** A station whose role has the `verdict` contract
+leaves `cards.result` alone — overwriting the executor's report with the word `PASS` would lose the one thing the next
 agent round the loop has to read. The verdict lands on the *move* it caused, as the `note` on a
 `card_events` row, and `cardPrompt` appends that as "Why this came back", because a second
 attempt without the reason for the first is the first attempt again. A pass records its reasons
@@ -178,8 +189,8 @@ trace under the heading "why this came back" was how a reset connection came to 
 
 There is no `blocked`. A card waiting on a dependency is `idle`, and `blockers` works out what it
 waits on when it is asked. The stored answer was written once and never revisited, so a card sat
-saying "waiting on X" long after X was done — the same staleness `lanes.readVerdict` has as a
-second place to say a thing the rows already know. Nothing stores what the rows around it say.
+saying "waiting on X" long after X was done — the same staleness `lanes.readVerdict` had as a
+second place to say a thing the rows already knew. Nothing stores what the rows around it say.
 
 **A card's history is a ledger of its moves.** `card_events` records every move a card makes —
 from, to, why, and who — because "why is this card here?" is a question about the move that
@@ -227,10 +238,10 @@ matters is the one for what you cannot see.
 **A review verdict is a property of the output, not of the run — and reading one is a property
 of the lane.** A reviewer that answers `FAIL` has still run fine, so the run is `ok` and the card
 is what fails. Ambiguity counts as a pass: a mumbling reviewer must not be able to wedge a board.
-`lanes.readVerdict` is what decides whether that first word is read at all, because judging is
+The lane's role is what decides whether that first word is read at all, because judging is
 something a station does: the same agent can work cards in Doing and rule on them in Review, and
-a board may have two reviewing stations or none. Nothing in a card run branches on which role its
-agent fills.
+a board may have two reviewing stations or none. Nothing in a card run knows anything about the
+agent beyond which endpoint it is.
 
 **Automation is opt-in per project.** `projects.autoRun` gates the worker; `server/worker/loop.ts`
 polls rather than waking on writes, because the things that make a card runnable are not all
@@ -258,7 +269,7 @@ tests hold that line.
 **The `/mcp` surface is curated, not the whole schema.** `server/mcp-endpoint.ts` lists the
 thirty-three tools an outside client gets. Nothing that empties a table in one call, nothing that
 reads or writes the API key, and no editing of agents, roles or MCP servers — a visiting client can
-see which agents and roles exist, because a lane points at one, but which model runs where and on
+see which agents and roles exist, because a lane points at each, but which model runs where and on
 whose key is the operator's business. A new tool goes in that list deliberately,
 with a `HINTS` entry if the generated description does not say enough. The driver renames after
 it filters, so the `include` list names GraphQL fields in camelCase while `HINTS` — and the
@@ -291,13 +302,13 @@ is unrepeatable, so a failure after that propagates. `requestTimeoutSeconds` is 
 watchdog that rearms on every chunk, not a deadline on the request, and an aborted stream ends
 its iteration rather than throwing — hence the `throwIfAborted()` after the loop.
 
-**Agents inherit from Settings by sentinel — and from their role for the prompt.** Every numeric
-knob treats `0` as "inherit",
+**Agents inherit from Settings by sentinel.** Every numeric knob treats `0` as "inherit",
 except `temperature` and `maxRetries`, which use `-1` because `0` is a value someone may
 genuinely want; empty strings inherit the same way, and `toolDiscovery` uses the word
 `"inherit"` rather than an empty string, because a nameless enum member reads as a bug in the
-API. `systemPrompt` is the one that inherits from the agent's role instead, a prompt being what a
-role *is*. `server/runner/llm.ts` is the only place any of that resolution happens.
+API. `systemPrompt` inherits from nothing: it is the agent's own word about itself, expected
+empty, and what to do comes from the lane. `server/runner/llm.ts` is the only place any of that
+resolution happens.
 
 **Run events are debugging output and are not persisted.** They live in an in-memory bus for a
 minute after the run ends, folded so consecutive output tokens arrive as one entry. Anything

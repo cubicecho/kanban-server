@@ -21,67 +21,67 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  type AgentsQuery,
   CreateRoleDocument,
-  type RolesStageEnum,
+  type RolesContractEnum,
+  type RolesQuery,
   UpdateRoleDocument,
 } from "@/gql/graphql";
 import { request } from "@/lib/gql";
 
-type Role = AgentsQuery["roles"][number];
+type Role = RolesQuery["roles"][number];
 
-const STAGES: { value: string; label: string; hint: string }[] = [
+const CONTRACTS: { value: string; label: string; hint: string }[] = [
   {
-    value: "card",
-    label: "Works cards",
-    hint: "A lane can point at an agent in this role. Anything a board does is one of these.",
+    value: "work",
+    label: "Works the card",
+    hint: "Answers with a report of what it did, which becomes the card's result.",
   },
   {
-    value: "refine",
-    label: "Refines a task",
-    hint: "Talks a request into a brief. Must answer with the JSON the refiner is asked for.",
+    value: "verdict",
+    label: "Judges the card",
+    hint: "Answers PASS or FAIL on its first line, then why. That word picks the arm the card leaves by, and the rest is kept as the reason it moved.",
   },
   {
-    value: "decompose",
-    label: "Decomposes a task",
-    hint: "Turns a brief into cards. Must answer with the JSON array the decomposer is asked for.",
+    value: "expand",
+    label: "Breaks the card up",
+    hint: "Answers with a JSON array of cards, which are written into the lane's success arm.",
   },
 ];
 
 /**
- * A role: the job, apart from the model that does it.
+ * A role: a kind of lane, apart from any board that has one.
  *
- * `stage` is the only part of this the server itself reads, and the two that are not `card`
- * carry an output contract — the refiner's reply and the decomposer's card list are parsed, not
- * displayed — so the form says so rather than letting somebody find out from a failed run.
+ * `contract` is the only part of this the server itself reads — it is the shape of the answer,
+ * and two of the three are parsed rather than displayed — so the form says what each expects
+ * instead of letting somebody find out from a failed run.
  */
 export function RoleDialog({ role, onClose }: { role?: Role; onClose: () => void }) {
   const queryClient = useQueryClient();
   const [name, setName] = useState(role?.name ?? "");
   const [description, setDescription] = useState(role?.description ?? "");
-  const [stage, setStage] = useState<string>(role?.stage ?? "card");
-  const [systemPrompt, setSystemPrompt] = useState(role?.systemPrompt ?? "");
+  const [contract, setContract] = useState<string>(role?.contract ?? "work");
+  const [prompt, setPrompt] = useState(role?.prompt ?? "");
 
   const save = useMutation({
     mutationFn: async () => {
       const values = {
         name: name.trim(),
         description: description.trim(),
-        stage: stage as RolesStageEnum,
-        systemPrompt,
+        contract: contract as RolesContractEnum,
+        prompt,
       };
       if (!values.name) throw new Error("A role needs a name.");
       if (role) await request(UpdateRoleDocument, { id: role.id, set: values });
       else await request(CreateRoleDocument, { values });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["agents"] });
+      queryClient.invalidateQueries({ queryKey: ["roles"] });
       onClose();
     },
     onError: (error: Error) => toast.error(error.message),
   });
 
-  const chosen = STAGES.find((row) => row.value === stage);
+  const chosen = CONTRACTS.find((row) => row.value === contract);
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -89,8 +89,8 @@ export function RoleDialog({ role, onClose }: { role?: Role; onClose: () => void
         <DialogHeader>
           <DialogTitle>{role ? "Edit role" : "New role"}</DialogTitle>
           <DialogDescription>
-            What an agent is asked to be. Every agent in this role is told this, unless it writes
-            its own.
+            A kind of lane. Every lane of this kind is told this, so editing it changes all of them
+            at once.
           </DialogDescription>
         </DialogHeader>
 
@@ -102,17 +102,17 @@ export function RoleDialog({ role, onClose }: { role?: Role; onClose: () => void
                 id="role-name"
                 value={name}
                 onChange={(event) => setName(event.target.value)}
-                placeholder="tester"
+                placeholder="Testing"
               />
             </div>
             <div className="flex flex-col gap-2">
-              <Label>Stage</Label>
-              <Select value={stage} onValueChange={setStage}>
+              <Label>Answers with</Label>
+              <Select value={contract} onValueChange={setContract}>
                 <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {STAGES.map((row) => (
+                  {CONTRACTS.map((row) => (
                     <SelectItem key={row.value} value={row.value}>
                       {row.label}
                     </SelectItem>
@@ -132,25 +132,22 @@ export function RoleDialog({ role, onClose }: { role?: Role; onClose: () => void
               placeholder="Runs the suite and says what broke"
             />
             <p className="text-xs text-muted-foreground">
-              One line, to pick this role by. It is never sent to a model.
+              One line, to pick this kind of lane by. It is never sent to a model.
             </p>
           </div>
 
           <div className="flex flex-col gap-2">
-            <Label htmlFor="role-prompt">System prompt</Label>
+            <Label htmlFor="role-prompt">Prompt</Label>
             <Textarea
               id="role-prompt"
               rows={10}
-              value={systemPrompt}
-              onChange={(event) => setSystemPrompt(event.target.value)}
-              placeholder="What an agent in this role is told."
+              value={prompt}
+              onChange={(event) => setPrompt(event.target.value)}
+              placeholder="What an agent working a lane of this kind is told."
             />
-            {stage === "card" ? (
-              <p className="text-xs text-muted-foreground">
-                A role for a lane that judges cards should begin its answer with PASS or FAIL on its
-                own line — that is the word the lane reads.
-              </p>
-            ) : null}
+            <p className="text-xs text-muted-foreground">
+              A lane may add to this on its own board. It never replaces it.
+            </p>
           </div>
         </div>
 

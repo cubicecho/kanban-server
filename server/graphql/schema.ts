@@ -34,7 +34,7 @@ import {
 import { fold, history, type RunEvent, watch } from "../runner/events.ts";
 import { listModels, loadSettings } from "../runner/llm.ts";
 import { type McpConnection, mcp, probe } from "../runner/mcp.ts";
-import { EXECUTOR_ROLE, REVIEWER_ROLE } from "../runner/prompts.ts";
+import { VERDICT_CONTRACT, WORK_CONTRACT } from "../runner/prompts.ts";
 import {
   blockers,
   decomposeTask,
@@ -188,26 +188,33 @@ const { entities } = buildSchema(db, {
  * its status set to `error`, which the worker will not pick up, so a rejected card waits for a
  * person instead of looping between two agents at whatever a token costs.
  *
- * The agents are looked up by their role's name rather than created, so a project made on a
- * server whose agents have been renamed or replaced gets that server's agents. Finding none is
- * not an error: the lanes are still drawn, and the board runs as soon as an agent is named on
- * one. Review is the lane that reads its agent's answer as a verdict — a fresh board is the one
- * place that is decided for somebody, and the lane dialog is where it is changed.
+ * The two staffed lanes are given a kind — the first role with that contract — and the first
+ * enabled agent to staff them with. A role is found by its contract rather than by its name,
+ * because a name is a thing somebody edits; the contract is what the server actually reads.
+ * Finding neither is not an error: the lanes are still drawn, and the board runs as soon as a
+ * role and an agent are named on one. Review judges because it *is* a Review lane, which is the
+ * whole of what used to be a flag on the lane and a second one on its agent.
  */
 async function seedLanes(tx: typeof db, rows: Project[]) {
   if (!rows.length) return;
-  const roleAgent = async (roleName: string) => {
+  const roleFor = async (contract: (typeof roles.contract.enumValues)[number]) => {
     const found = await tx
-      .select({ id: agents.id })
-      .from(agents)
-      .innerJoin(roles, eq(agents.roleId, roles.id))
-      .where(and(eq(roles.name, roleName), eq(agents.enabled, true)))
-      .orderBy(asc(agents.name))
+      .select({ id: roles.id })
+      .from(roles)
+      .where(eq(roles.contract, contract))
+      .orderBy(asc(roles.name))
       .limit(1);
     return found[0]?.id ?? null;
   };
-  const executor = await roleAgent(EXECUTOR_ROLE);
-  const reviewer = await roleAgent(REVIEWER_ROLE);
+  const [worker] = await tx
+    .select({ id: agents.id })
+    .from(agents)
+    .where(eq(agents.enabled, true))
+    .orderBy(asc(agents.name))
+    .limit(1);
+  const agentId = worker?.id ?? null;
+  const doingRole = await roleFor(WORK_CONTRACT);
+  const reviewRole = await roleFor(VERDICT_CONTRACT);
 
   for (const project of rows) {
     if (!project?.id) continue;
@@ -215,14 +222,8 @@ async function seedLanes(tx: typeof db, rows: Project[]) {
       .insert(lanes)
       .values([
         { projectId: project.id, name: "Backlog", position: 0, intake: true },
-        { projectId: project.id, name: "Doing", position: 1, agentId: executor },
-        {
-          projectId: project.id,
-          name: "Review",
-          position: 2,
-          agentId: reviewer,
-          readVerdict: true,
-        },
+        { projectId: project.id, name: "Doing", position: 1, roleId: doingRole, agentId },
+        { projectId: project.id, name: "Review", position: 2, roleId: reviewRole, agentId },
         { projectId: project.id, name: "Done", position: 3 },
       ])
       .returning();
@@ -485,12 +486,13 @@ type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
  *
  * The lanes go in first and the arrows second, because a template's arrows are indexes into
  * its own list and half of them point at lanes that do not exist yet — the same two steps
- * `seedLanes` takes, for the same reason. An `agentId` naming an agent this server no longer
- * has resolves to none rather than failing: a template is a shape, and the agents are whoever
- * happens to be here.
+ * `seedLanes` takes, for the same reason. An `agentId` or a `roleId` naming something this
+ * server no longer has resolves to none rather than failing: a template is a shape, and the
+ * agents and the roles are whoever happens to be here.
  */
 async function drawTemplate(tx: Tx, projectId: string, plan: TemplateLane[]) {
   const known = new Set((await tx.select({ id: agents.id }).from(agents)).map((row) => row.id));
+  const kinds = new Set((await tx.select({ id: roles.id }).from(roles)).map((row) => row.id));
   const written = await tx
     .insert(lanes)
     .values(
@@ -499,12 +501,13 @@ async function drawTemplate(tx: Tx, projectId: string, plan: TemplateLane[]) {
         name: lane.name,
         position: index,
         intake: lane.intake,
+        roleId: lane.roleId && kinds.has(lane.roleId) ? lane.roleId : null,
         agentId: lane.agentId && known.has(lane.agentId) ? lane.agentId : null,
         wipLimit: lane.wipLimit,
-        // Templates saved before stations could judge cards have no such key; a lane that does
-        // not say it reads a verdict does not read one, and one that does not say how many
-        // times it will put a card back does not put one back at all.
-        readVerdict: lane.readVerdict ?? false,
+        // Templates saved before a lane carried its own job have neither key; a lane with no
+        // kind is a resting place, and one with nothing to add adds nothing. Nor does one that
+        // does not say how many times it will put a card back put one back at all.
+        prompt: lane.prompt ?? "",
         maxAttempts: lane.maxAttempts ?? 0,
       })),
     )
@@ -1021,9 +1024,10 @@ export const schema = new GraphQLSchema({
             name: lane.name,
             position,
             intake: lane.intake,
+            roleId: lane.roleId,
+            prompt: lane.prompt,
             agentId: lane.agentId,
             wipLimit: lane.wipLimit,
-            readVerdict: lane.readVerdict,
             maxAttempts: lane.maxAttempts,
             onSuccess: index.get(lane.onSuccessLaneId ?? "") ?? null,
             onFailure: index.get(lane.onFailureLaneId ?? "") ?? null,

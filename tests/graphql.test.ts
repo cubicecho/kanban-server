@@ -332,8 +332,11 @@ test("runs are the server's own record: nothing outside it may write one", async
   );
 });
 
-test("submitting a task with no decomposer says so rather than leaving a task in limbo", async () => {
+test("submitting a task with nothing to decompose it says so rather than leaving a task in limbo", async () => {
   const project = await newProject("no agents");
+  // Switched off rather than deleted, and every one of them: no agent holds the job of
+  // decomposing any more, so "no decomposer" now means there is nothing enabled to ask.
+  await db.update(tables.agents).set({ enabled: false });
   const { submitTask } = await run(
     `mutation Submit($projectId: String!) {
        submitTask(projectId: $projectId, title: "ship it", brief: "make the thing") {
@@ -342,6 +345,7 @@ test("submitting a task with no decomposer says so rather than leaving a task in
      }`,
     { projectId: project.id },
   );
+  await db.update(tables.agents).set({ enabled: true });
   // Kept, not thrown away: the task is there to retry once an agent exists, and it says why.
   expect(submitTask.status).toBe("error");
   expect(submitTask.error).toMatch(/decompose/i);
@@ -523,14 +527,9 @@ test("a board saved under a name is drawn onto the next project the same shape",
 });
 
 test("a template names its agents by id, and forgets the ones this server no longer has", async () => {
-  const [role] = await db
-    .select()
-    .from(tables.roles)
-    .where(eq(tables.roles.name, "executor"))
-    .limit(1);
   const [agent] = await db
     .insert(tables.agents)
-    .values({ name: "a passing executor", roleId: role.id, model: "none", baseUrl: "http://x" })
+    .values({ name: "a passing worker", model: "none", baseUrl: "http://x" })
     .returning();
 
   const source = await newProject("staffed");

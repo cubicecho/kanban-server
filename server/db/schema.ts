@@ -53,33 +53,34 @@ const updatedAt = () =>
     .$onUpdateFn(() => new Date());
 
 /**
- * A named job of work: the prompt, apart from the model that runs it.
+ * A kind of lane: what happens to a card at a station, apart from which model it happens on.
  *
- * Roles are rows and not an enum because the useful ones are not knowable from here. A board
- * may want a tester, a security reviewer, a technical writer; each of those is a paragraph of
- * instruction and nothing else, and none of them should need a migration. What cannot be
- * invented is `stage`: refining and decomposing answer in JSON that a program parses, so they
- * are two fixed stations rather than two names in a list.
+ * A role used to be something an agent *was*. It is the role a lane *plays* — "this lane's role
+ * is to review" — and a lane is an instance of one. Roles are rows and not an enum because the
+ * useful kinds are not knowable from here: a tester, a security reviewer, a technical writer are
+ * each a paragraph of instruction and none should need a migration. What cannot be invented is
+ * `contract`, which is the shape of answer the server itself reads.
  *
- * An agent points at one of these and may leave `systemPrompt` empty to take the role's — the
- * same sentinel inheritance every other setting on an agent uses.
+ * A lane points at one and may append an addendum of its own. Editing a role changes every lane
+ * of that kind, which is the whole reason a lane keeps the pointer rather than a copy.
  */
 export const roles = pgTable("roles", {
   id: id(),
   name: text().notNull().unique(),
-  /** What this role is for, in one line. Shown where a role is picked; never sent to a model. */
+  /** What this kind of lane is for, in one line. Shown where one is picked; never sent to a model. */
   description: text().notNull().default(""),
   /**
-   * Which of the three jobs this role is for. `refine` talks a task into shape and `decompose`
-   * turns an accepted one into cards; both are answered in JSON and neither is a thing to have
-   * two shapes of. `card` is every role a lane can point at, and what one of those is *for* is
-   * only ever its prompt.
+   * The only thing about a role a program relies on; everything else here is prose.
+   *
+   * `work` is answered with a report, which becomes the card's `result`. `verdict` is answered
+   * with `PASS` or `FAIL` and then why, which routes the card and is kept as the move's note.
+   * `expand` is answered with JSON cards, which are written down the pass arrow.
    */
-  stage: text({ enum: ["card", "refine", "decompose"] })
+  contract: text({ enum: ["work", "verdict", "expand"] })
     .notNull()
-    .default("card"),
-  /** What an agent with this role is told, unless the agent writes its own. */
-  systemPrompt: text().notNull().default(""),
+    .default("work"),
+  /** What an agent working a lane of this kind is told. The job itself. */
+  prompt: text().notNull().default(""),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
@@ -93,28 +94,26 @@ export const roles = pgTable("roles", {
  * whichever one has the tools. Each agent carries its own `baseUrl`, key and model, so one can
  * be a local llama.cpp and the next a frontier API without either knowing about the other.
  *
+ * An agent does not know what job it does. The job belongs to the lane, and the two meet nowhere
+ * else — which is what lets one agent work a Doing lane and judge a Review lane on one board.
+ *
  * Every numeric knob treats zero as "inherit from settings", and `temperature` uses `-1` for it
- * — zero being a temperature someone may genuinely want. Empty strings inherit the same way,
- * and `systemPrompt` inherits from the agent's role rather than from settings, because a prompt
- * is what a role is.
+ * — zero being a temperature someone may genuinely want. Empty strings inherit the same way.
  */
 export const agents = pgTable("agents", {
   id: id(),
   name: text().notNull().unique(),
-  /**
-   * What this agent is for. `restrict` rather than `set null`: an agent with no role has no
-   * prompt and no stage, which is not a state worth being able to reach by deleting a row.
-   */
-  roleId: text()
-    .notNull()
-    .references(() => roles.id, { onDelete: "restrict" }),
   enabled: boolean().notNull().default(true),
   /** Any OpenAI-compatible endpoint. Empty falls back to the one in settings. */
   baseUrl: text().notNull().default(""),
   /** Empty falls back to settings, then to $OPENAI_API_KEY. Never readable over the API. */
   apiKey: text().notNull().default(""),
   model: text().notNull().default(""),
-  /** This agent's own instructions. Empty takes the role's. */
+  /**
+   * Who this agent is, said before the lane says what to do. Expected empty: it is for the
+   * standing instruction a particular model needs wherever it works — "you are a small local
+   * model; be terse" — and not for the job, which belongs to the lane.
+   */
   systemPrompt: text().notNull().default(""),
   maxTokens: integer().notNull().default(0),
   temperature: real().notNull().default(-1),
@@ -197,22 +196,25 @@ export const projects = pgTable("projects", {
    * because trusting it is a per-project decision.
    */
   autoRun: boolean().notNull().default(false),
-  /** Which agent refines this project's tasks. Empty falls back to any enabled `refine`. */
+  /** Which agent refines this project's tasks. Empty takes the one in Settings. */
   refineAgentId: text().references(() => agents.id, { onDelete: "set null" }),
-  /** Which agent decomposes them. Empty falls back to any enabled `decompose`. */
+  /** Which agent decomposes them. Empty takes the one in Settings. */
   decomposeAgentId: text().references(() => agents.id, { onDelete: "set null" }),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
 
 /**
- * A column of a project's board, and — where it names an agent — a stage of a pipeline.
+ * A column of a project's board, and — where it names a role — a station of a pipeline.
  *
- * A lane is not only a place a card sits. `agentId` is what runs on the cards in it,
- * `onSuccessLaneId` is where they go when that succeeds and `onFailureLaneId` where they go
- * when it does not, which is enough to describe "decompose → review → execute → done" without
- * a workflow engine. A lane with no agent is a resting place: a backlog, a done column, a
- * bucket for the ones that need a person.
+ * A lane is not only a place a card sits. `roleId` says what sort of station this is,
+ * `agentId` which model staffs it, `onSuccessLaneId` where cards go when it succeeds and
+ * `onFailureLaneId` where they go when it does not, which is enough to describe
+ * "intake → doing → review → done" without a workflow engine. Every one of those may be empty:
+ * a lane with no role is a resting place — a backlog, a done column, a bucket for the ones that
+ * need a person.
+ *
+ * This is the one place a role and an agent meet. Neither table knows about the other.
  */
 export const lanes = pgTable(
   "lanes",
@@ -226,6 +228,22 @@ export const lanes = pgTable(
     position: integer().notNull().default(0),
     /** Where freshly decomposed cards land. The lowest-positioned lane if none is marked. */
     intake: boolean().notNull().default(false),
+    /**
+     * What sort of station this is: the job, and the prompt that goes with it. Null is a
+     * resting place, where nothing runs however the rest of the lane is filled in.
+     *
+     * `restrict` rather than `set null`, because a lane that quietly stopped being a Review
+     * lane because somebody tidied up the roles list is the silent wedge this codebase keeps
+     * refusing to allow. Deleting a role in use is refused instead.
+     */
+    roleId: text().references(() => roles.id, { onDelete: "restrict" }),
+    /**
+     * Anything to add on this board, appended to the role's prompt and never replacing it.
+     *
+     * The role says what a Review lane does everywhere; this says what it does here — "the
+     * acceptance criteria are in the card body" — without forking a role per project.
+     */
+    prompt: text().notNull().default(""),
     /** The agent that works cards in this lane. Null means nothing runs here. */
     agentId: text().references(() => agents.id, { onDelete: "set null" }),
     /** Where a card goes when its run succeeds. Null leaves it where it is. */
@@ -234,17 +252,6 @@ export const lanes = pgTable(
     onFailureLaneId: text().references((): AnyPgColumn => lanes.id, { onDelete: "set null" }),
     /** How many cards the worker will run here at once. Zero means one — never unbounded. */
     wipLimit: integer().notNull().default(1),
-    /**
-     * Whether what comes out of this lane is a verdict on the card rather than work on it.
-     *
-     * A reviewing station's agent answers `PASS` or `FAIL` on its first line, and that word —
-     * not whether the run finished — is what sends the card down `onSuccessLaneId` or
-     * `onFailureLaneId`. It is the lane's property and not the agent's because reviewing is
-     * something a station does: the same agent asked to judge a card here can be asked to work
-     * one in the lane before. Ambiguity counts as a pass, so a mumbling reviewer cannot wedge
-     * a board.
-     */
-    readVerdict: boolean().notNull().default(false),
     /**
      * How many times this station will put a card it failed back in play, before it stops and
      * waits for a person.
@@ -535,11 +542,13 @@ export interface TemplateLane {
   name: string;
   position: number;
   intake: boolean;
+  /** By id, like `agentId`: a role belongs to this server, and a missing one resolves to none. */
+  roleId: string | null;
+  /** The lane's own addendum to its role's prompt. */
+  prompt: string;
   /** By id, so a template keeps the agents it was drawn with. Missing ones resolve to none. */
   agentId: string | null;
   wipLimit: number;
-  /** Whether this station reads its agent's answer as a PASS/FAIL verdict on the card. */
-  readVerdict: boolean;
   /** How many times this station puts a card it failed back in play. Zero never does. */
   maxAttempts: number;
   /** Index into the same list, or null for "leave the card where it is". */
@@ -588,6 +597,23 @@ export const settings = pgTable("settings", {
   runRetentionDays: integer().notNull().default(0),
   /** How often the worker looks for cards to pick up, in seconds. Zero stops it entirely. */
   workerIntervalSeconds: integer().notNull().default(5),
+  /**
+   * The two jobs that are not stations, and so cannot be found on a board.
+   *
+   * Refining and decomposing happen off the board, and used to be found by asking which agent
+   * held a role with that stage. An agent has no role now, so the answer is named here instead:
+   * the fallback for a project that names none of its own. Empty falls back to the first
+   * enabled agent, there being nothing else to go on.
+   */
+  refineAgentId: text().references(() => agents.id, { onDelete: "set null" }),
+  decomposeAgentId: text().references(() => agents.id, { onDelete: "set null" }),
+  /**
+   * What the refiner is told. Empty takes `REFINE_SYSTEM`.
+   *
+   * Refinement is a conversation and not a kind of lane, so its prompt has no role to live on;
+   * it lives here, editable, rather than being a constant nobody can reach.
+   */
+  refinePrompt: text().notNull().default(""),
 });
 
 export const schema = {
@@ -609,10 +635,9 @@ export const schema = {
 
 export const relations = defineRelations(schema, (r) => ({
   roles: {
-    agents: r.many.agents({ from: r.roles.id, to: r.agents.roleId }),
+    lanes: r.many.lanes({ from: r.roles.id, to: r.lanes.roleId }),
   },
   agents: {
-    role: r.one.roles({ from: r.agents.roleId, to: r.roles.id, optional: false }),
     servers: r.many.agentServers({ from: r.agents.id, to: r.agentServers.agentId }),
     lanes: r.many.lanes({ from: r.agents.id, to: r.lanes.agentId }),
     runs: r.many.runs({ from: r.agents.id, to: r.runs.agentId }),
@@ -640,6 +665,7 @@ export const relations = defineRelations(schema, (r) => ({
   // point sideways within one board, and everything that reads them already has every lane.
   lanes: {
     project: r.one.projects({ from: r.lanes.projectId, to: r.projects.id, optional: false }),
+    role: r.one.roles({ from: r.lanes.roleId, to: r.roles.id }),
     agent: r.one.agents({ from: r.lanes.agentId, to: r.agents.id }),
     cards: r.many.cards({ from: r.lanes.id, to: r.cards.laneId }),
   },

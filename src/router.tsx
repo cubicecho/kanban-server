@@ -46,6 +46,12 @@ const agentsRoute = createRoute({
   component: lazyRouteComponent(() => import("@/routes/agents"), "AgentsRoute"),
 });
 
+const rolesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/roles",
+  component: lazyRouteComponent(() => import("@/routes/roles"), "RolesRoute"),
+});
+
 const runsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/runs",
@@ -78,6 +84,7 @@ export const router = createRouter({
     boardRoute,
     tasksRoute,
     agentsRoute,
+    rolesRoute,
     runsRoute,
     archiveRoute,
     mcpRoute,

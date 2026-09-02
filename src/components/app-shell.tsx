@@ -7,6 +7,7 @@ import {
   KanbanSquare,
   ListChecks,
   MessageSquare,
+  Notebook,
   Plug,
   SlidersHorizontal,
 } from "lucide-react";
@@ -27,6 +28,7 @@ const NAV = [
   { to: "/board", label: "Board", icon: KanbanSquare },
   { to: "/tasks", label: "Tasks", icon: ListChecks },
   { to: "/agents", label: "Agents", icon: Bot },
+  { to: "/roles", label: "Roles", icon: Notebook },
   { to: "/runs", label: "Runs", icon: History },
   { to: "/archive", label: "Archive", icon: Archive },
   { to: "/servers", label: "MCP servers", icon: Plug },

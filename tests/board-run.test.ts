@@ -59,15 +59,16 @@ afterAll(async () => {
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-/** The three agents a board needs, each filling a seeded role and pointed at the fake model. */
-const seedAgents = async () => {
-  const roles = await db.select().from(tables.roles);
-  for (const name of ["decomposer", "executor", "reviewer"] as const) {
-    const role = roles.find((row) => row.name === name);
-    if (!role) throw new Error(`the ${name} role was not seeded`);
-    await db.insert(tables.agents).values({ name, roleId: role.id, baseUrl, model: "fake" });
-  }
+/**
+ * One agent for the whole board, which is the point: it works Doing and judges Review without
+ * knowing it does either. What each station is comes from the lane's role.
+ */
+const seedAgent = async () => {
+  await db.insert(tables.agents).values({ name: "worker", baseUrl, model: "fake" });
 };
+
+/** The one agent, for the tests that reach past the board to break or reconfigure it. */
+const theAgent = async () => (await db.select().from(tables.agents).limit(1))[0];
 
 /** A project with the seeded board, which the GraphQL layer writes rather than the tables. */
 async function seedProject(name: string) {
@@ -114,7 +115,7 @@ beforeEach(async () => {
   await db.delete(tables.lanes);
   await db.delete(tables.projects);
   await db.delete(tables.agents);
-  await seedAgents();
+  await seedAgent();
 });
 
 test("a decomposition puts the cards in the intake lane, in the order it gave them", async () => {
@@ -223,15 +224,8 @@ test("a reviewer that says FAIL sends the card back, and one that rambles does n
 
 test("the verdict is the lane's to read, not the agent's to declare", async () => {
   const { projectId, doing, review, done } = await seedProject("stations");
-  // The same reviewing agent in both lanes. Only Review is set to read what it says as a
-  // ruling, so the identical answer means two different things depending on where it lands.
-  const [reviewer] = await db
-    .select()
-    .from(tables.agents)
-    .where(eq(tables.agents.name, "reviewer"))
-    .limit(1);
-  await db.update(tables.lanes).set({ agentId: reviewer.id }).where(eq(tables.lanes.id, doing.id));
-
+  // One agent staffs both lanes, and only Review is of a kind that rules on cards — so the
+  // identical answer means two different things depending on where it lands.
   const worked = (
     await db
       .insert(tables.cards)
@@ -260,7 +254,7 @@ test("the verdict is the lane's to read, not the agent's to declare", async () =
   expect(done).toBeDefined();
 });
 
-test("an agent with no prompt of its own is told its role's", async () => {
+test("the lane says what to do, and the agent only says who it is", async () => {
   const { projectId, doing } = await seedProject("inherited prompts");
   const sent: string[] = [];
   const listener = (body: { messages: { role: string; content: string }[] }) => {
@@ -276,19 +270,73 @@ test("an agent with no prompt of its own is told its role's", async () => {
   await runner.runCard(card.id);
   expect(sent[0]).toContain("You carry out one card of work");
 
-  // And an agent that writes its own overrides the role rather than appending to it.
-  await db
-    .update(tables.agents)
-    .set({ systemPrompt: "You are terse." })
-    .where(eq(tables.agents.name, "executor"));
+  // An identity is a layer above the job, not a replacement for it: the agent says who it is
+  // and the lane still says what to do, in that order.
+  await db.update(tables.agents).set({ systemPrompt: "You are terse." });
   const [second] = await db
     .insert(tables.cards)
     .values({ projectId, laneId: doing.id, title: "again" })
     .returning();
   replies = ["done"];
   await runner.runCard(second.id);
-  expect(sent[1]).toBe("You are terse.");
+  expect(sent[1]).toContain("You are terse.");
+  expect(sent[1]).toContain("You carry out one card of work");
+  expect(sent[1].indexOf("You are terse.")).toBeLessThan(
+    sent[1].indexOf("You carry out one card of work"),
+  );
   bodies = undefined;
+});
+
+test("one agent, three lanes, three kinds — and it knows about none of them", async () => {
+  const { projectId, doing, review } = await seedProject("one worker");
+  const agent = await theAgent();
+
+  // A fourth station of a kind this server did not seed, staffed by the same agent as the other
+  // two. Nothing about the agent changes; the lane is where the job is.
+  const [notes] = await db
+    .insert(tables.roles)
+    .values({
+      name: "Notes",
+      contract: "work",
+      prompt: "You keep the notes.",
+    })
+    .returning();
+  const [noting] = await db
+    .insert(tables.lanes)
+    .values({
+      projectId,
+      name: "Notes",
+      position: 4,
+      roleId: notes.id,
+      agentId: agent.id,
+      prompt: "Write in French.",
+    })
+    .returning();
+
+  const sent: string[] = [];
+  bodies = (body) => sent.push(body.messages[0].content);
+
+  for (const laneId of [doing.id, review.id, noting.id]) {
+    const [card] = await db
+      .insert(tables.cards)
+      .values({ projectId, laneId, title: "anything" })
+      .returning();
+    replies = ["PASS: fine"];
+    const run = await runner.runCard(card.id);
+    expect(run.status).toBe("ok");
+  }
+  bodies = undefined;
+
+  expect(sent[0]).toContain("You carry out one card of work");
+  expect(sent[1]).toContain("PASS");
+  // The lane's own addendum is appended to what its kind says, never instead of it.
+  expect(sent[2]).toContain("You keep the notes.");
+  expect(sent[2]).toContain("Write in French.");
+  expect(sent[2].indexOf("You keep the notes.")).toBeLessThan(sent[2].indexOf("Write in French."));
+
+  // And only the judging lane read a verdict off any of it.
+  const runs = await db.select().from(tables.runs).orderBy(tables.runs.startedAt);
+  expect(runs.map((run) => run.verdict)).toEqual(["none", "pass", "none"]);
 });
 
 test("a card waiting on an unfinished one does not run", async () => {
@@ -374,11 +422,7 @@ test("a lane retries its own failures in place, up to its budget", async () => {
     .returning();
 
   // The endpoint is gone, so the run fails before the model says anything.
-  const [executor] = await db
-    .select()
-    .from(tables.agents)
-    .where(eq(tables.agents.name, "executor"))
-    .limit(1);
+  const executor = await theAgent();
   await db
     .update(tables.agents)
     .set({ baseUrl: "http://127.0.0.1:1/v1", maxRetries: 0 })
@@ -452,11 +496,7 @@ test("a reviewer that crashes has ruled on nothing, and its crash is not feedbac
     .values({ projectId, laneId: review.id, title: "judge me", result: "wrote it, in src/a.ts" })
     .returning();
 
-  const [reviewer] = await db
-    .select()
-    .from(tables.agents)
-    .where(eq(tables.agents.name, "reviewer"))
-    .limit(1);
+  const reviewer = await theAgent();
   await db
     .update(tables.agents)
     .set({ baseUrl: "http://127.0.0.1:1/v1", maxRetries: 0 })

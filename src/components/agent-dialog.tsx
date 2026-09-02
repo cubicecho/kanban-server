@@ -33,12 +33,10 @@ import {
 import { request } from "@/lib/gql";
 
 type Agent = AgentsQuery["agents"][number];
-type Role = AgentsQuery["roles"][number];
 type McpServer = AgentsQuery["mcpServers"][number];
 
 interface Draft {
   name: string;
-  roleId: string;
   enabled: boolean;
   baseUrl: string;
   model: string;
@@ -53,7 +51,6 @@ interface Draft {
 
 const toDraft = (agent?: Agent): Draft => ({
   name: agent?.name ?? "",
-  roleId: agent?.roleId ?? "",
   enabled: agent?.enabled ?? true,
   baseUrl: agent?.baseUrl ?? "",
   model: agent?.model ?? "",
@@ -67,7 +64,10 @@ const toDraft = (agent?: Agent): Draft => ({
 });
 
 /**
- * An agent: an endpoint, a prompt, and the tools it may reach.
+ * An agent: an endpoint, the tools it may reach, and an optional word about itself.
+ *
+ * It does not know what job it does. A lane says that, and the same agent can work one lane and
+ * judge another — which is why there is no role on this form.
  *
  * Every number here treats zero as "whatever Settings says" — and temperature and retries use
  * -1, zero being a value someone may genuinely want. The placeholders say so rather than the
@@ -76,12 +76,10 @@ const toDraft = (agent?: Agent): Draft => ({
  */
 export function AgentDialog({
   agent,
-  roles,
   servers,
   onClose,
 }: {
   agent?: Agent;
-  roles: readonly Role[];
   servers: readonly McpServer[];
   onClose: () => void;
 }) {
@@ -92,13 +90,11 @@ export function AgentDialog({
     () => agent?.servers.map((link) => link.serverId) ?? [],
   );
   const set = (patch: Partial<Draft>) => setDraft((current) => ({ ...current, ...patch }));
-  const role = roles.find((row) => row.id === draft.roleId);
 
   const save = useMutation({
     mutationFn: async () => {
       const values = { ...draft, name: draft.name.trim() };
       if (!values.name) throw new Error("An agent needs a name.");
-      if (!values.roleId) throw new Error("An agent needs a role — that is what it is told.");
       for (const key of [
         "maxTokens",
         "temperature",
@@ -136,47 +132,23 @@ export function AgentDialog({
         <DialogHeader>
           <DialogTitle>{agent ? "Edit agent" : "New agent"}</DialogTitle>
           <DialogDescription>
-            A model endpoint, a prompt, and a set of tools. Anything left blank falls back to
-            Settings.
+            A model endpoint and a set of tools. What it is asked to do comes from the lane it
+            works; anything left blank here falls back to Settings.
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-col gap-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="agent-name">Name</Label>
-              <Input
-                id="agent-name"
-                value={draft.name}
-                onChange={(event) => set({ name: event.target.value })}
-                placeholder="executor"
-              />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label>Role</Label>
-              <Select value={draft.roleId} onValueChange={(roleId) => set({ roleId })}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Pick a role" />
-                </SelectTrigger>
-                <SelectContent>
-                  {roles.map((row) => (
-                    <SelectItem key={row.id} value={row.id}>
-                      {row.name}
-                      {row.description ? ` — ${row.description}` : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                {role?.stage === "card"
-                  ? "Works cards. A lane can point at this agent."
-                  : role?.stage === "refine"
-                    ? "Talks tasks into shape. Named on a project, not on a lane."
-                    : role?.stage === "decompose"
-                      ? "Turns tasks into cards. Named on a project, not on a lane."
-                      : "The job this agent is for, and the prompt it takes."}
-              </p>
-            </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="agent-name">Name</Label>
+            <Input
+              id="agent-name"
+              value={draft.name}
+              onChange={(event) => set({ name: event.target.value })}
+              placeholder="local llama"
+            />
+            <p className="text-xs text-muted-foreground">
+              Name it after the model or the machine — never after a job, which is the lane's.
+            </p>
           </div>
 
           <div className="flex items-center justify-between gap-4 rounded-md border p-3">
@@ -230,41 +202,25 @@ export function AgentDialog({
           </div>
 
           <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between gap-4">
-              <Label htmlFor="agent-prompt">System prompt</Label>
-              {role?.systemPrompt && !draft.systemPrompt ? (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-auto py-1 text-xs"
-                  onClick={() => set({ systemPrompt: role.systemPrompt })}
-                >
-                  Start from {role.name}
-                </Button>
-              ) : null}
-            </div>
+            <Label htmlFor="agent-prompt">Identity</Label>
             <Textarea
               id="agent-prompt"
-              rows={6}
+              rows={4}
               value={draft.systemPrompt}
               onChange={(event) => set({ systemPrompt: event.target.value })}
-              placeholder={
-                role?.systemPrompt
-                  ? `empty — use the ${role.name} role's prompt:\n\n${role.systemPrompt}`
-                  : "How this agent should work. Empty takes its role's prompt."
-              }
+              placeholder="usually empty — the lane says what to do"
             />
             <p className="text-xs text-muted-foreground">
-              Leave this empty and the agent is told whatever its role says, so editing the role
-              changes every agent doing that job. Write here to override it for this one.
+              Said before the lane's own prompt, on every lane this agent works. It is for what a
+              lane cannot know — "you are a small local model; be terse" — not for the job.
             </p>
           </div>
 
           <div className="flex flex-col gap-2">
             <Label>MCP servers</Label>
             <p className="text-xs text-muted-foreground">
-              What this agent can actually do. With none it can only think and write — which is
-              right for a refiner, and useless for an executor.
+              What this agent can actually do. With none it can only think and write — enough to
+              judge a card, and useless for working one.
             </p>
             <div className="flex flex-col gap-2 rounded-md border p-3">
               {servers.length === 0 ? (

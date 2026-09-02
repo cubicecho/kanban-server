@@ -20,10 +20,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import {
   AgentsDocument,
   type BoardQuery,
   CreateLaneDocument,
+  RolesDocument,
   UpdateLaneDocument,
 } from "@/gql/graphql";
 import { request } from "@/lib/gql";
@@ -33,11 +35,22 @@ type Lane = BoardQuery["lanes"][number];
 // Radix refuses an empty item value, so "nothing" carries a sentinel.
 const NONE = "__none__";
 
+/** What a lane of each kind does to a card, said in the dialog rather than found out from a run. */
+const CONTRACT_SAYS: Record<string, string> = {
+  work: "The agent works the card and reports back. What it says becomes the card's result, and the card leaves by the success arm.",
+  verdict:
+    "The agent judges the card: PASS or FAIL on its first line, and that word picks the arm. Anything else counts as a pass, and the card's result is left alone.",
+  expand:
+    "The agent breaks the card into cards, which are written into the success arm. The card itself is archived.",
+};
+
 /**
  * A lane, and what it does to the cards in it.
  *
- * This is where the pipeline is drawn: the agent that works cards here, and the lanes they go
- * to when it succeeds or fails. Everything the worker does follows from these three fields.
+ * This is where the pipeline is drawn, and the fields are ordered as the sentence a lane makes:
+ * what it is called, what kind of lane it is, anything to add on this board, who works it, and
+ * where cards go afterwards. The kind is a role — shared with every other lane of that kind —
+ * and the agent is only a model, which is why the picker below does not filter.
  */
 export function LaneDialog({
   lane,
@@ -52,28 +65,32 @@ export function LaneDialog({
 }) {
   const queryClient = useQueryClient();
   const [name, setName] = useState(lane?.name ?? "");
+  const [roleId, setRoleId] = useState(lane?.roleId ?? "");
+  const [prompt, setPrompt] = useState(lane?.prompt ?? "");
   const [agentId, setAgentId] = useState(lane?.agentId ?? "");
   const [onSuccessLaneId, setOnSuccess] = useState(lane?.onSuccessLaneId ?? "");
   const [onFailureLaneId, setOnFailure] = useState(lane?.onFailureLaneId ?? "");
   const [wipLimit, setWipLimit] = useState(lane?.wipLimit ?? 1);
   const [maxAttempts, setMaxAttempts] = useState(lane?.maxAttempts ?? 0);
   const [intake, setIntake] = useState(lane?.intake ?? false);
-  const [readVerdict, setReadVerdict] = useState(lane?.readVerdict ?? false);
 
   const agents = useQuery({ queryKey: ["agents"], queryFn: () => request(AgentsDocument) });
+  const roles = useQuery({ queryKey: ["roles"], queryFn: () => request(RolesDocument) });
   const others = lanes.filter((row) => row.id !== lane?.id);
+  const kind = (roles.data?.roles ?? []).find((row) => row.id === roleId);
 
   const save = useMutation({
     mutationFn: async () => {
       const values = {
         name: name.trim(),
+        roleId: roleId || null,
+        prompt,
         agentId: agentId || null,
         onSuccessLaneId: onSuccessLaneId || null,
         onFailureLaneId: onFailureLaneId || null,
         wipLimit,
         maxAttempts,
         intake,
-        readVerdict,
       };
       if (!values.name) throw new Error("A lane needs a name.");
       if (lane) await request(UpdateLaneDocument, { id: lane.id, set: values });
@@ -89,6 +106,14 @@ export function LaneDialog({
     },
     onError: (error: Error) => toast.error(error.message),
   });
+
+  // Picking a kind for a lane nobody has named yet names it: a board is assembled out of known
+  // parts, and "New lane ▸ Review" is the whole gesture.
+  const pickKind = (next: string) => {
+    const id = next === NONE ? "" : next;
+    setRoleId(id);
+    if (!name.trim()) setName((roles.data?.roles ?? []).find((row) => row.id === id)?.name ?? "");
+  };
 
   const laneSelect = (value: string, onChange: (next: string) => void, empty: string) => (
     <Select value={value || NONE} onValueChange={(next) => onChange(next === NONE ? "" : next)}>
@@ -112,14 +137,61 @@ export function LaneDialog({
         <DialogHeader>
           <DialogTitle>{lane ? "Edit lane" : "New lane"}</DialogTitle>
           <DialogDescription>
-            A lane with an agent is a stage of a pipeline. One without is somewhere cards rest.
+            A lane with a kind and an agent is a station. One without either is somewhere cards
+            rest.
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-col gap-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="lane-name">Name</Label>
+              <Input
+                id="lane-name"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label>Kind</Label>
+              <Select value={roleId || NONE} onValueChange={pickKind}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NONE}>Cards just rest here</SelectItem>
+                  {(roles.data?.roles ?? []).map((row) => (
+                    <SelectItem key={row.id} value={row.id}>
+                      {row.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {kind ? (
+            <div className="flex flex-col gap-2 rounded-md border p-3">
+              <p className="text-xs text-muted-foreground">{CONTRACT_SAYS[kind.contract]}</p>
+              <pre className="max-h-40 overflow-y-auto whitespace-pre-wrap text-xs text-muted-foreground">
+                {kind.prompt || "This kind of lane says nothing yet."}
+              </pre>
+              <p className="text-xs text-muted-foreground">
+                Shared with every {kind.name} lane on this server — editing it on the Roles page
+                changes all of them.
+              </p>
+            </div>
+          ) : null}
+
           <div className="flex flex-col gap-2">
-            <Label htmlFor="lane-name">Name</Label>
-            <Input id="lane-name" value={name} onChange={(event) => setName(event.target.value)} />
+            <Label htmlFor="lane-prompt">Also on this board</Label>
+            <Textarea
+              id="lane-prompt"
+              rows={4}
+              value={prompt}
+              onChange={(event) => setPrompt(event.target.value)}
+              placeholder="Added after the kind's prompt, for this lane only. It never replaces it."
+            />
           </div>
 
           <div className="flex flex-col gap-2">
@@ -133,16 +205,16 @@ export function LaneDialog({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={NONE}>Nothing runs here</SelectItem>
-                {/* Refining and decomposing are the project's stations, not the board's. */}
-                {(agents.data?.agents ?? [])
-                  .filter((agent) => agent.role.stage === "card")
-                  .map((agent) => (
-                    <SelectItem key={agent.id} value={agent.id}>
-                      {agent.name} · {agent.role.name}
-                    </SelectItem>
-                  ))}
+                {(agents.data?.agents ?? []).map((agent) => (
+                  <SelectItem key={agent.id} value={agent.id}>
+                    {agent.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
+            <p className="text-xs text-muted-foreground">
+              Which model does the work. The same agent can work one lane and judge another.
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -194,17 +266,6 @@ export function LaneDialog({
               </p>
             </div>
             <Switch id="lane-intake" checked={intake} onCheckedChange={setIntake} />
-          </div>
-
-          <div className="flex items-center justify-between gap-4 rounded-md border p-3">
-            <div>
-              <Label htmlFor="lane-verdict">Judge, do not work</Label>
-              <p className="mt-1 text-xs text-muted-foreground">
-                The agent here answers PASS or FAIL on its first line, and that word picks the arm.
-                Anything else counts as a pass.
-              </p>
-            </div>
-            <Switch id="lane-verdict" checked={readVerdict} onCheckedChange={setReadVerdict} />
           </div>
         </div>
 

@@ -34,21 +34,23 @@ key from the environment instead of the UI.
   every agent working it, ahead of whatever that agent was asked to do, so no card's prompt has
   to repeat what the project is. `autoRun` is the switch that lets agents pick cards up on their
   own.
-- **lane** — a column, and where it names an `agentId`, a station. `onSuccessLaneId` and
-  `onFailureLaneId` are where a card goes when that agent is finished with it, and `wipLimit`
-  caps how many run there at once. `readVerdict` says this station judges cards rather than
-  working them — its agent's answer is read as `PASS` or `FAIL`, and that word picks the arm.
-  `maxAttempts` is how many failures it will put back in play before it stops and waits for a
-  person. A lane with no agent is a resting place, which is what a backlog and a done pile are.
-- **role** — a job of work: a name, a `stage`, and the prompt that goes with it. `stage` is
-  `refine`, `decompose` or `card`; the first two are fixed stations whose answers this server
-  parses, and `card` is every role a lane can point at — an executor, a reviewer, a tester, a
-  technical writer, as many as somebody has written. A role is a row, so a new kind of station
-  is something you write rather than something we ship.
-- **agent** — a role given a model to run on: an endpoint, optionally a prompt of its own, and a
-  set of MCP servers. Each agent carries its own base URL, key and model, so one can be a local
-  llama.cpp and the next a frontier API; anything left empty inherits from Settings, and an
-  empty `systemPrompt` inherits from the role.
+- **lane** — a column, and where it names a `roleId` and an `agentId`, a station: the role says
+  what kind of lane it is, the agent says which model works it. `prompt` is anything this board
+  adds to what the kind says, appended and never replacing it. `onSuccessLaneId` and
+  `onFailureLaneId` are where a card goes when the agent is finished with it, and `wipLimit`
+  caps how many run there at once. `maxAttempts` is how many failures it will put back in play
+  before it stops and waits for a person. A lane with no role or no agent is a resting place,
+  which is what a backlog and a done pile are.
+- **role** — a kind of lane: a name, a `contract`, and the prompt every lane of that kind is
+  told. `contract` is the shape of the answer — `work` reports on the card, `verdict` rules
+  `PASS`/`FAIL` on it, `expand` breaks it into more cards — and it is the only part of a role
+  the server itself reads. A role is a row, so a new kind of station — a tester, a technical
+  writer — is something you write rather than something we ship.
+- **agent** — a model to run work on: an endpoint, a set of MCP servers, and optionally a word
+  about itself. It does not know what job it does; it finds that out at the lane, and the same
+  agent can work one lane and judge another. Each agent carries its own base URL, key and model,
+  so one can be a local llama.cpp and the next a frontier API; anything left empty inherits from
+  Settings.
 - **task** — what a person asked for, in their own words. A title, a `brief`, and a `status`
   that walks `draft` → `ready` → `decomposing` → `decomposed`.
 - **message** — one turn of the conversation refining a task. The thread is the task's history.
@@ -108,15 +110,18 @@ A new project comes with four lanes already wired:
 
 ```
 Backlog  ──▶  Doing  ──▶  Review  ──▶  Done
-   (intake)   executor     reviewer
+   (intake)   work        verdict
                  ▲            │
                  └── on FAIL ─┘
 ```
 
-There is no workflow engine here. `agentId`, `onSuccessLaneId` and `onFailureLaneId` on the lane
-rows are the whole of it, which means the pipeline is whatever board someone drew — add a lane
-called "Needs a human" with no agent on it and cards sent there stop, because that is what a
-lane with no agent is.
+Doing and Review are both staffed by whatever agent this server has; what makes them different
+is the kind of lane each one is.
+
+There is no workflow engine here. `roleId`, `agentId`, `onSuccessLaneId` and `onFailureLaneId` on
+the lane rows are the whole of it, which means the pipeline is whatever board someone drew — add
+a lane called "Needs a human" with no agent on it and cards sent there stop, because that is what
+a lane with no agent is.
 
 Two rules are worth knowing because they are what keeps a board from running away:
 
@@ -167,10 +172,10 @@ What a card's prompt never contains is `error`. A crash is not feedback: an endp
 the connection has said nothing about the work, and an agent handed a stack trace under that
 heading is being told the last attempt was wrong when nobody said so.
 
-Reading an answer as a verdict is the **lane's** setting (`readVerdict`), not the agent's. A new
-board has it on Review and nowhere else, and the lane dialog is where it moves — which is what
-lets the same agent judge cards at one station and work them at another, and lets a board have
-two reviewing stations, or none.
+Reading an answer as a verdict is the **lane's** business, not the agent's: a lane judges
+because it is a Review lane, which is what its role says. A new board has one such lane and the
+lane dialog is where that moves — which is what lets the same agent judge cards at one station
+and work them at another, and lets a board have two reviewing stations, or none.
 
 A card whose dependencies have not finished is skipped by the worker rather than run out of
 order, and asking for it by hand is refused with the count. Nothing is written to the card about
@@ -286,26 +291,30 @@ prints on the way up says how much it found.
 
 ## Agents and their tools
 
-There are two lists on the **Agents** page, because they answer different questions. A **role**
-is the job — the prompt, and nothing about a model. An **agent** is a role pointed at an
-endpoint. Four of each are seeded on first boot (`refiner`, `decomposer`, `executor`,
-`reviewer`), with every model setting left inheriting, so configuring one endpoint in Settings
-makes all four work.
+There are two pages, because they answer different questions. **Roles** are the kinds of lane a
+board can be assembled out of — a prompt and the shape of the answer, and nothing about a model.
+**Agents** are the models available to run work on, and nothing about a job. They meet only at a
+lane. Three roles (`Doing`, `Review`, `Intake`) and one agent are seeded on first boot, with every
+model setting left inheriting, so configuring one endpoint in Settings makes a board work.
 
-The split is what makes a board's staff yours to define. Write a `tester` role and an agent to
-fill it, add a lane, point the lane at the agent: that is a new station, with no release
-involved. Editing what every executor is told is one edit to the role rather than one per agent
-doing the job, and an agent may still write its own `systemPrompt` to override the role for
-itself. A role an agent is filling cannot be deleted until nothing points at it.
+The split is what makes a board's staff yours to define. Write a `Testing` role, add a lane of
+that kind and point it at any agent you have: that is a new station, with no release involved.
+Editing what every Review lane is told is one edit to the role rather than one per board, and a
+lane may add its own paragraph on top without touching the kind. A role a lane is still of cannot
+be deleted until nothing is of it.
+
+The prompt a run starts with is three layers: the agent's `systemPrompt` (who it is — expected
+empty), the role's `prompt` (what happens here), and the lane's `prompt` (and on this board). The
+lane speaks last, and a station whose three layers come out empty is refused rather than run.
 
 Inheritance is by sentinel, and it is worth knowing which: `0` means "inherit" for every numeric
 knob except `temperature` and `maxRetries`, which use `-1` because `0` is a value someone may
-genuinely want. Empty strings inherit the same way, `toolDiscovery` uses the word `inherit`, and
-`systemPrompt` inherits from the role rather than from Settings — a prompt is what a role is.
+genuinely want. Empty strings inherit the same way and `toolDiscovery` uses the word `inherit`.
+`systemPrompt` inherits from nothing — it is the agent's own, and blank is the usual answer.
 
 Which MCP servers an agent may reach is per agent (`setAgentServers`), because the answer differs
-by role: an executor wants everything it can get, and a refiner is having a conversation and
-should have nothing. The connection pool is shared — a stdio server is a child process, and one
+by model as much as by job: an agent working cards wants everything it can get, and one that only
+ever judges them needs nothing. The connection pool is shared — a stdio server is a child process, and one
 per agent would be one per agent per restart — so this decides what an agent is *shown*, not what
 is running.
 

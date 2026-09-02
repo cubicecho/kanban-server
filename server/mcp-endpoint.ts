@@ -76,13 +76,13 @@ const HINTS: Record<string, string> = {
     "`context` is the standing description every agent working this project is shown, so it is " +
     "the place to put what the project is and how it should be worked.",
   lanes:
-    "The columns of a board, in `position` order — and its pipeline. A lane with an `agentId` " +
-    "is a station: cards there get worked by that agent, and go to `onSuccessLaneId` or " +
-    "`onFailureLaneId` afterwards. A lane with no agent is a resting place, which is what a " +
-    "backlog and a done pile are. `wipLimit` caps how many cards it works at once, and a lane " +
-    "with `readVerdict` judges cards rather than working them: its agent answers PASS or FAIL " +
-    "and that word picks the arm, and the rest of what it said is kept as the reason for the " +
-    "move. Filter by `projectId`.",
+    "The columns of a board, in `position` order — and its pipeline. A lane with a `roleId` and " +
+    "an `agentId` is a station: `roleId` says what kind of lane it is and `agentId` which model " +
+    "works it, and cards there go to `onSuccessLaneId` or `onFailureLaneId` afterwards. A lane " +
+    "with neither is a resting place, which is what a backlog and a done pile are. `prompt` is " +
+    "anything this board adds to what its kind says, appended and never replacing it. " +
+    "`wipLimit` caps how many cards it works at once, and `maxAttempts` is how many times it " +
+    "puts a card it failed back in play before waiting for a person. Filter by `projectId`.",
   cards:
     "The units of work. `status` is `idle`, `running`, `done`, `rejected` or `error` — " +
     "`rejected` is a reviewer having turned the card down, `error` is something having broken, " +
@@ -118,12 +118,15 @@ const HINTS: Record<string, string> = {
     "a judging one that never finished, because a reviewer whose connection dropped ruled on " +
     "nothing. Order by `startedAt` descending for the latest.",
   agents:
-    "Who does the work: which model on which endpoint, filling which role. Read-only here — an " +
-    "agent's endpoint and key are the operator's to set.",
+    "Which models are available to work with: one endpoint each, and nothing about what they " +
+    "do — an agent finds that out from the lane it works, and the same one can work a lane and " +
+    "judge another. Read-only here: an agent's endpoint and key are the operator's to set.",
   roles:
-    "The jobs an agent can be asked to fill: a name and the prompt that goes with it. `stage` " +
-    "is `refine`, `decompose` or `card`; only a `card` role is one a lane can point at, and " +
-    "there may be as many of those as somebody has written. Read-only here.",
+    "The kinds of lane a board can be assembled out of: a name and the prompt every lane of " +
+    "that kind is told. `contract` is the shape of the answer — `work` reports on the card, " +
+    "`verdict` rules PASS or FAIL on it, `expand` breaks it into more cards — and it is the " +
+    "only part of a role anything here reads. There may be as many as somebody has written. " +
+    "Read-only here.",
   spend:
     "What a board has cost in tokens, added up from its runs. With a `taskId` it is one task " +
     "instead — its refinement, its decomposition and every run of every card it became. `from` " +
@@ -131,13 +134,13 @@ const HINTS: Record<string, string> = {
     "retention setting are gone and cannot be in the total.",
   board_templates:
     "Boards that have been kept under a name, to start the next project with. `lanes` is the " +
-    "shape itself — the columns, their agents, their WIP limits and the arrows between them, " +
-    "written as indexes into the same list so it can be drawn onto any project.",
+    "shape itself — the columns, their kinds, their agents, their WIP limits and the arrows " +
+    "between them, written as indexes into the same list so it can be drawn onto any project.",
   create_project:
-    "Adds a board. It comes with four lanes — Backlog, Doing, Review, Done — already wired to " +
-    "this server's executor and reviewer agents, so it is ready for work as soon as it exists. " +
-    "Review is set to read its agent's answer as a PASS/FAIL verdict. Set `autoRun: true` for " +
-    "cards to be picked up without being asked.",
+    "Adds a board. It comes with four lanes — Backlog, Doing, Review, Done — Doing and Review " +
+    "already carrying those kinds of lane and staffed by an agent this server has, so it is " +
+    "ready for work as soon as it exists. Review judges what Doing produced. Set " +
+    "`autoRun: true` for cards to be picked up without being asked.",
   update_project_single:
     "Edits one board. `set: { autoRun: false }` leaves everything in place but stops agents " +
     "picking up cards, which is the gentle way to pause a project.",

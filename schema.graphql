@@ -2,8 +2,8 @@ type Role {
   id: String!
   name: String!
   description: String!
-  stage: RolesStageEnum!
-  systemPrompt: String!
+  contract: RolesContractEnum!
+  prompt: String!
   createdAt: DateTime!
   updatedAt: DateTime!
 
@@ -11,9 +11,9 @@ type Role {
   Opaque cursor of this row's position in the query's ordering. Pass it as `after` to resume from here. Only set on rows returned by a list query.
   """
   cursor: String
-  agents(
-    where: AgentFilters
-    orderBy: AgentOrderBy
+  lanes(
+    where: LaneFilters
+    orderBy: LaneOrderBy
     offset: Int
     limit: Int
 
@@ -21,20 +21,20 @@ type Role {
     Keyset pagination: only return related rows strictly after this cursor (a row's `cursor` field from a previous page of this relation, under the same orderBy).
     """
     after: String
-    distinct: [AgentDistinctColumn!]
-  ): [Agent!]!
-  agentsAggregate(where: AgentFilters): AgentAggregate!
+    distinct: [LaneDistinctColumn!]
+  ): [Lane!]!
+  lanesAggregate(where: LaneFilters): LaneAggregate!
 }
 
-enum RolesStageEnum {
-  """Value: card"""
-  card
+enum RolesContractEnum {
+  """Value: work"""
+  work
 
-  """Value: refine"""
-  refine
+  """Value: verdict"""
+  verdict
 
-  """Value: decompose"""
-  decompose
+  """Value: expand"""
+  expand
 }
 
 """
@@ -42,23 +42,21 @@ A date-time string at UTC, such as 2007-12-03T10:15:30Z, compliant with the `dat
 """
 scalar DateTime
 
-"""Columns of Agent that a query can be made distinct on"""
-enum AgentDistinctColumn {
+"""Columns of Lane that a query can be made distinct on"""
+enum LaneDistinctColumn {
   id
+  projectId
   name
+  position
+  intake
   roleId
-  enabled
-  baseUrl
-  model
-  systemPrompt
-  maxTokens
-  temperature
-  maxToolIterations
-  toolDiscovery
-  requestTimeoutSeconds
-  maxRetries
+  prompt
+  agentId
+  onSuccessLaneId
+  onFailureLaneId
+  wipLimit
+  maxAttempts
   createdAt
-  updatedAt
 }
 
 type RoleAggregate {
@@ -73,8 +71,8 @@ type RoleMinAggregate {
   id: String
   name: String
   description: String
-  stage: RolesStageEnum
-  systemPrompt: String
+  contract: RolesContractEnum
+  prompt: String
   createdAt: DateTime
   updatedAt: DateTime
 }
@@ -83,8 +81,8 @@ type RoleMaxAggregate {
   id: String
   name: String
   description: String
-  stage: RolesStageEnum
-  systemPrompt: String
+  contract: RolesContractEnum
+  prompt: String
   createdAt: DateTime
   updatedAt: DateTime
 }
@@ -93,8 +91,8 @@ type RoleCountNonNullAggregate {
   id: Int!
   name: Int!
   description: Int!
-  stage: Int!
-  systemPrompt: Int!
+  contract: Int!
+  prompt: Int!
   createdAt: Int!
   updatedAt: Int!
 }
@@ -103,8 +101,8 @@ type RoleCountDistinctAggregate {
   id: Int!
   name: Int!
   description: Int!
-  stage: Int!
-  systemPrompt: Int!
+  contract: Int!
+  prompt: Int!
   createdAt: Int!
   updatedAt: Int!
 }
@@ -125,8 +123,8 @@ type RoleGroupKeys {
   id: String
   name: String
   description: String
-  stage: RolesStageEnum
-  systemPrompt: String
+  contract: RolesContractEnum
+  prompt: String
   createdAt: DateTime
   updatedAt: DateTime
 }
@@ -134,7 +132,6 @@ type RoleGroupKeys {
 type Agent {
   id: String!
   name: String!
-  roleId: String!
   enabled: Boolean!
   baseUrl: String!
   model: String!
@@ -152,7 +149,6 @@ type Agent {
   Opaque cursor of this row's position in the query's ordering. Pass it as `after` to resume from here. Only set on rows returned by a list query.
   """
   cursor: String
-  role(where: RoleFilters): Role!
   servers(
     where: AgentServerFilters
     orderBy: AgentServerOrderBy
@@ -212,22 +208,6 @@ enum AgentServerDistinctColumn {
   serverId
 }
 
-"""Columns of Lane that a query can be made distinct on"""
-enum LaneDistinctColumn {
-  id
-  projectId
-  name
-  position
-  intake
-  agentId
-  onSuccessLaneId
-  onFailureLaneId
-  wipLimit
-  readVerdict
-  maxAttempts
-  createdAt
-}
-
 """Columns of Run that a query can be made distinct on"""
 enum RunDistinctColumn {
   id
@@ -278,7 +258,6 @@ type AgentSumAggregate {
 type AgentMinAggregate {
   id: String
   name: String
-  roleId: String
   baseUrl: String
   model: String
   systemPrompt: String
@@ -295,7 +274,6 @@ type AgentMinAggregate {
 type AgentMaxAggregate {
   id: String
   name: String
-  roleId: String
   baseUrl: String
   model: String
   systemPrompt: String
@@ -312,7 +290,6 @@ type AgentMaxAggregate {
 type AgentCountNonNullAggregate {
   id: Int!
   name: Int!
-  roleId: Int!
   enabled: Int!
   baseUrl: Int!
   model: Int!
@@ -330,7 +307,6 @@ type AgentCountNonNullAggregate {
 type AgentCountDistinctAggregate {
   id: Int!
   name: Int!
-  roleId: Int!
   baseUrl: Int!
   model: Int!
   systemPrompt: Int!
@@ -361,7 +337,6 @@ The grouped column values of one Agent group. A column the query did not group b
 type AgentGroupKeys {
   id: String
   name: String
-  roleId: String
   baseUrl: String
   model: String
   systemPrompt: String
@@ -738,11 +713,12 @@ type Lane {
   name: String!
   position: Int!
   intake: Boolean!
+  roleId: String
+  prompt: String!
   agentId: String
   onSuccessLaneId: String
   onFailureLaneId: String
   wipLimit: Int!
-  readVerdict: Boolean!
   maxAttempts: Int!
   createdAt: DateTime!
 
@@ -751,6 +727,7 @@ type Lane {
   """
   cursor: String
   project(where: ProjectFilters): Project!
+  role(where: RoleFilters): Role
   agent(where: AgentFilters): Agent
   cards(
     where: CardFilters
@@ -794,6 +771,8 @@ type LaneMinAggregate {
   projectId: String
   name: String
   position: Int
+  roleId: String
+  prompt: String
   agentId: String
   onSuccessLaneId: String
   onFailureLaneId: String
@@ -807,6 +786,8 @@ type LaneMaxAggregate {
   projectId: String
   name: String
   position: Int
+  roleId: String
+  prompt: String
   agentId: String
   onSuccessLaneId: String
   onFailureLaneId: String
@@ -821,11 +802,12 @@ type LaneCountNonNullAggregate {
   name: Int!
   position: Int!
   intake: Int!
+  roleId: Int!
+  prompt: Int!
   agentId: Int!
   onSuccessLaneId: Int!
   onFailureLaneId: Int!
   wipLimit: Int!
-  readVerdict: Int!
   maxAttempts: Int!
   createdAt: Int!
 }
@@ -835,6 +817,8 @@ type LaneCountDistinctAggregate {
   projectId: Int!
   name: Int!
   position: Int!
+  roleId: Int!
+  prompt: Int!
   agentId: Int!
   onSuccessLaneId: Int!
   onFailureLaneId: Int!
@@ -862,6 +846,8 @@ type LaneGroupKeys {
   projectId: String
   name: String
   position: Int
+  roleId: String
+  prompt: String
   agentId: String
   onSuccessLaneId: String
   onFailureLaneId: String
@@ -869,7 +855,6 @@ type LaneGroupKeys {
   maxAttempts: Int
   createdAt: DateTime
   intake: Boolean
-  readVerdict: Boolean
 }
 
 type Task {
@@ -1785,6 +1770,9 @@ type Setting {
   maxRetries: Int!
   runRetentionDays: Int!
   workerIntervalSeconds: Int!
+  refineAgentId: String
+  decomposeAgentId: String
+  refinePrompt: String!
 
   """
   Opaque cursor of this row's position in the query's ordering. Pass it as `after` to resume from here. Only set on rows returned by a list query.
@@ -1843,6 +1831,9 @@ type SettingMinAggregate {
   maxRetries: Int
   runRetentionDays: Int
   workerIntervalSeconds: Int
+  refineAgentId: String
+  decomposeAgentId: String
+  refinePrompt: String
 }
 
 type SettingMaxAggregate {
@@ -1858,6 +1849,9 @@ type SettingMaxAggregate {
   maxRetries: Int
   runRetentionDays: Int
   workerIntervalSeconds: Int
+  refineAgentId: String
+  decomposeAgentId: String
+  refinePrompt: String
 }
 
 type SettingCountNonNullAggregate {
@@ -1873,6 +1867,9 @@ type SettingCountNonNullAggregate {
   maxRetries: Int!
   runRetentionDays: Int!
   workerIntervalSeconds: Int!
+  refineAgentId: Int!
+  decomposeAgentId: Int!
+  refinePrompt: Int!
 }
 
 type SettingCountDistinctAggregate {
@@ -1888,6 +1885,9 @@ type SettingCountDistinctAggregate {
   maxRetries: Int!
   runRetentionDays: Int!
   workerIntervalSeconds: Int!
+  refineAgentId: Int!
+  decomposeAgentId: Int!
+  refinePrompt: Int!
 }
 
 type SettingGroupBy {
@@ -1917,14 +1917,17 @@ type SettingGroupKeys {
   maxRetries: Int
   runRetentionDays: Int
   workerIntervalSeconds: Int
+  refineAgentId: String
+  decomposeAgentId: String
+  refinePrompt: String
 }
 
 input CreateRoleInput {
   id: String
   name: String!
   description: String
-  stage: RolesStageEnum
-  systemPrompt: String
+  contract: RolesContractEnum
+  prompt: String
   createdAt: DateTime
   updatedAt: DateTime
 }
@@ -1933,8 +1936,8 @@ input UpdateRoleInput {
   id: String
   name: String
   description: String
-  stage: RolesStageEnum
-  systemPrompt: String
+  contract: RolesContractEnum
+  prompt: String
   createdAt: DateTime
   updatedAt: DateTime
 }
@@ -1952,11 +1955,11 @@ input RoleFilters {
   id: StringFilter
   name: StringFilter
   description: StringFilter
-  stage: RolesStageEnumFilter
-  systemPrompt: StringFilter
+  contract: RolesContractEnumFilter
+  prompt: StringFilter
   createdAt: DateTimeFilter
   updatedAt: DateTimeFilter
-  agents: AgentListRelationFilter
+  lanes: LaneListRelationFilter
 
   """At least one branch matches; ANDed with any sibling fields"""
   OR: [RoleFilters!]
@@ -2042,24 +2045,24 @@ input StringFilter {
   NOT: StringFilter
 }
 
-input RolesStageEnumFilter {
+input RolesContractEnumFilter {
   """Equal to"""
-  eq: RolesStageEnum
+  eq: RolesContractEnum
 
   """Not equal to"""
-  ne: RolesStageEnum
+  ne: RolesContractEnum
 
   """Less than"""
-  lt: RolesStageEnum
+  lt: RolesContractEnum
 
   """Less than or equal to"""
-  lte: RolesStageEnum
+  lte: RolesContractEnum
 
   """Greater than"""
-  gt: RolesStageEnum
+  gt: RolesContractEnum
 
   """Greater than or equal to"""
-  gte: RolesStageEnum
+  gte: RolesContractEnum
   like: String
   notLike: String
   ilike: String
@@ -2095,10 +2098,10 @@ input RolesStageEnumFilter {
   insensitive: Boolean
 
   """Matches any one of these values (SQL `IN`)"""
-  inArray: [RolesStageEnum!]
+  inArray: [RolesContractEnum!]
 
   """Matches none of these values (SQL `NOT IN`)"""
-  notInArray: [RolesStageEnum!]
+  notInArray: [RolesContractEnum!]
 
   """When true, matches rows where the column is NULL"""
   isNull: Boolean
@@ -2107,13 +2110,13 @@ input RolesStageEnumFilter {
   isNotNull: Boolean
 
   """At least one branch matches; ANDed with any sibling operators"""
-  OR: [RolesStageEnumFilter!]
+  OR: [RolesContractEnumFilter!]
 
   """Every branch matches"""
-  AND: [RolesStageEnumFilter!]
+  AND: [RolesContractEnumFilter!]
 
   """Negates the nested operators"""
-  NOT: RolesStageEnumFilter
+  NOT: RolesContractEnumFilter
 }
 
 input DateTimeFilter {
@@ -2190,23 +2193,23 @@ input DateTimeFilter {
   NOT: DateTimeFilter
 }
 
-input AgentListRelationFilter {
+input LaneListRelationFilter {
   """At least one related row matches"""
-  some: AgentFilters
+  some: LaneFilters
 
   """No related row matches"""
-  none: AgentFilters
+  none: LaneFilters
 
   """Every related row matches"""
-  every: AgentFilters
+  every: LaneFilters
 }
 
 input RoleOrderBy {
   id: InnerOrder
   name: InnerOrder
   description: InnerOrder
-  stage: InnerOrder
-  systemPrompt: InnerOrder
+  contract: InnerOrder
+  prompt: InnerOrder
   createdAt: InnerOrder
   updatedAt: InnerOrder
 }
@@ -2270,8 +2273,8 @@ input RoleCountNonNullHaving {
   id: AggregateNumberFilter
   name: AggregateNumberFilter
   description: AggregateNumberFilter
-  stage: AggregateNumberFilter
-  systemPrompt: AggregateNumberFilter
+  contract: AggregateNumberFilter
+  prompt: AggregateNumberFilter
   createdAt: AggregateNumberFilter
   updatedAt: AggregateNumberFilter
 }
@@ -2280,8 +2283,8 @@ input RoleCountDistinctHaving {
   id: AggregateNumberFilter
   name: AggregateNumberFilter
   description: AggregateNumberFilter
-  stage: AggregateNumberFilter
-  systemPrompt: AggregateNumberFilter
+  contract: AggregateNumberFilter
+  prompt: AggregateNumberFilter
   createdAt: AggregateNumberFilter
   updatedAt: AggregateNumberFilter
 }
@@ -2289,7 +2292,6 @@ input RoleCountDistinctHaving {
 input CreateAgentInput {
   id: String
   name: String!
-  roleId: String!
   enabled: Boolean
   baseUrl: String
   model: String
@@ -2307,7 +2309,6 @@ input CreateAgentInput {
 input UpdateAgentInput {
   id: String
   name: String
-  roleId: String
   enabled: Boolean
   baseUrl: String
   model: String
@@ -2334,7 +2335,6 @@ input UpdateAgentManyInput {
 input AgentFilters {
   id: StringFilter
   name: StringFilter
-  roleId: StringFilter
   enabled: BooleanFilter
   baseUrl: StringFilter
   model: StringFilter
@@ -2347,9 +2347,6 @@ input AgentFilters {
   maxRetries: IntFilter
   createdAt: DateTimeFilter
   updatedAt: DateTimeFilter
-
-  """Matches rows whose role matches these filters"""
-  role: RoleFilters
   servers: AgentServerListRelationFilter
   lanes: LaneListRelationFilter
   runs: RunListRelationFilter
@@ -2605,17 +2602,6 @@ input AgentServerListRelationFilter {
   every: AgentServerFilters
 }
 
-input LaneListRelationFilter {
-  """At least one related row matches"""
-  some: LaneFilters
-
-  """No related row matches"""
-  none: LaneFilters
-
-  """Every related row matches"""
-  every: LaneFilters
-}
-
 input RunListRelationFilter {
   """At least one related row matches"""
   some: RunFilters
@@ -2630,7 +2616,6 @@ input RunListRelationFilter {
 input AgentOrderBy {
   id: InnerOrder
   name: InnerOrder
-  roleId: InnerOrder
   enabled: InnerOrder
   baseUrl: InnerOrder
   model: InnerOrder
@@ -2643,9 +2628,6 @@ input AgentOrderBy {
   maxRetries: InnerOrder
   createdAt: InnerOrder
   updatedAt: InnerOrder
-
-  """Order by columns of the related role row"""
-  role: RoleOrderBy
 }
 
 """Filters Agent groups by their aggregated values"""
@@ -2695,7 +2677,6 @@ input AgentMaxHaving {
 input AgentCountNonNullHaving {
   id: AggregateNumberFilter
   name: AggregateNumberFilter
-  roleId: AggregateNumberFilter
   enabled: AggregateNumberFilter
   baseUrl: AggregateNumberFilter
   model: AggregateNumberFilter
@@ -2713,7 +2694,6 @@ input AgentCountNonNullHaving {
 input AgentCountDistinctHaving {
   id: AggregateNumberFilter
   name: AggregateNumberFilter
-  roleId: AggregateNumberFilter
   baseUrl: AggregateNumberFilter
   model: AggregateNumberFilter
   systemPrompt: AggregateNumberFilter
@@ -3216,11 +3196,12 @@ input CreateLaneInput {
   name: String!
   position: Int
   intake: Boolean
+  roleId: String
+  prompt: String
   agentId: String
   onSuccessLaneId: String
   onFailureLaneId: String
   wipLimit: Int
-  readVerdict: Boolean
   maxAttempts: Int
   createdAt: DateTime
 }
@@ -3231,11 +3212,12 @@ input UpdateLaneInput {
   name: String
   position: Int
   intake: Boolean
+  roleId: String
+  prompt: String
   agentId: String
   onSuccessLaneId: String
   onFailureLaneId: String
   wipLimit: Int
-  readVerdict: Boolean
   maxAttempts: Int
   createdAt: DateTime
 }
@@ -3255,16 +3237,20 @@ input LaneFilters {
   name: StringFilter
   position: IntFilter
   intake: BooleanFilter
+  roleId: StringFilter
+  prompt: StringFilter
   agentId: StringFilter
   onSuccessLaneId: StringFilter
   onFailureLaneId: StringFilter
   wipLimit: IntFilter
-  readVerdict: BooleanFilter
   maxAttempts: IntFilter
   createdAt: DateTimeFilter
 
   """Matches rows whose project matches these filters"""
   project: ProjectFilters
+
+  """Matches rows whose role matches these filters"""
+  role: RoleFilters
 
   """Matches rows whose agent matches these filters"""
   agent: AgentFilters
@@ -3286,16 +3272,20 @@ input LaneOrderBy {
   name: InnerOrder
   position: InnerOrder
   intake: InnerOrder
+  roleId: InnerOrder
+  prompt: InnerOrder
   agentId: InnerOrder
   onSuccessLaneId: InnerOrder
   onFailureLaneId: InnerOrder
   wipLimit: InnerOrder
-  readVerdict: InnerOrder
   maxAttempts: InnerOrder
   createdAt: InnerOrder
 
   """Order by columns of the related project row"""
   project: ProjectOrderBy
+
+  """Order by columns of the related role row"""
+  role: RoleOrderBy
 
   """Order by columns of the related agent row"""
   agent: AgentOrderBy
@@ -3343,11 +3333,12 @@ input LaneCountNonNullHaving {
   name: AggregateNumberFilter
   position: AggregateNumberFilter
   intake: AggregateNumberFilter
+  roleId: AggregateNumberFilter
+  prompt: AggregateNumberFilter
   agentId: AggregateNumberFilter
   onSuccessLaneId: AggregateNumberFilter
   onFailureLaneId: AggregateNumberFilter
   wipLimit: AggregateNumberFilter
-  readVerdict: AggregateNumberFilter
   maxAttempts: AggregateNumberFilter
   createdAt: AggregateNumberFilter
 }
@@ -3357,6 +3348,8 @@ input LaneCountDistinctHaving {
   projectId: AggregateNumberFilter
   name: AggregateNumberFilter
   position: AggregateNumberFilter
+  roleId: AggregateNumberFilter
+  prompt: AggregateNumberFilter
   agentId: AggregateNumberFilter
   onSuccessLaneId: AggregateNumberFilter
   onFailureLaneId: AggregateNumberFilter
@@ -4650,6 +4643,9 @@ input UpdateSettingInput {
   maxRetries: Int
   runRetentionDays: Int
   workerIntervalSeconds: Int
+  refineAgentId: String
+  decomposeAgentId: String
+  refinePrompt: String
 }
 
 """
@@ -4674,6 +4670,9 @@ input SettingFilters {
   maxRetries: IntFilter
   runRetentionDays: IntFilter
   workerIntervalSeconds: IntFilter
+  refineAgentId: StringFilter
+  decomposeAgentId: StringFilter
+  refinePrompt: StringFilter
 
   """At least one branch matches; ANDed with any sibling fields"""
   OR: [SettingFilters!]
@@ -4772,6 +4771,9 @@ input SettingOrderBy {
   maxRetries: InnerOrder
   runRetentionDays: InnerOrder
   workerIntervalSeconds: InnerOrder
+  refineAgentId: InnerOrder
+  decomposeAgentId: InnerOrder
+  refinePrompt: InnerOrder
 }
 
 """Filters Setting groups by their aggregated values"""
@@ -4839,6 +4841,9 @@ input SettingCountNonNullHaving {
   maxRetries: AggregateNumberFilter
   runRetentionDays: AggregateNumberFilter
   workerIntervalSeconds: AggregateNumberFilter
+  refineAgentId: AggregateNumberFilter
+  decomposeAgentId: AggregateNumberFilter
+  refinePrompt: AggregateNumberFilter
 }
 
 input SettingCountDistinctHaving {
@@ -4854,6 +4859,9 @@ input SettingCountDistinctHaving {
   maxRetries: AggregateNumberFilter
   runRetentionDays: AggregateNumberFilter
   workerIntervalSeconds: AggregateNumberFilter
+  refineAgentId: AggregateNumberFilter
+  decomposeAgentId: AggregateNumberFilter
+  refinePrompt: AggregateNumberFilter
 }
 
 type Query {
@@ -5271,8 +5279,8 @@ enum RoleDistinctColumn {
   id
   name
   description
-  stage
-  systemPrompt
+  contract
+  prompt
   createdAt
   updatedAt
 }
@@ -5282,8 +5290,26 @@ enum RoleGroupByColumn {
   id
   name
   description
-  stage
+  contract
+  prompt
+  createdAt
+  updatedAt
+}
+
+"""Columns of Agent that a query can be made distinct on"""
+enum AgentDistinctColumn {
+  id
+  name
+  enabled
+  baseUrl
+  model
   systemPrompt
+  maxTokens
+  temperature
+  maxToolIterations
+  toolDiscovery
+  requestTimeoutSeconds
+  maxRetries
   createdAt
   updatedAt
 }
@@ -5292,7 +5318,6 @@ enum RoleGroupByColumn {
 enum AgentGroupByColumn {
   id
   name
-  roleId
   enabled
   baseUrl
   model
@@ -5372,11 +5397,12 @@ enum LaneGroupByColumn {
   name
   position
   intake
+  roleId
+  prompt
   agentId
   onSuccessLaneId
   onFailureLaneId
   wipLimit
-  readVerdict
   maxAttempts
   createdAt
 }
@@ -5491,6 +5517,9 @@ enum SettingDistinctColumn {
   maxRetries
   runRetentionDays
   workerIntervalSeconds
+  refineAgentId
+  decomposeAgentId
+  refinePrompt
 }
 
 """Columns of Setting that a query can group by"""
@@ -5507,6 +5536,9 @@ enum SettingGroupByColumn {
   maxRetries
   runRetentionDays
   workerIntervalSeconds
+  refineAgentId
+  decomposeAgentId
+  refinePrompt
 }
 
 """

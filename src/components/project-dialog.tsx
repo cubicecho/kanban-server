@@ -79,8 +79,9 @@ export function ProjectDialog({
   const [templateId, setTemplateId] = useState(SEEDED);
 
   const agents = useQuery({ queryKey: ["agents"], queryFn: () => request(AgentsDocument) });
-  const byStage = (stage: string) =>
-    (agents.data?.agents ?? []).filter((agent) => agent.role.stage === stage);
+  // Every enabled agent, for both pickers: an agent is a model, and refining is a prompt this
+  // server holds rather than a job any particular agent has been minted for.
+  const enabled = (agents.data?.agents ?? []).filter((agent) => agent.enabled);
 
   // Only offered on a new project: applying one to a board that has cards is refused, and by
   // the time a project is being edited it usually has.
@@ -213,8 +214,8 @@ export function ProjectDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={ANY}>Any enabled refiner</SelectItem>
-                  {byStage("refine").map((agent) => (
+                  <SelectItem value={ANY}>Whatever Settings says</SelectItem>
+                  {enabled.map((agent) => (
                     <SelectItem key={agent.id} value={agent.id}>
                       {agent.name}
                     </SelectItem>
@@ -232,8 +233,8 @@ export function ProjectDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={ANY}>Any enabled decomposer</SelectItem>
-                  {byStage("decompose").map((agent) => (
+                  <SelectItem value={ANY}>Whatever Settings says</SelectItem>
+                  {enabled.map((agent) => (
                     <SelectItem key={agent.id} value={agent.id}>
                       {agent.name}
                     </SelectItem>

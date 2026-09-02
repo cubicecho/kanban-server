@@ -10,12 +10,13 @@ import {
   messages,
   projects,
   type Run,
+  roles,
   runs,
   tasks,
 } from "../db/schema.ts";
 import { type AgentResult, runAgent } from "./agent.ts";
 import { emit } from "./events.ts";
-import { type Resolved, resolveAgentId, resolveStage } from "./llm.ts";
+import { loadSettings, type Resolved, resolveAgentId, resolveJobAgent } from "./llm.ts";
 import {
   cardPrompt,
   DECOMPOSE_SYSTEM,
@@ -23,6 +24,7 @@ import {
   decomposePrompt,
   projectContext,
   REFINE_SYSTEM,
+  systemPromptFor,
 } from "./prompts.ts";
 import { parseJson } from "./side-task.ts";
 
@@ -261,7 +263,8 @@ export async function refineTask(taskId: string, userMessage: string): Promise<R
   const task = await loadTask(taskId);
   if (task.status !== "draft") throw new Error("this task has been accepted; it is past refining");
   const project = await loadProject(task.projectId);
-  const agent = await resolveStage("refine", project.refineAgentId);
+  const agent = await resolveJobAgent("refine", project.refineAgentId);
+  const config = await loadSettings();
 
   await db.insert(messages).values({ taskId, role: "user", content: userMessage });
   const thread = await db
@@ -281,7 +284,10 @@ export async function refineTask(taskId: string, userMessage: string): Promise<R
     kind: "refine",
     taskId,
     label: `refining "${task.title || "untitled task"}"`,
-    systemPrompt: `${agent.systemPrompt || REFINE_SYSTEM}\n\n${projectContext(project)}`,
+    systemPrompt: `${systemPromptFor({
+      identity: agent.systemPrompt,
+      role: config.refinePrompt || REFINE_SYSTEM,
+    })}\n\n${projectContext(project)}`,
     prompt: `Current brief:\n${task.brief || "(nothing yet)"}\n\nConversation so far:\n\n${transcript}`,
   });
 
@@ -337,7 +343,7 @@ export async function decomposeTask(taskId: string): Promise<Run> {
   const task = await loadTask(taskId);
   if (!task.brief.trim()) throw new Error("this task has no brief for the decomposer to read");
   const project = await loadProject(task.projectId);
-  const agent = await resolveStage("decompose", project.decomposeAgentId);
+  const agent = await resolveJobAgent("decompose", project.decomposeAgentId);
   const lane = await intakeLane(project.id);
 
   await db.update(tasks).set({ status: "decomposing", error: "" }).where(eq(tasks.id, taskId));
@@ -349,7 +355,7 @@ export async function decomposeTask(taskId: string): Promise<Run> {
     kind: "decompose",
     taskId,
     label: `decomposing "${task.title || "untitled task"}"`,
-    systemPrompt: agent.systemPrompt || DECOMPOSE_SYSTEM,
+    systemPrompt: systemPromptFor({ identity: agent.systemPrompt, role: DECOMPOSE_SYSTEM }),
     prompt: decomposePrompt(project, task),
   });
 
@@ -452,10 +458,14 @@ export async function blockers(cardId: string): Promise<Card[]> {
  * `onFailureLaneId` are what make a board a pipeline, and a lane that names neither simply
  * keeps its cards. A card with no lane agent cannot be run at all — that is what a backlog is.
  *
- * A lane with `readVerdict` is judged on what its agent said rather than on whether it answered:
- * a reviewer did its job either way, so its run is `ok`, and a verdict beginning FAIL sends the
- * card down the failure arm. Anything else counts as a pass, because a reviewer that cannot make
- * itself clear should not silently block the board.
+ * What the agent is told is composed here and nowhere else: its own identity, the lane's role,
+ * and whatever this board adds on top. A lane whose composition comes out empty has no job, and
+ * is refused rather than run on an empty system message.
+ *
+ * A lane whose role answers with a `verdict` is judged on what its agent said rather than on
+ * whether it answered: a reviewer did its job either way, so its run is `ok`, and a verdict
+ * beginning FAIL sends the card down the failure arm. Anything else counts as a pass, because a
+ * reviewer that cannot make itself clear should not silently block the board.
  */
 export async function runCard(cardId: string, agentId?: string | null): Promise<Run> {
   const card = await loadCard(cardId);
@@ -468,6 +478,19 @@ export async function runCard(cardId: string, agentId?: string | null): Promise<
   const chosen = agentId ?? lane.agentId;
   if (!chosen) throw new Error(`lane "${lane.name}" has no agent — nothing runs there`);
   const agent = await resolveAgentId(chosen);
+
+  // The one place a role and an agent meet. Neither knows about the other anywhere else, which
+  // is what lets this agent work cards in Doing and rule on them in Review on the same board.
+  const [role] = lane.roleId
+    ? await db.select().from(roles).where(eq(roles.id, lane.roleId)).limit(1)
+    : [undefined];
+  const systemPrompt = systemPromptFor({
+    identity: agent.systemPrompt,
+    role: role?.prompt,
+    extra: lane.prompt,
+  });
+  if (!systemPrompt)
+    throw new Error(`lane "${lane.name}" has nothing to tell an agent — give it a role`);
 
   // Nothing is written about waiting. What a card waits on is a fact about the cards around
   // it, and the one this used to store went stale the moment a dependency finished — a card
@@ -489,6 +512,7 @@ export async function runCard(cardId: string, agentId?: string | null): Promise<
     taskId: card.taskId,
     laneId: lane.id,
     label: `working "${card.title}"`,
+    systemPrompt,
     prompt: cardPrompt(project, card, note),
   });
 
@@ -497,8 +521,9 @@ export async function runCard(cardId: string, agentId?: string | null): Promise<
   // and the same agent works cards elsewhere without its answer being read as a ruling. It
   // also needs a run that finished — a reviewer whose connection dropped ruled on nothing,
   // whatever half a sentence made it out before the stream died.
+  const judges = role?.contract === "verdict";
   const verdict: Run["verdict"] =
-    lane.readVerdict && ok ? (/^\s*FAIL\b/i.test(output) ? "fail" : "pass") : "none";
+    judges && ok ? (/^\s*FAIL\b/i.test(output) ? "fail" : "pass") : "none";
   const passed = ok && verdict !== "fail";
   // A run somebody called off is not a verdict on the card: it costs it no attempt and leaves
   // it where it was, to be started again whenever.
@@ -545,7 +570,7 @@ export async function runCard(cardId: string, agentId?: string | null): Promise<
       // A station that judges does not overwrite the account of the work with its ruling on it:
       // that report is the one thing the agent asked to fix the card needs to read. The ruling
       // goes on the move it caused, where the next prompt picks it up as the reason.
-      result: lane.readVerdict ? card.result : output || card.result,
+      result: judges ? card.result : output || card.result,
       // What broke, and only that. A verdict is not a fault and a stopped run is not one
       // either — the sentence that used to be invented here, "the agent did not finish", was
       // written onto every card whose run somebody deliberately called off.

@@ -34,9 +34,11 @@ field and none of the machinery.
 - **Project** — a board, and a body of work. \`context\` on it is the standing description every
   agent working the project is shown; \`autoRun\` says whether agents pick cards up by themselves
   or wait to be asked.
-- **Lane** — a column, left to right by \`position\`. A lane with an \`agentId\` is a *station*:
-  cards that land there get worked by that agent. A lane without one is a resting place, which
-  is what a backlog and a done pile are.
+- **Lane** — a column, left to right by \`position\`. A lane with a \`roleId\` and an \`agentId\` is
+  a *station*: the role is what kind of lane it is, the agent is which model works it. A lane
+  without them is a resting place, which is what a backlog and a done pile are.
+- **Role** — a kind of lane, shared across boards. Its \`contract\` is what happens to a card
+  there: \`work\` reports on it, \`verdict\` rules PASS or FAIL on it, \`expand\` breaks it up.
 - **Card** — the unit an agent executes. A title, a body, an \`acceptance\` it will be judged on,
   and a \`status\`.
 - **Task** — what somebody asked for, in their own words. A task is not a card. It is usually
@@ -46,11 +48,12 @@ field and none of the machinery.
 
 ## The board is the pipeline
 
-There is no workflow engine here. A lane says who works its cards (\`agentId\`), how many at once
-(\`wipLimit\`), and where a card goes when its run succeeds (\`onSuccessLaneId\`) or fails
-(\`onFailureLaneId\`). That is the whole of the automation, and the shape of the pipeline is the
-shape of the board somebody drew. A new project arrives with four lanes — Backlog, Doing, Review,
-Done — already wired to this server's agents, so it works without being configured.
+There is no workflow engine here. A lane says what happens to its cards (\`roleId\`), who does it
+(\`agentId\`), how many at once (\`wipLimit\`), and where a card goes when its run succeeds
+(\`onSuccessLaneId\`) or fails (\`onFailureLaneId\`). That is the whole of the automation, and the
+shape of the pipeline is the shape of the board somebody drew. A new project arrives with four
+lanes — Backlog, Doing, Review, Done — already carrying kinds and an agent, so it works without
+being configured.
 
 ## Getting work onto a board
 
@@ -147,8 +150,8 @@ In this order, because the order matters:
 
 1. \`board_templates\`. If one of the saved shapes fits this work, plan on it now: a template can
    only be applied to a board with no cards, so it has to go on before any work does.
-2. \`create_project\`. It arrives with Backlog, Doing, Review and Done already wired to this
-   server's execute and review agents. Put the standing description in \`context\` — what this
+2. \`create_project\`. It arrives with Backlog, Doing, Review and Done already wired — Doing
+   working cards and Review judging them, both staffed by an agent this server has. Put the standing description in \`context\` — what this
    project is, what it is working on, and any constraint that applies to every card in it. Every
    agent working the project is shown it, which makes it the one cheap place to say something
    once instead of in every card.
