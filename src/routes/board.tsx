@@ -284,6 +284,17 @@ export function BoardRoute() {
         </div>
       }
     >
+      {/* The front door is a guess when nobody has marked one: `submitCard` and `makeCard` fall
+          back to the leftmost lane so nothing throws, and a guess that works silently is a guess
+          nobody ever corrects. Say it on the board, where the lane it would pick is visible. */}
+      {lanes.length && !lanes.some((lane) => lane.intake) ? (
+        <p className="rounded-md border border-dashed px-3 py-2 text-xs text-muted-foreground">
+          No lane is marked <span className="font-medium">intake</span>, so work arriving without a
+          lane lands in <span className="font-medium">{lanes[0].name}</span> — whichever column
+          happens to be leftmost. Mark the one you meant.
+        </p>
+      ) : null}
+
       <DndContext
         sensors={sensors}
         collisionDetection={closestCorners}

@@ -19,16 +19,17 @@ import {
  * The shape of the thing, in the order work moves through it:
  *
  * A **project** is a body of work with a board. Its **lanes** are the columns of that board,
- * and a lane may name an **agent**, which is a model endpoint, a system prompt and a set of
- * MCP servers — the unit that actually does something. A **task** is what a person asks for,
- * in their own words, refined over a **message** thread until they accept it. Accepting it
- * hands it to a decompose agent, which turns the one task into many **cards**: the things that
- * land on the board and get worked. Every time an agent is asked to do anything — refine,
- * decompose, or work a card — that is one **run**.
+ * and a lane may name a **role** — what kind of station it is — and an **agent**, which is a
+ * model endpoint and a set of MCP servers. A **task** is what a person asks for in their own
+ * words, thought through over a **message** thread; when they are happy with it, it becomes one
+ * **card** in the project's intake lane, and everything after that happens on the board. A
+ * station whose role expands breaks that card into more of them. Every time an agent is asked
+ * to do anything — refine, or work a card — that is one **run**.
  *
  * A task is deliberately not a card. It is the unit a person thinks in and a card is the unit
- * an agent executes, and the whole point of the decomposer is that those two are different
- * sizes. Keeping both means a card can be traced back to the sentence that asked for it.
+ * an agent executes, and an expanding station exists because those two are different sizes.
+ * Keeping both means a card can be traced back to the sentence that asked for it, through
+ * `taskId` and, for a card written out of another, `parentId`.
  *
  * Column names stay camelCase. Postgres folds unquoted identifiers to lower case, so the
  * generated migrations under `drizzle/` quote every one of them. This file is the only
@@ -198,8 +199,6 @@ export const projects = pgTable("projects", {
   autoRun: boolean().notNull().default(false),
   /** Which agent refines this project's tasks. Empty takes the one in Settings. */
   refineAgentId: text().references(() => agents.id, { onDelete: "set null" }),
-  /** Which agent decomposes them. Empty takes the one in Settings. */
-  decomposeAgentId: text().references(() => agents.id, { onDelete: "set null" }),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
@@ -286,12 +285,8 @@ export const tasks = pgTable(
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
     title: text().notNull().default(""),
-    /** The statement the decomposer will read. What refinement is refining. */
+    /** The statement a card will be made out of. What refinement is refining. */
     brief: text().notNull().default(""),
-    status: text({ enum: ["draft", "ready", "decomposing", "decomposed", "error"] })
-      .notNull()
-      .default("draft"),
-    error: text().notNull().default(""),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -333,8 +328,15 @@ export const cards = pgTable(
     projectId: text()
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
-    /** The task this was decomposed out of. Null for a card someone wrote by hand. */
+    /** The conversation this came out of. Null for a card someone wrote by hand. */
     taskId: text().references(() => tasks.id, { onDelete: "set null" }),
+    /**
+     * The card that asked for this one: what an expanding station wrote it out of.
+     *
+     * `set null` rather than a cascade. A parent that has been broken up is archived and may
+     * one day be deleted; taking its children with it would delete the work itself.
+     */
+    parentId: text().references((): AnyPgColumn => cards.id, { onDelete: "set null" }),
     laneId: text()
       .notNull()
       .references(() => lanes.id, { onDelete: "cascade" }),
@@ -489,6 +491,11 @@ export const runs = pgTable(
       .references(() => projects.id, { onDelete: "cascade" }),
     /** Null once the agent that ran has been deleted — the account of the run still stands. */
     agentId: text().references(() => agents.id, { onDelete: "set null" }),
+    /**
+     * `decompose` is history and nothing writes it any more: breaking work up is a station now,
+     * and a station's run is a `card` run like any other. The member stays because the rows
+     * that carry it do, and a column that lies about what is in it is worse than an odd one.
+     */
     kind: text({ enum: ["refine", "decompose", "card"] })
       .notNull()
       .default("card"),
@@ -598,15 +605,15 @@ export const settings = pgTable("settings", {
   /** How often the worker looks for cards to pick up, in seconds. Zero stops it entirely. */
   workerIntervalSeconds: integer().notNull().default(5),
   /**
-   * The two jobs that are not stations, and so cannot be found on a board.
+   * The one job that is not a station, and so cannot be found on a board.
    *
-   * Refining and decomposing happen off the board, and used to be found by asking which agent
-   * held a role with that stage. An agent has no role now, so the answer is named here instead:
-   * the fallback for a project that names none of its own. Empty falls back to the first
-   * enabled agent, there being nothing else to go on.
+   * Refining is a conversation with a person rather than something that happens to a card, so
+   * there is no lane to read an agent off. It used to be found by asking which agent held a
+   * role with that stage; an agent has no role now, so the answer is named here instead — the
+   * fallback for a project that names none of its own. Empty falls back to the first enabled
+   * agent, there being nothing else to go on.
    */
   refineAgentId: text().references(() => agents.id, { onDelete: "set null" }),
-  decomposeAgentId: text().references(() => agents.id, { onDelete: "set null" }),
   /**
    * What the refiner is told. Empty takes `REFINE_SYSTEM`.
    *
@@ -659,7 +666,6 @@ export const relations = defineRelations(schema, (r) => ({
     cards: r.many.cards({ from: r.projects.id, to: r.cards.projectId }),
     runs: r.many.runs({ from: r.projects.id, to: r.runs.projectId }),
     refineAgent: r.one.agents({ from: r.projects.refineAgentId, to: r.agents.id }),
-    decomposeAgent: r.one.agents({ from: r.projects.decomposeAgentId, to: r.agents.id }),
   },
   // `lanes.onSuccessLaneId` and `onFailureLaneId` are foreign keys but not relations: they
   // point sideways within one board, and everything that reads them already has every lane.

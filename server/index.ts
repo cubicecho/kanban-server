@@ -21,7 +21,7 @@ const interrupted = await reconcile();
 if (interrupted.runs) {
   console.log(
     `[kanban-server] a restart interrupted ${interrupted.runs} run(s): ` +
-      `${interrupted.cards} card(s) back in play, ${interrupted.tasks} task(s) to decompose again`,
+      `${interrupted.cards} card(s) back in play`,
   );
 }
 

@@ -110,7 +110,6 @@ interface Form {
   runRetentionDays: number;
   workerIntervalSeconds: number;
   refineAgentId: string;
-  decomposeAgentId: string;
   refinePrompt: string;
 }
 
@@ -146,7 +145,6 @@ export function SettingsRoute() {
         workerIntervalSeconds: loaded.workerIntervalSeconds,
         // Nulls become the empty string the pickers speak, and go back as null on save.
         refineAgentId: loaded.refineAgentId ?? "",
-        decomposeAgentId: loaded.decomposeAgentId ?? "",
         refinePrompt: loaded.refinePrompt,
       });
     }
@@ -172,7 +170,6 @@ export function SettingsRoute() {
         set: {
           ...form,
           refineAgentId: form.refineAgentId || null,
-          decomposeAgentId: form.decomposeAgentId || null,
         },
       });
       // The key travels on its own mutation because it is write-only — it is excluded from
@@ -376,8 +373,9 @@ export function SettingsRoute() {
           <div>
             <h2 className="font-medium">Off the board</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Refining a task and breaking it into cards happen nowhere on a board, so no lane can
-              say who does them. A project may name its own; this is what it falls back to.
+              Talking a task over happens nowhere on a board, so no lane can say who does it —
+              everything else an agent does, a lane names. A project may name its own refiner; this
+              is what it falls back to.
             </p>
           </div>
 
@@ -387,25 +385,6 @@ export function SettingsRoute() {
               <Select
                 value={form.refineAgentId || ANY}
                 onValueChange={(value) => field("refineAgentId", value === ANY ? "" : value)}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ANY}>The first enabled agent</SelectItem>
-                  {enabled.map((agent) => (
-                    <SelectItem key={agent.id} value={agent.id}>
-                      {agent.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label>Decomposing agent</Label>
-              <Select
-                value={form.decomposeAgentId || ANY}
-                onValueChange={(value) => field("decomposeAgentId", value === ANY ? "" : value)}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue />

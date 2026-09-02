@@ -535,7 +535,6 @@ type Project {
   context: String!
   autoRun: Boolean!
   refineAgentId: String
-  decomposeAgentId: String
   createdAt: DateTime!
   updatedAt: DateTime!
 
@@ -596,7 +595,6 @@ type Project {
   ): [Run!]!
   runsAggregate(where: RunFilters): RunAggregate!
   refineAgent(where: AgentFilters): Agent
-  decomposeAgent(where: AgentFilters): Agent
 }
 
 """Columns of Task that a query can be made distinct on"""
@@ -605,8 +603,6 @@ enum TaskDistinctColumn {
   projectId
   title
   brief
-  status
-  error
   createdAt
   updatedAt
 }
@@ -616,6 +612,7 @@ enum CardDistinctColumn {
   id
   projectId
   taskId
+  parentId
   laneId
   title
   body
@@ -644,7 +641,6 @@ type ProjectMinAggregate {
   description: String
   context: String
   refineAgentId: String
-  decomposeAgentId: String
   createdAt: DateTime
   updatedAt: DateTime
 }
@@ -655,7 +651,6 @@ type ProjectMaxAggregate {
   description: String
   context: String
   refineAgentId: String
-  decomposeAgentId: String
   createdAt: DateTime
   updatedAt: DateTime
 }
@@ -667,7 +662,6 @@ type ProjectCountNonNullAggregate {
   context: Int!
   autoRun: Int!
   refineAgentId: Int!
-  decomposeAgentId: Int!
   createdAt: Int!
   updatedAt: Int!
 }
@@ -678,7 +672,6 @@ type ProjectCountDistinctAggregate {
   description: Int!
   context: Int!
   refineAgentId: Int!
-  decomposeAgentId: Int!
   createdAt: Int!
   updatedAt: Int!
 }
@@ -701,7 +694,6 @@ type ProjectGroupKeys {
   description: String
   context: String
   refineAgentId: String
-  decomposeAgentId: String
   createdAt: DateTime
   updatedAt: DateTime
   autoRun: Boolean
@@ -862,8 +854,6 @@ type Task {
   projectId: String!
   title: String!
   brief: String!
-  status: TasksStatusEnum!
-  error: String!
   createdAt: DateTime!
   updatedAt: DateTime!
 
@@ -900,23 +890,6 @@ type Task {
   cardsAggregate(where: CardFilters): CardAggregate!
 }
 
-enum TasksStatusEnum {
-  """Value: draft"""
-  draft
-
-  """Value: ready"""
-  ready
-
-  """Value: decomposing"""
-  decomposing
-
-  """Value: decomposed"""
-  decomposed
-
-  """Value: error"""
-  error
-}
-
 """Columns of Message that a query can be made distinct on"""
 enum MessageDistinctColumn {
   id
@@ -939,8 +912,6 @@ type TaskMinAggregate {
   projectId: String
   title: String
   brief: String
-  status: TasksStatusEnum
-  error: String
   createdAt: DateTime
   updatedAt: DateTime
 }
@@ -950,8 +921,6 @@ type TaskMaxAggregate {
   projectId: String
   title: String
   brief: String
-  status: TasksStatusEnum
-  error: String
   createdAt: DateTime
   updatedAt: DateTime
 }
@@ -961,8 +930,6 @@ type TaskCountNonNullAggregate {
   projectId: Int!
   title: Int!
   brief: Int!
-  status: Int!
-  error: Int!
   createdAt: Int!
   updatedAt: Int!
 }
@@ -972,8 +939,6 @@ type TaskCountDistinctAggregate {
   projectId: Int!
   title: Int!
   brief: Int!
-  status: Int!
-  error: Int!
   createdAt: Int!
   updatedAt: Int!
 }
@@ -995,8 +960,6 @@ type TaskGroupKeys {
   projectId: String
   title: String
   brief: String
-  status: TasksStatusEnum
-  error: String
   createdAt: DateTime
   updatedAt: DateTime
 }
@@ -1087,6 +1050,7 @@ type Card {
   id: String!
   projectId: String!
   taskId: String
+  parentId: String
   laneId: String!
   title: String!
   body: String!
@@ -1221,6 +1185,7 @@ type CardMinAggregate {
   id: String
   projectId: String
   taskId: String
+  parentId: String
   laneId: String
   title: String
   body: String
@@ -1239,6 +1204,7 @@ type CardMaxAggregate {
   id: String
   projectId: String
   taskId: String
+  parentId: String
   laneId: String
   title: String
   body: String
@@ -1257,6 +1223,7 @@ type CardCountNonNullAggregate {
   id: Int!
   projectId: Int!
   taskId: Int!
+  parentId: Int!
   laneId: Int!
   title: Int!
   body: Int!
@@ -1275,6 +1242,7 @@ type CardCountDistinctAggregate {
   id: Int!
   projectId: Int!
   taskId: Int!
+  parentId: Int!
   laneId: Int!
   title: Int!
   body: Int!
@@ -1307,6 +1275,7 @@ type CardGroupKeys {
   id: String
   projectId: String
   taskId: String
+  parentId: String
   laneId: String
   title: String
   body: String
@@ -1771,7 +1740,6 @@ type Setting {
   runRetentionDays: Int!
   workerIntervalSeconds: Int!
   refineAgentId: String
-  decomposeAgentId: String
   refinePrompt: String!
 
   """
@@ -1832,7 +1800,6 @@ type SettingMinAggregate {
   runRetentionDays: Int
   workerIntervalSeconds: Int
   refineAgentId: String
-  decomposeAgentId: String
   refinePrompt: String
 }
 
@@ -1850,7 +1817,6 @@ type SettingMaxAggregate {
   runRetentionDays: Int
   workerIntervalSeconds: Int
   refineAgentId: String
-  decomposeAgentId: String
   refinePrompt: String
 }
 
@@ -1868,7 +1834,6 @@ type SettingCountNonNullAggregate {
   runRetentionDays: Int!
   workerIntervalSeconds: Int!
   refineAgentId: Int!
-  decomposeAgentId: Int!
   refinePrompt: Int!
 }
 
@@ -1886,7 +1851,6 @@ type SettingCountDistinctAggregate {
   runRetentionDays: Int!
   workerIntervalSeconds: Int!
   refineAgentId: Int!
-  decomposeAgentId: Int!
   refinePrompt: Int!
 }
 
@@ -1918,7 +1882,6 @@ type SettingGroupKeys {
   runRetentionDays: Int
   workerIntervalSeconds: Int
   refineAgentId: String
-  decomposeAgentId: String
   refinePrompt: String
 }
 
@@ -3062,7 +3025,6 @@ input CreateProjectInput {
   context: String
   autoRun: Boolean
   refineAgentId: String
-  decomposeAgentId: String
   createdAt: DateTime
   updatedAt: DateTime
 }
@@ -3074,7 +3036,6 @@ input UpdateProjectInput {
   context: String
   autoRun: Boolean
   refineAgentId: String
-  decomposeAgentId: String
   createdAt: DateTime
   updatedAt: DateTime
 }
@@ -3095,7 +3056,6 @@ input ProjectFilters {
   context: StringFilter
   autoRun: BooleanFilter
   refineAgentId: StringFilter
-  decomposeAgentId: StringFilter
   createdAt: DateTimeFilter
   updatedAt: DateTimeFilter
   lanes: LaneListRelationFilter
@@ -3105,9 +3065,6 @@ input ProjectFilters {
 
   """Matches rows whose refineAgent matches these filters"""
   refineAgent: AgentFilters
-
-  """Matches rows whose decomposeAgent matches these filters"""
-  decomposeAgent: AgentFilters
 
   """At least one branch matches; ANDed with any sibling fields"""
   OR: [ProjectFilters!]
@@ -3148,15 +3105,11 @@ input ProjectOrderBy {
   context: InnerOrder
   autoRun: InnerOrder
   refineAgentId: InnerOrder
-  decomposeAgentId: InnerOrder
   createdAt: InnerOrder
   updatedAt: InnerOrder
 
   """Order by columns of the related refineAgent row"""
   refineAgent: AgentOrderBy
-
-  """Order by columns of the related decomposeAgent row"""
-  decomposeAgent: AgentOrderBy
 }
 
 """Filters Project groups by their aggregated values"""
@@ -3174,7 +3127,6 @@ input ProjectCountNonNullHaving {
   context: AggregateNumberFilter
   autoRun: AggregateNumberFilter
   refineAgentId: AggregateNumberFilter
-  decomposeAgentId: AggregateNumberFilter
   createdAt: AggregateNumberFilter
   updatedAt: AggregateNumberFilter
 }
@@ -3185,7 +3137,6 @@ input ProjectCountDistinctHaving {
   description: AggregateNumberFilter
   context: AggregateNumberFilter
   refineAgentId: AggregateNumberFilter
-  decomposeAgentId: AggregateNumberFilter
   createdAt: AggregateNumberFilter
   updatedAt: AggregateNumberFilter
 }
@@ -3363,8 +3314,6 @@ input CreateTaskInput {
   projectId: String!
   title: String
   brief: String
-  status: TasksStatusEnum
-  error: String
   createdAt: DateTime
   updatedAt: DateTime
 }
@@ -3374,8 +3323,6 @@ input UpdateTaskInput {
   projectId: String
   title: String
   brief: String
-  status: TasksStatusEnum
-  error: String
   createdAt: DateTime
   updatedAt: DateTime
 }
@@ -3394,8 +3341,6 @@ input TaskFilters {
   projectId: StringFilter
   title: StringFilter
   brief: StringFilter
-  status: TasksStatusEnumFilter
-  error: StringFilter
   createdAt: DateTimeFilter
   updatedAt: DateTimeFilter
 
@@ -3414,80 +3359,6 @@ input TaskFilters {
   NOT: TaskFilters
 }
 
-input TasksStatusEnumFilter {
-  """Equal to"""
-  eq: TasksStatusEnum
-
-  """Not equal to"""
-  ne: TasksStatusEnum
-
-  """Less than"""
-  lt: TasksStatusEnum
-
-  """Less than or equal to"""
-  lte: TasksStatusEnum
-
-  """Greater than"""
-  gt: TasksStatusEnum
-
-  """Greater than or equal to"""
-  gte: TasksStatusEnum
-  like: String
-  notLike: String
-  ilike: String
-  notIlike: String
-
-  """
-  Matches values starting with the given string. `%`, `_` and `\` are matched literally.
-  """
-  startsWith: String
-
-  """
-  Matches values ending with the given string. `%`, `_` and `\` are matched literally.
-  """
-  endsWith: String
-
-  """
-  Matches values containing the given string. `%`, `_` and `\` are matched literally.
-  """
-  contains: String
-
-  """Case-insensitive `startsWith`."""
-  iStartsWith: String
-
-  """Case-insensitive `endsWith`."""
-  iEndsWith: String
-
-  """Case-insensitive `contains`."""
-  iContains: String
-
-  """
-  When true, every comparison operator in this object matches case-insensitively — `eq`, `ne`, the ordering operators, `inArray`/`notInArray` and the pattern operators all compare `lower(column)` against `lower(operand)`. Applies only to the operators beside it; a nested `AND`/`OR`/`NOT` branch sets its own.
-  """
-  insensitive: Boolean
-
-  """Matches any one of these values (SQL `IN`)"""
-  inArray: [TasksStatusEnum!]
-
-  """Matches none of these values (SQL `NOT IN`)"""
-  notInArray: [TasksStatusEnum!]
-
-  """When true, matches rows where the column is NULL"""
-  isNull: Boolean
-
-  """When true, matches rows where the column is not NULL"""
-  isNotNull: Boolean
-
-  """At least one branch matches; ANDed with any sibling operators"""
-  OR: [TasksStatusEnumFilter!]
-
-  """Every branch matches"""
-  AND: [TasksStatusEnumFilter!]
-
-  """Negates the nested operators"""
-  NOT: TasksStatusEnumFilter
-}
-
 input MessageListRelationFilter {
   """At least one related row matches"""
   some: MessageFilters
@@ -3504,8 +3375,6 @@ input TaskOrderBy {
   projectId: InnerOrder
   title: InnerOrder
   brief: InnerOrder
-  status: InnerOrder
-  error: InnerOrder
   createdAt: InnerOrder
   updatedAt: InnerOrder
 
@@ -3526,8 +3395,6 @@ input TaskCountNonNullHaving {
   projectId: AggregateNumberFilter
   title: AggregateNumberFilter
   brief: AggregateNumberFilter
-  status: AggregateNumberFilter
-  error: AggregateNumberFilter
   createdAt: AggregateNumberFilter
   updatedAt: AggregateNumberFilter
 }
@@ -3537,8 +3404,6 @@ input TaskCountDistinctHaving {
   projectId: AggregateNumberFilter
   title: AggregateNumberFilter
   brief: AggregateNumberFilter
-  status: AggregateNumberFilter
-  error: AggregateNumberFilter
   createdAt: AggregateNumberFilter
   updatedAt: AggregateNumberFilter
 }
@@ -3701,6 +3566,7 @@ input CreateCardInput {
   id: String
   projectId: String!
   taskId: String
+  parentId: String
   laneId: String!
   title: String!
   body: String
@@ -3719,6 +3585,7 @@ input UpdateCardInput {
   id: String
   projectId: String
   taskId: String
+  parentId: String
   laneId: String
   title: String
   body: String
@@ -3746,6 +3613,7 @@ input CardFilters {
   id: StringFilter
   projectId: StringFilter
   taskId: StringFilter
+  parentId: StringFilter
   laneId: StringFilter
   title: StringFilter
   body: StringFilter
@@ -3882,6 +3750,7 @@ input CardOrderBy {
   id: InnerOrder
   projectId: InnerOrder
   taskId: InnerOrder
+  parentId: InnerOrder
   laneId: InnerOrder
   title: InnerOrder
   body: InnerOrder
@@ -3941,6 +3810,7 @@ input CardCountNonNullHaving {
   id: AggregateNumberFilter
   projectId: AggregateNumberFilter
   taskId: AggregateNumberFilter
+  parentId: AggregateNumberFilter
   laneId: AggregateNumberFilter
   title: AggregateNumberFilter
   body: AggregateNumberFilter
@@ -3959,6 +3829,7 @@ input CardCountDistinctHaving {
   id: AggregateNumberFilter
   projectId: AggregateNumberFilter
   taskId: AggregateNumberFilter
+  parentId: AggregateNumberFilter
   laneId: AggregateNumberFilter
   title: AggregateNumberFilter
   body: AggregateNumberFilter
@@ -4644,7 +4515,6 @@ input UpdateSettingInput {
   runRetentionDays: Int
   workerIntervalSeconds: Int
   refineAgentId: String
-  decomposeAgentId: String
   refinePrompt: String
 }
 
@@ -4671,7 +4541,6 @@ input SettingFilters {
   runRetentionDays: IntFilter
   workerIntervalSeconds: IntFilter
   refineAgentId: StringFilter
-  decomposeAgentId: StringFilter
   refinePrompt: StringFilter
 
   """At least one branch matches; ANDed with any sibling fields"""
@@ -4772,7 +4641,6 @@ input SettingOrderBy {
   runRetentionDays: InnerOrder
   workerIntervalSeconds: InnerOrder
   refineAgentId: InnerOrder
-  decomposeAgentId: InnerOrder
   refinePrompt: InnerOrder
 }
 
@@ -4842,7 +4710,6 @@ input SettingCountNonNullHaving {
   runRetentionDays: AggregateNumberFilter
   workerIntervalSeconds: AggregateNumberFilter
   refineAgentId: AggregateNumberFilter
-  decomposeAgentId: AggregateNumberFilter
   refinePrompt: AggregateNumberFilter
 }
 
@@ -4860,7 +4727,6 @@ input SettingCountDistinctHaving {
   runRetentionDays: AggregateNumberFilter
   workerIntervalSeconds: AggregateNumberFilter
   refineAgentId: AggregateNumberFilter
-  decomposeAgentId: AggregateNumberFilter
   refinePrompt: AggregateNumberFilter
 }
 
@@ -5372,7 +5238,6 @@ enum ProjectDistinctColumn {
   context
   autoRun
   refineAgentId
-  decomposeAgentId
   createdAt
   updatedAt
 }
@@ -5385,7 +5250,6 @@ enum ProjectGroupByColumn {
   context
   autoRun
   refineAgentId
-  decomposeAgentId
   createdAt
   updatedAt
 }
@@ -5413,8 +5277,6 @@ enum TaskGroupByColumn {
   projectId
   title
   brief
-  status
-  error
   createdAt
   updatedAt
 }
@@ -5433,6 +5295,7 @@ enum CardGroupByColumn {
   id
   projectId
   taskId
+  parentId
   laneId
   title
   body
@@ -5518,7 +5381,6 @@ enum SettingDistinctColumn {
   runRetentionDays
   workerIntervalSeconds
   refineAgentId
-  decomposeAgentId
   refinePrompt
 }
 
@@ -5537,7 +5399,6 @@ enum SettingGroupByColumn {
   runRetentionDays
   workerIntervalSeconds
   refineAgentId
-  decomposeAgentId
   refinePrompt
 }
 
@@ -5725,32 +5586,25 @@ type Mutation {
   updateSettingSingle(set: UpdateSettingInput!, where: SettingFilters!): Setting
 
   """
-  One turn of talking a task into shape: says something to the refining agent and resolves once it has answered. The answer is appended to the task's messages and the task's title and brief are rewritten from it, so read the task back after this to see where the brief has got to. Only a `draft` task can be refined.
+  One turn of talking a task into shape: says something to the refining agent and resolves once it has answered. The answer is appended to the task's messages and the task's title and brief are rewritten from it, so read the task back after this to see where the brief has got to. A task can be talked about for as long as you like; `makeCard` is what ends the conversation by putting it on the board.
   """
   refineTask(taskId: String!, message: String!): Run!
 
   """
-  Marks a refined task ready for the decomposer, without running it. `decomposeTask` is the next step, and is what actually produces cards.
+  Ends a refining conversation by putting it on the board: writes the task's title and brief as one card in the project's intake lane, linked back to the task. It is one card and not many — breaking work up is a station on the board now, so a card landing in a lane that expands is what turns it into the cards that carry it out. The conversation is left exactly where it is and can go on afterwards.
   """
-  acceptTask(taskId: String!): Task!
+  makeCard(taskId: String!): Card!
 
   """
-  Breaks a task into cards and puts them in the project's intake lane, resolving with the finished run — which means it does not answer until the decomposer is done. The cards it wrote are the ones with this `taskId`. A decomposition that produced nothing readable fails, and says so on the task as well as in the run.
+  The way onto a board for a caller that has no lane ids: writes one card at the project's front door — the lane marked `intake`, else the leftmost — and answers with it. Use this rather than `create_card` unless you know exactly which lane you mean. If that lane is a station that expands, the card becomes the cards that carry the work out as soon as it is worked.
   """
-  decomposeTask(taskId: String!): Run!
-
-  """
-  The short way in, for a caller that already knows what it wants: writes the task and decomposes it in one call, resolving with the task once its cards are on the board. Skips refinement entirely. A decomposition that fails leaves the task in `error` with the reason on it rather than throwing, so the task is still there to retry.
-  """
-  submitTask(
+  submitCard(
     projectId: String!
     title: String!
 
-    """
-    What is wanted, in as much detail as you have. The decomposer reads it.
-    """
-    brief: String!
-  ): Task!
+    """What is wanted, in as much detail as you have. An agent reads it."""
+    body: String!
+  ): Card!
 
   """
   Works one card now, with its lane's agent unless `agentId` names another, and resolves with the finished run — a long call for a long card. Read `runEvents` meanwhile to watch it, or `stopCard` to call it off. The card moves on afterwards exactly as it would have under `autoRun`, following its lane's success and failure arrows. Refused for a card waiting on unfinished dependencies.
@@ -5762,9 +5616,7 @@ type Mutation {
   """
   stopCard(cardId: String!): Boolean!
 
-  """
-  Calls off a refinement or decomposition in flight. False means none was running.
-  """
+  """Calls off a refinement in flight. False means none was running."""
   stopTask(taskId: String!): Boolean!
 
   """

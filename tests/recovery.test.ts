@@ -58,7 +58,7 @@ test("a run the process died in is closed, and its card comes back to the queue"
   const working = await card("running");
   const started = await run("running", working.id);
 
-  expect(await reconcile()).toEqual({ runs: 1, cards: 1, tasks: 0 });
+  expect(await reconcile()).toEqual({ runs: 1, cards: 1 });
 
   const [after] = await db.select().from(tables.runs).where(eq(tables.runs.id, started.id));
   // `error`, not `stopped`: nobody called this off, and a run with no outcome at all would be
@@ -80,29 +80,26 @@ test("a run the process died in is closed, and its card comes back to the queue"
   expect(await db.select().from(tables.cardEvents)).toEqual([]);
 });
 
-test("a task caught mid-decomposition is left to be asked for again", async () => {
+test("a conversation is not something a restart can interrupt", async () => {
+  // A task has no status left to be caught in the middle of: a refinement that died is a run
+  // and a card, both of which reconcile closes, and the thread itself is only what was said.
   const [task] = await db
     .insert(tables.tasks)
-    .values({ projectId, title: "t", brief: "b", status: "decomposing" })
+    .values({ projectId, title: "t", brief: "b" })
     .returning();
 
-  expect((await reconcile()).tasks).toBe(1);
+  expect(await reconcile()).toEqual({ runs: 0, cards: 0 });
 
   const [after] = await db.select().from(tables.tasks).where(eq(tables.tasks.id, task.id));
-  expect(after.status).toBe("error");
-  expect(after.error).toMatch(/restart/i);
+  expect(after.brief).toBe("b");
 });
 
 test("what was not running is not touched", async () => {
   const idle = await card("idle");
   const finished = await card("done");
   const ok = await run("ok");
-  const [ready] = await db
-    .insert(tables.tasks)
-    .values({ projectId, title: "t", brief: "b", status: "ready" })
-    .returning();
 
-  expect(await reconcile()).toEqual({ runs: 0, cards: 0, tasks: 0 });
+  expect(await reconcile()).toEqual({ runs: 0, cards: 0 });
 
   expect((await db.select().from(tables.cards).where(eq(tables.cards.id, idle.id)))[0].status).toBe(
     "idle",
@@ -113,7 +110,4 @@ test("what was not running is not touched", async () => {
   expect((await db.select().from(tables.runs).where(eq(tables.runs.id, ok.id)))[0].status).toBe(
     "ok",
   );
-  expect(
-    (await db.select().from(tables.tasks).where(eq(tables.tasks.id, ready.id)))[0].status,
-  ).toBe("ready");
 });

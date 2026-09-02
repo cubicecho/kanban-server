@@ -1,4 +1,4 @@
-import type { Card, Project, Task } from "../db/schema.ts";
+import type { Card, Project } from "../db/schema.ts";
 
 /**
  * What the three built-in kinds of lane are told, plus the refiner, which is not one.
@@ -23,15 +23,15 @@ Answer with JSON and nothing else:
   "brief": "the current best statement of the whole task, rewritten each turn"
 }
 
-The brief is what a decomposer will read without seeing this conversation, so it has to stand
+The brief becomes a card, read by agents who will not see this conversation, so it has to stand
 on its own. Carry forward everything already settled; never shorten it to a summary.`;
 
-export const DECOMPOSE_SYSTEM = `You break one task into the cards that would carry it out.
+export const EXPAND_SYSTEM = `You break one card of work into the cards that would carry it out.
 
 A card is one sitting of work with a result someone could check. Split where the work genuinely
 changes shape — a migration, then the endpoint that reads it, then the page that calls it — and
 not merely to make the list longer. Between three and ten cards is usual; one card is a fine
-answer for a small task.
+answer for a small piece of work.
 
 Answer with a JSON array and nothing else:
 
@@ -87,13 +87,14 @@ export const DEFAULT_ROLES = [
     name: "Intake",
     contract: "expand" as const,
     description: "Breaks one card of work into the cards that carry it out",
-    prompt: DECOMPOSE_SYSTEM,
+    prompt: EXPAND_SYSTEM,
   },
 ];
 
 /** The kinds `seedLanes` draws a board out of, found by contract rather than by name. */
 export const WORK_CONTRACT = "work";
 export const VERDICT_CONTRACT = "verdict";
+export const EXPAND_CONTRACT = "expand";
 
 /**
  * One agent, so the first card has something to run on.
@@ -129,8 +130,8 @@ export const systemPromptFor = (layers: {
     .filter(Boolean)
     .join("\n\n");
 
-/** One card as JSON, before it is a row: what the decomposer is asked for. */
-export interface DecomposedCard {
+/** One card as JSON, before it is a row: what an expanding station is asked for. */
+export interface ProposedCard {
   title: string;
   body?: string;
   acceptance?: string;
@@ -140,9 +141,9 @@ export interface DecomposedCard {
 /**
  * The project's own background: standing context, so it belongs in the system prompt.
  *
- * Every agent working a project needs the same paragraph about it, and putting it in each
- * card's prompt would mean the decomposer writing it out ten times. It is the `where` layer
- * of `systemPromptFor` — the card's own prompt says what to do, not where it is.
+ * Every agent working a project needs the same paragraph about it, and repeating it in each
+ * card's prompt would send it twice on every run. It is the `where` layer of `systemPromptFor`
+ * — the card's own prompt says what to do, not where it is.
  */
 export const projectContext = (project: Project): string =>
   [
@@ -152,10 +153,6 @@ export const projectContext = (project: Project): string =>
   ]
     .join("")
     .trim();
-
-/** What the decomposer is given: the project it is for, and the task to break up. */
-export const decomposePrompt = (project: Project, task: Task): string =>
-  `${projectContext(project)}\n\nTask: ${task.title || "(untitled)"}\n\n${task.brief}`.trim();
 
 /**
  * What an agent working a card is given: the card, and its criteria.

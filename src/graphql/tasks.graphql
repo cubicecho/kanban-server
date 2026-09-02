@@ -6,8 +6,6 @@ query Tasks($projectId: String!) {
     id
     title
     brief
-    status
-    error
     createdAt
     messages(orderBy: { createdAt: { direction: asc, priority: 1 } }) {
       id
@@ -27,7 +25,6 @@ mutation CreateTask($values: CreateTaskInput!) {
     id
     title
     brief
-    status
   }
 }
 
@@ -39,26 +36,19 @@ mutation RefineTask($taskId: String!, $message: String!) {
   }
 }
 
-mutation AcceptTask($taskId: String!) {
-  acceptTask(taskId: $taskId) {
+mutation MakeCard($taskId: String!) {
+  makeCard(taskId: $taskId) {
     id
-    status
+    title
+    laneId
   }
 }
 
-mutation DecomposeTask($taskId: String!) {
-  decomposeTask(taskId: $taskId) {
+mutation SubmitCard($projectId: String!, $title: String!, $body: String!) {
+  submitCard(projectId: $projectId, title: $title, body: $body) {
     id
-    status
-    error
-  }
-}
-
-mutation SubmitTask($projectId: String!, $title: String!, $brief: String!) {
-  submitTask(projectId: $projectId, title: $title, brief: $brief) {
-    id
-    status
-    error
+    title
+    laneId
   }
 }
 

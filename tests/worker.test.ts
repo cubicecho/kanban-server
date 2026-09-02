@@ -82,7 +82,7 @@ async function seedBoard(name: string, autoRun: boolean) {
     .from(tables.lanes)
     .where(eq(tables.lanes.projectId, projectId))
     .orderBy(tables.lanes.position);
-  return { projectId, doing: board[1], review: board[2], done: board[3] };
+  return { projectId, intake: board[0], doing: board[2], review: board[3], done: board[4] };
 }
 
 const addCards = (projectId: string, laneId: string, titles: string[]) =>

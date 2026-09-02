@@ -81,23 +81,21 @@ export async function resolveAgentId(agentId: string): Promise<Resolved> {
 }
 
 /**
- * The agent for one of the two jobs that are not stations, resolved.
+ * The agent that refines, resolved.
  *
- * Refining and decomposing happen off the board, so there is no lane to read an agent off. The
- * project names one, or Settings does, or it is the first enabled agent by name — deterministic
- * so two servers with the same rows agree on which that is. Nothing here asks what an agent is
- * *for*: an agent is not for anything, and which job this is belongs to the caller.
+ * Refinement is the one job with no lane behind it — a conversation with a person rather than
+ * something that happens to a card — so there is nowhere on the board to read an agent off.
+ * The project names one, or Settings does, or it is the first enabled agent by name:
+ * deterministic, so two servers with the same rows agree on which that is. Nothing here asks
+ * what an agent is *for*, because an agent is not for anything.
  */
-export async function resolveJobAgent(
-  job: "refine" | "decompose",
-  preferredId?: string | null,
-): Promise<Resolved> {
+export async function resolveRefineAgent(preferredId?: string | null): Promise<Resolved> {
   const base = await loadSettings();
-  const named = preferredId || (job === "refine" ? base.refineAgentId : base.decomposeAgentId);
+  const named = preferredId || base.refineAgentId;
   if (named) return resolveAgentId(named);
   const enabled = await db.select().from(agents).where(eq(agents.enabled, true));
   const [agent] = enabled.sort((a, b) => a.name.localeCompare(b.name));
-  if (!agent) throw new Error(`no enabled agent to ${job} with — define one first`);
+  if (!agent) throw new Error("no enabled agent to refine with — define one first");
   return resolveAgent(agent, base);
 }
 

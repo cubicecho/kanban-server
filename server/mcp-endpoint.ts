@@ -41,11 +41,10 @@ const TOOLS = [
   "Query.boardTemplates",
   "Mutation.createProject",
   "Mutation.updateProjectSingle",
-  "Mutation.submitTask",
+  "Mutation.submitCard",
   "Mutation.createTask",
   "Mutation.refineTask",
-  "Mutation.acceptTask",
-  "Mutation.decomposeTask",
+  "Mutation.makeCard",
   "Mutation.deleteTaskSingle",
   "Mutation.createCard",
   "Mutation.updateCardSingle",
@@ -88,8 +87,10 @@ const HINTS: Record<string, string> = {
     "`rejected` is a reviewer having turned the card down, `error` is something having broken, " +
     "and they are apart because they want different things from you. A card carries the last " +
     "`result` an agent working it reported; `error` is what broke and never a verdict, so read " +
-    "`card_events` for why a card is where it is. `acceptance` is what it will be judged on " +
-    "and `taskId` is the task it was decomposed out of. A card waiting on a dependency is " +
+    "`card_events` for why a card is where it is. `acceptance` is what it will be judged on, " +
+    "`taskId` is the conversation it was written out of and `parentId` the card it was broken " +
+    "off — a station that expands archives the card it read and writes its children. A card " +
+    "waiting on a dependency is " +
     "`idle` like any other — ask `blockers` what is in its way. Filter by `projectId`, or by " +
     "`laneId` for one column. A card with an `archivedAt` has been put away and is not on the " +
     "board any more, so add `archivedAt: { isNull: true }` to see what the board sees — this " +
@@ -107,11 +108,13 @@ const HINTS: Record<string, string> = {
     "ask, so it is never stale; an archived dependency does not count, since taking one off " +
     "the board is a decision that it need not happen.",
   tasks:
-    "What people ask for, before it is work. A task is a title and a `brief`, and it becomes " +
-    "cards only by being decomposed — `status` walks `draft` → `ready` → `decomposing` → " +
-    "`decomposed`. Filter by `projectId`.",
+    "A conversation about what somebody wants, before it is work: a title, a `brief` that " +
+    "`refine_task` rewrites each turn, and the messages it was arrived at through. A task has " +
+    "no status and no pipeline of its own — `make_card` is its one exit, and whether it ever " +
+    "reached the board is the cards carrying its id. Filter by `projectId`.",
   runs:
-    "What happened when an agent ran — `kind` is `refine`, `decompose` or `card`, `status` is " +
+    "What happened when an agent ran — `kind` is `refine` or `card`, and `decompose` on old " +
+    "rows from before breaking work up was a station. `status` is " +
     "`running`, `ok`, `error` or `stopped`, and a finished run carries its output, its error, " +
     "the tools it called and what it cost. `verdict` is what it ruled, and only a run at a " +
     "judging station rules anything: `pass`, `fail`, or `none` for every other run — including " +
@@ -129,7 +132,7 @@ const HINTS: Record<string, string> = {
     "Read-only here.",
   spend:
     "What a board has cost in tokens, added up from its runs. With a `taskId` it is one task " +
-    "instead — its refinement, its decomposition and every run of every card it became. `from` " +
+    "instead — its refinement and every run of every card it became. `from` " +
     "is the oldest run counted: quote that rather than `days`, because runs older than the " +
     "retention setting are gone and cannot be in the total.",
   board_templates:
@@ -137,40 +140,41 @@ const HINTS: Record<string, string> = {
     "shape itself — the columns, their kinds, their agents, their WIP limits and the arrows " +
     "between them, written as indexes into the same list so it can be drawn onto any project.",
   create_project:
-    "Adds a board. It comes with four lanes — Backlog, Doing, Review, Done — Doing and Review " +
-    "already carrying those kinds of lane and staffed by an agent this server has, so it is " +
-    "ready for work as soon as it exists. Review judges what Doing produced. Set " +
+    "Adds a board. It comes with five lanes — Intake, Backlog, Doing, Review, Done — Intake, " +
+    "Doing and Review already carrying those kinds of lane and staffed by an agent this " +
+    "server has, so it is ready for work as soon as it exists. Intake breaks a card into the " +
+    "cards that carry it out, Doing works them and Review judges what Doing produced. Set " +
     "`autoRun: true` for cards to be picked up without being asked.",
   update_project_single:
     "Edits one board. `set: { autoRun: false }` leaves everything in place but stops agents " +
     "picking up cards, which is the gentle way to pause a project.",
-  submit_task:
-    "The short way in, and the one to reach for: describe what you want and it is written down, " +
-    "broken into cards by the decomposing agent, and put on the board — one call, answering " +
-    "once the cards exist. Put as much as you know in the `brief`; it is all the decomposer " +
-    "gets. A decomposition that fails leaves the task in `error` with the reason on it, so read " +
-    "the task back rather than assuming cards appeared.",
+  submit_card:
+    "The short way in, and the one to reach for: one card at the board's front door — the lane " +
+    "marked `intake`, else the leftmost — without needing to know a lane id. Put as much as " +
+    "you know in the `body`; it and the project's `context` are all the first agent gets. If " +
+    "that lane is a station that expands, this one card becomes the cards that carry the work " +
+    "out as soon as it is worked, so it does not have to be small.",
   create_task:
-    "Writes a task down without doing anything with it. A `draft` task is for talking over " +
-    "first — `refine_task`, then `accept_task`, then `decompose_task`. If you already know what " +
-    "you want, `submit_task` is the one call that does all of it.",
+    "Opens a conversation about something without putting it on a board — for a request too " +
+    "vague to write a card from. `refine_task` for as many turns as it takes, then `make_card` " +
+    "when the brief is worth working. If you already know what you want, `submit_card` skips " +
+    "all of it.",
   refine_task:
-    "Says something to the refining agent about a draft task and returns its run. Each turn " +
-    "rewrites the task's title and brief, so read the task back afterwards to see where the " +
-    "brief has got to. Only works on a `draft` task.",
-  accept_task:
-    "Marks a task ready for decomposition. This does not produce cards on its own — " +
-    "`decompose_task` does.",
-  decompose_task:
-    "Breaks a task into cards and puts them in the board's intake lane, answering when the " +
-    "decomposer is done. The cards it wrote are the ones carrying this task's id.",
+    "Says something to the refining agent about a task and returns its run. Each turn rewrites " +
+    "the task's title and brief, so read the task back afterwards to see where the brief has " +
+    "got to. A task can be talked about for as long as you like.",
+  make_card:
+    "Ends a conversation by putting it on the board: the task's title and brief become one " +
+    "card at the front door, carrying the task's id. One card, not many — breaking work up is " +
+    "a station now, so a front door that expands is what turns it into the cards that carry " +
+    "the work out. The conversation is left where it is and can go on afterwards.",
   delete_task_single:
     "Deletes one task and its conversation. The cards it produced are left where they are: " +
     "they are the work, and the task was only how it was asked for.",
   create_card:
-    "Puts one piece of work on a board directly, without a task to decompose — the thing to " +
-    "reach for when you already know what the card is and breaking it up would only be " +
-    "ceremony. Needs a `projectId` and a `laneId`: there is no intake defaulting here, so read " +
+    "Puts one piece of work in a lane you have picked — the thing to reach for when you know " +
+    "exactly which station it should start at. Otherwise `submit_card`, which finds the front " +
+    "door for you. Needs a `projectId` and a `laneId`: there is no intake defaulting here, so read " +
     "`lanes` and pick one, which for work nobody should start yet is the lane with `intake` " +
     "set. `acceptance` is what a review agent will judge it on, and is worth writing even " +
     "when the body says it in passing — a criterion buried in a paragraph is one that gets " +
@@ -238,11 +242,12 @@ const HINTS: Record<string, string> = {
  * The rest are named after neither prefix, so they arrive under the conservative default of
  * destructive and not idempotent. Only one of them earns it.
  *
- * The four that run an agent destroy nothing: each adds a run and waits for it. None is
- * idempotent — decomposing a task twice makes two sets of cards, and refining it twice is two
- * turns of a conversation — so the default is overridden in one direction only. `accept_task`,
- * `move_card`, `retry_card`, `archive_card` and `restore_card` do the same thing twice
- * running, and none discards anything.
+ * The two that run an agent destroy nothing: each adds a run and waits for it. Neither is
+ * idempotent — refining a task twice is two turns of a conversation — so the default is
+ * overridden in one direction only. The two front doors are the same shape: each adds a card
+ * and discards nothing, and asking twice puts two cards on the board. `move_card`,
+ * `retry_card`, `archive_card` and `restore_card` do the same thing twice running, and none
+ * discards anything.
  *
  * `stop_card` keeps the destructive mark. Aborting a run discards it: the run is finished as
  * `stopped` with no output, so whatever the agent had done by then is gone and cannot be
@@ -250,11 +255,10 @@ const HINTS: Record<string, string> = {
  * nothing is in flight and it answers `false` — and that is the part the convention cannot know.
  */
 const WRITE_HINTS: Record<string, { destructiveHint?: boolean; idempotentHint?: boolean }> = {
-  submit_task: { destructiveHint: false },
+  submit_card: { destructiveHint: false },
+  make_card: { destructiveHint: false },
   refine_task: { destructiveHint: false },
-  decompose_task: { destructiveHint: false },
   run_card: { destructiveHint: false },
-  accept_task: { destructiveHint: false, idempotentHint: true },
   move_card: { destructiveHint: false, idempotentHint: true },
   retry_card: { destructiveHint: false, idempotentHint: true },
   // Neither loses anything — archiving is the alternative to deleting, and each is the other's

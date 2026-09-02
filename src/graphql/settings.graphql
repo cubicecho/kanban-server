@@ -13,7 +13,6 @@ query Settings {
     runRetentionDays
     workerIntervalSeconds
     refineAgentId
-    decomposeAgentId
     refinePrompt
   }
 }

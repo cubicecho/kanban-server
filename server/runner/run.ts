@@ -16,12 +16,10 @@ import {
 } from "../db/schema.ts";
 import { type AgentResult, runAgent } from "./agent.ts";
 import { emit } from "./events.ts";
-import { loadSettings, type Resolved, resolveAgentId, resolveJobAgent } from "./llm.ts";
+import { loadSettings, type Resolved, resolveAgentId, resolveRefineAgent } from "./llm.ts";
 import {
   cardPrompt,
-  DECOMPOSE_SYSTEM,
-  type DecomposedCard,
-  decomposePrompt,
+  type ProposedCard,
   projectContext,
   REFINE_SYSTEM,
   systemPromptFor,
@@ -68,7 +66,6 @@ const INTERRUPTED = "interrupted by a restart";
 export interface Interrupted {
   runs: number;
   cards: number;
-  tasks: number;
 }
 
 /**
@@ -85,9 +82,8 @@ export interface Interrupted {
  * `running` row is stale by definition. The runs are marked `error` rather than `stopped` —
  * `stopped` is a run somebody called off, and nobody called these off — and their cards go back
  * to `idle` with the reason on their face, which is where an auto-run board picks them up again
- * and a manual one shows a person what happened. A task caught mid-decomposition is left
- * `error` for the opposite reason: nothing decomposes a task unasked, so being told to ask
- * again is the whole of the recovery.
+ * and a manual one shows a person what happened. Nothing is put back on a task: a refinement is
+ * one turn of a conversation, and breaking work up is a card on the board like any other.
  *
  * Whatever this process is genuinely running is left alone, so calling it later is safe rather
  * than merely discouraged. It costs an attempt nothing — a restart is not the card's failure.
@@ -113,18 +109,10 @@ export async function reconcile(): Promise<Interrupted> {
     )
     .returning({ id: cards.id });
 
-  const halfDone = await db
-    .update(tasks)
-    .set({ status: "error", error: INTERRUPTED })
-    .where(
-      and(
-        eq(tasks.status, "decomposing"),
-        subjects.length ? notInArray(tasks.id, subjects) : undefined,
-      ),
-    )
-    .returning({ id: tasks.id });
-
-  return { runs: abandoned.length, cards: stranded.length, tasks: halfDone.length };
+  // A task has nothing left to be caught in the middle of. Refining is one turn of a
+  // conversation — an interrupted one leaves the thread a message short and nothing else — and
+  // breaking work up happens on the board now, where it is a card like any other.
+  return { runs: abandoned.length, cards: stranded.length };
 }
 
 interface ExecuteOptions {
@@ -252,6 +240,10 @@ interface RefineReply {
  * One turn of refining a task: the person says something, the agent answers, and the brief is
  * rewritten.
  *
+ * A task can be talked about for as long as anyone wants to. There is nothing to be past: the
+ * conversation's one exit is somebody making a card out of it, and that leaves the thread
+ * where it is rather than closing it.
+ *
  * The whole thread is sent each time rather than kept as a session — a refinement is a handful
  * of short turns, and holding conversation state across HTTP requests would buy nothing and
  * cost a reconnection story.
@@ -261,9 +253,8 @@ interface RefineReply {
  */
 export async function refineTask(taskId: string, userMessage: string): Promise<Run> {
   const task = await loadTask(taskId);
-  if (task.status !== "draft") throw new Error("this task has been accepted; it is past refining");
   const project = await loadProject(task.projectId);
-  const agent = await resolveJobAgent("refine", project.refineAgentId);
+  const agent = await resolveRefineAgent(project.refineAgentId);
   const config = await loadSettings();
 
   await db.insert(messages).values({ taskId, role: "user", content: userMessage });
@@ -308,7 +299,7 @@ export async function refineTask(taskId: string, userMessage: string): Promise<R
   return run;
 }
 
-/** Where decomposed cards land: the lane marked `intake`, else the leftmost one. */
+/** A project's front door: the lane marked `intake`, else the leftmost one. */
 async function intakeLane(projectId: string) {
   const [lane] = await db
     .select()
@@ -316,7 +307,7 @@ async function intakeLane(projectId: string) {
     .where(eq(lanes.projectId, projectId))
     .orderBy(desc(lanes.intake), asc(lanes.position))
     .limit(1);
-  if (!lane) throw new Error("this project has no lanes — add one before decomposing a task");
+  if (!lane) throw new Error("this project has no lanes — add one before putting work in it");
   return lane;
 }
 
@@ -331,64 +322,29 @@ const nextPosition = async (laneId: string) => {
 };
 
 /**
- * Turns one accepted task into the cards that carry it out.
+ * Turns proposed cards into rows, in the order they were proposed, and links what they wait on.
  *
- * The task is marked `decomposing` before the agent starts and `decomposed` or `error` after,
- * so a decomposition in flight is visible and a failed one says why on the task rather than
- * only in the run history.
- *
- * A decomposition that produces nothing usable is an error, not an empty success: a task the
- * agent could not break up is exactly the case a person needs to be told about.
+ * Dependencies come back as titles, because a model cannot know the ids of rows that do not
+ * exist yet. Anything naming a card outside this batch is dropped rather than failing the whole
+ * expansion — a hallucinated title is a lost ordering hint, not a lost card.
  */
-export async function decomposeTask(taskId: string): Promise<Run> {
-  const task = await loadTask(taskId);
-  if (!task.brief.trim()) throw new Error("this task has no brief for the decomposer to read");
-  const project = await loadProject(task.projectId);
-  const agent = await resolveJobAgent("decompose", project.decomposeAgentId);
-  const lane = await intakeLane(project.id);
-
-  await db.update(tasks).set({ status: "decomposing", error: "" }).where(eq(tasks.id, taskId));
-
-  const { run, result } = await execute({
-    subjectId: taskId,
-    projectId: project.id,
-    agent,
-    kind: "decompose",
-    taskId,
-    label: `decomposing "${task.title || "untitled task"}"`,
-    systemPrompt: systemPromptFor({ identity: agent.systemPrompt, role: DECOMPOSE_SYSTEM }),
-    prompt: decomposePrompt(project, task),
-  });
-
-  const fail = async (why: string) => {
-    await db.update(tasks).set({ status: "error", error: why }).where(eq(tasks.id, taskId));
-    return db
-      .update(runs)
-      .set({ status: "error", error: run.error || why })
-      .where(eq(runs.id, run.id))
-      .returning()
-      .then((rows) => rows[0]);
-  };
-
-  if (run.status !== "ok" || !result) {
-    return await fail(run.error || "the decompose agent did not finish");
-  }
-
-  const proposed = (parseJson<DecomposedCard[]>(result.output) ?? []).filter(
-    (card) => card && typeof card.title === "string" && card.title.trim(),
-  );
-  if (!proposed.length) {
-    return await fail("the decompose agent produced no cards this server could read");
-  }
-
-  const start = await nextPosition(lane.id);
+async function writeCards(where: {
+  projectId: string;
+  laneId: string;
+  taskId?: string | null;
+  parentId?: string | null;
+  runId: string;
+  proposed: ProposedCard[];
+}): Promise<Card[]> {
+  const start = await nextPosition(where.laneId);
   const written = await db
     .insert(cards)
     .values(
-      proposed.map((card, at) => ({
-        projectId: project.id,
-        taskId,
-        laneId: lane.id,
+      where.proposed.map((card, at) => ({
+        projectId: where.projectId,
+        taskId: where.taskId ?? null,
+        parentId: where.parentId ?? null,
+        laneId: where.laneId,
         title: card.title.trim(),
         body: card.body?.trim() ?? "",
         acceptance: card.acceptance?.trim() ?? "",
@@ -402,16 +358,13 @@ export async function decomposeTask(taskId: string): Promise<Run> {
   for (const card of written)
     await recordMove({
       cardId: card.id,
-      runId: run.id,
-      toLaneId: lane.id,
+      runId: where.runId,
+      toLaneId: where.laneId,
       actor: "agent",
     });
 
-  // Dependencies come back as titles, because a model cannot know the ids of rows that do not
-  // exist yet. Anything naming a card outside this batch is dropped rather than failing the
-  // decomposition — a hallucinated title is a lost ordering hint, not a lost card.
   const byTitle = new Map(written.map((card) => [card.title, card.id]));
-  const links = proposed.flatMap((card, at) =>
+  const links = where.proposed.flatMap((card, at) =>
     (card.dependsOn ?? [])
       .map((title) => byTitle.get(title.trim()))
       .filter((dependsOnCardId) => dependsOnCardId && dependsOnCardId !== written[at].id)
@@ -421,9 +374,56 @@ export async function decomposeTask(taskId: string): Promise<Run> {
       })),
   );
   if (links.length) await db.insert(cardDeps).values(links).onConflictDoNothing();
+  return written;
+}
 
-  await db.update(tasks).set({ status: "decomposed", error: "" }).where(eq(tasks.id, taskId));
-  return run;
+/** The cards an expanding station's answer proposes — none, where this server could read none. */
+const proposedCards = (output: string): ProposedCard[] =>
+  (parseJson<ProposedCard[]>(output) ?? []).filter(
+    (card) => card && typeof card.title === "string" && card.title.trim(),
+  );
+
+/**
+ * A card in at the front door.
+ *
+ * This is the way onto a board for a caller that has no lane ids to hand — an MCP client, or a
+ * conversation that has finished being a conversation. Where the front door is is the project's
+ * business, which is what `intake` on a lane says.
+ */
+export async function submitCard(
+  projectId: string,
+  title: string,
+  body: string,
+  taskId?: string | null,
+): Promise<Card> {
+  const lane = await intakeLane(projectId);
+  const [card] = await db
+    .insert(cards)
+    .values({
+      projectId,
+      taskId: taskId ?? null,
+      laneId: lane.id,
+      title: title.trim() || body.trim().slice(0, 80) || "untitled",
+      body,
+      position: await nextPosition(lane.id),
+    })
+    .returning();
+  await recordMove({ cardId: card.id, toLaneId: lane.id, actor: "user" });
+  return card;
+}
+
+/**
+ * The one exit from a conversation: what was talked about, as a card in the front door.
+ *
+ * The thread is left exactly where it is. A task has no status to advance and nothing further
+ * happens to it — whether it produced work is the card pointing back at it, which is a fact
+ * about the board rather than a second copy of one.
+ */
+export async function makeCard(taskId: string): Promise<Card> {
+  const task = await loadTask(taskId);
+  if (!task.brief.trim() && !task.title.trim())
+    throw new Error("this task has nothing in it yet — say what you want first");
+  return submitCard(task.projectId, task.title, task.brief, taskId);
 }
 
 /**
@@ -467,6 +467,10 @@ export async function blockers(cardId: string): Promise<Card[]> {
  * whether it answered: a reviewer did its job either way, so its run is `ok`, and a verdict
  * beginning FAIL sends the card down the failure arm. Anything else counts as a pass, because a
  * reviewer that cannot make itself clear should not silently block the board.
+ *
+ * A lane whose role `expand`s answers with cards instead. They are written down the pass arrow
+ * and the card that asked for them is archived: it has become the work rather than waiting on
+ * it, and leaving it on the board would be a card nobody can finish.
  */
 export async function runCard(cardId: string, agentId?: string | null): Promise<Run> {
   const card = await loadCard(cardId);
@@ -485,6 +489,12 @@ export async function runCard(cardId: string, agentId?: string | null): Promise<
   const [role] = lane.roleId
     ? await db.select().from(roles).where(eq(roles.id, lane.roleId)).limit(1)
     : [undefined];
+  // Where an expansion's children would land, asked before the run rather than after it: a
+  // station that breaks cards up and has nowhere to put the pieces has no job it can finish,
+  // and finding that out after the tokens are spent helps nobody.
+  if (role?.contract === "expand" && !lane.onSuccessLaneId)
+    throw new Error(`lane "${lane.name}" breaks cards up but has no lane to put them in`);
+
   // The project's background is asked for separately from the job, because a lane that says
   // nothing at all is a lane with no job — and a system prompt made only of background would
   // hide that behind text an agent cannot act on.
@@ -528,7 +538,13 @@ export async function runCard(cardId: string, agentId?: string | null): Promise<
   const judges = role?.contract === "verdict";
   const verdict: Run["verdict"] =
     judges && ok ? (/^\s*FAIL\b/i.test(output) ? "fail" : "pass") : "none";
-  const passed = ok && verdict !== "fail";
+
+  // An expansion is judged on what it produced. An answer no cards could be read out of is a
+  // failure and not an empty success: a card the agent could not break up is exactly the case
+  // a person needs telling about, and a board that quietly swallowed it would lose the work.
+  const proposed = role?.contract === "expand" && ok ? proposedCards(output) : [];
+  const barren = role?.contract === "expand" && ok && !proposed.length;
+  const passed = ok && verdict !== "fail" && !barren;
   // A run somebody called off is not a verdict on the card: it costs it no attempt and leaves
   // it where it was, to be started again whenever.
   const stopped = run.status === "stopped";
@@ -551,6 +567,20 @@ export async function runCard(cardId: string, agentId?: string | null): Promise<
   const landing = next ?? lane;
   const rework = !passed && !stopped && attempts <= lane.maxAttempts && !!landing.agentId;
 
+  // The children go where the parent's pass arrow points — the same place the parent would have
+  // gone, because that is what the board says happens to work that is finished here.
+  const children =
+    passed && proposed.length && next
+      ? await writeCards({
+          projectId: project.id,
+          laneId: next.id,
+          taskId: card.taskId,
+          parentId: cardId,
+          runId: run.id,
+          proposed,
+        })
+      : [];
+
   // A card that passes into a lane with an agent of its own is not finished — it is waiting for
   // that lane's turn, and only an `idle` card is picked up. `done` is for a card nothing further
   // will happen to: one that stayed put, or one that landed where no agent runs.
@@ -568,25 +598,46 @@ export async function runCard(cardId: string, agentId?: string | null): Promise<
             ? verdict === "fail"
               ? "rejected"
               : "error"
-            : next?.agentId
-              ? "idle"
-              : "done",
+            : children.length
+              ? "done"
+              : next?.agentId
+                ? "idle"
+                : "done",
       // A station that judges does not overwrite the account of the work with its ruling on it:
       // that report is the one thing the agent asked to fix the card needs to read. The ruling
       // goes on the move it caused, where the next prompt picks it up as the reason.
       result: judges ? card.result : output || card.result,
       // What broke, and only that. A verdict is not a fault and a stopped run is not one
       // either — the sentence that used to be invented here, "the agent did not finish", was
-      // written onto every card whose run somebody deliberately called off.
-      error: run.error,
+      // written onto every card whose run somebody deliberately called off. An expansion that
+      // answered with nothing readable did break, and this is where it says so.
+      error: barren ? "the agent produced no cards this server could read" : run.error,
       attempts,
-      ...(target ? { laneId: target, position: await nextPosition(target) } : {}),
+      // A card that has become other cards goes off the board rather than along it. Its own
+      // lane is kept, which is where restoring would put it back.
+      ...(children.length
+        ? { archivedAt: new Date() }
+        : target
+          ? { laneId: target, position: await nextPosition(target) }
+          : {}),
     })
     .where(eq(cards.id, cardId));
 
   // A ruling that moved nothing is still a ruling, so it is recorded where it stands: `from`
   // and `to` being the same lane is the ledger's way of saying the card was judged and left.
-  if (verdict !== "none" || next)
+  // A card that was broken up went nowhere at all — `to` is null, which is this ledger's word
+  // for off the board — and the note says what became of it, since the run that says so will
+  // be pruned long before the children are.
+  if (children.length)
+    await recordMove({
+      cardId,
+      runId: run.id,
+      fromLaneId: lane.id,
+      toLaneId: null,
+      note: `broken into ${children.length} card(s)`,
+      actor: "agent",
+    });
+  else if (verdict !== "none" || next)
     await recordMove({
       cardId,
       runId: run.id,
@@ -597,6 +648,17 @@ export async function runCard(cardId: string, agentId?: string | null): Promise<
     });
 
   if (verdict !== "none") await db.update(runs).set({ verdict }).where(eq(runs.id, run.id));
+
+  // An expansion nobody could read cards out of is a failed run and not a successful one that
+  // happened to write nothing, so the run history says so too.
+  if (barren) {
+    const [failed] = await db
+      .update(runs)
+      .set({ status: "error", error: "the agent produced no cards this server could read" })
+      .where(eq(runs.id, run.id))
+      .returning();
+    return { ...failed, verdict };
+  }
 
   return { ...run, verdict };
 }

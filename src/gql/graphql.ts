@@ -759,6 +759,7 @@ export type Card = {
   id: Scalars['String']['output'];
   lane: Lane;
   laneId: Scalars['String']['output'];
+  parentId?: Maybe<Scalars['String']['output']>;
   position: Scalars['Int']['output'];
   project: Project;
   projectId: Scalars['String']['output'];
@@ -876,6 +877,7 @@ export type CardCountDistinctAggregate = {
   error: Scalars['Int']['output'];
   id: Scalars['Int']['output'];
   laneId: Scalars['Int']['output'];
+  parentId: Scalars['Int']['output'];
   position: Scalars['Int']['output'];
   projectId: Scalars['Int']['output'];
   result: Scalars['Int']['output'];
@@ -894,6 +896,7 @@ export type CardCountDistinctHaving = {
   error?: InputMaybe<AggregateNumberFilter>;
   id?: InputMaybe<AggregateNumberFilter>;
   laneId?: InputMaybe<AggregateNumberFilter>;
+  parentId?: InputMaybe<AggregateNumberFilter>;
   position?: InputMaybe<AggregateNumberFilter>;
   projectId?: InputMaybe<AggregateNumberFilter>;
   result?: InputMaybe<AggregateNumberFilter>;
@@ -912,6 +915,7 @@ export type CardCountNonNullAggregate = {
   error: Scalars['Int']['output'];
   id: Scalars['Int']['output'];
   laneId: Scalars['Int']['output'];
+  parentId: Scalars['Int']['output'];
   position: Scalars['Int']['output'];
   projectId: Scalars['Int']['output'];
   result: Scalars['Int']['output'];
@@ -930,6 +934,7 @@ export type CardCountNonNullHaving = {
   error?: InputMaybe<AggregateNumberFilter>;
   id?: InputMaybe<AggregateNumberFilter>;
   laneId?: InputMaybe<AggregateNumberFilter>;
+  parentId?: InputMaybe<AggregateNumberFilter>;
   position?: InputMaybe<AggregateNumberFilter>;
   projectId?: InputMaybe<AggregateNumberFilter>;
   result?: InputMaybe<AggregateNumberFilter>;
@@ -1086,6 +1091,7 @@ export enum CardDistinctColumn {
   Error = 'error',
   Id = 'id',
   LaneId = 'laneId',
+  ParentId = 'parentId',
   Position = 'position',
   ProjectId = 'projectId',
   Result = 'result',
@@ -1388,6 +1394,7 @@ export type CardFilters = {
   /** Matches rows whose lane matches these filters */
   lane?: InputMaybe<LaneFilters>;
   laneId?: InputMaybe<StringFilter>;
+  parentId?: InputMaybe<StringFilter>;
   position?: InputMaybe<IntFilter>;
   /** Matches rows whose project matches these filters */
   project?: InputMaybe<ProjectFilters>;
@@ -1423,6 +1430,7 @@ export enum CardGroupByColumn {
   Error = 'error',
   Id = 'id',
   LaneId = 'laneId',
+  ParentId = 'parentId',
   Position = 'position',
   ProjectId = 'projectId',
   Result = 'result',
@@ -1442,6 +1450,7 @@ export type CardGroupKeys = {
   error?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['String']['output']>;
   laneId?: Maybe<Scalars['String']['output']>;
+  parentId?: Maybe<Scalars['String']['output']>;
   position?: Maybe<Scalars['Int']['output']>;
   projectId?: Maybe<Scalars['String']['output']>;
   result?: Maybe<Scalars['String']['output']>;
@@ -1481,6 +1490,7 @@ export type CardMaxAggregate = {
   error?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['String']['output']>;
   laneId?: Maybe<Scalars['String']['output']>;
+  parentId?: Maybe<Scalars['String']['output']>;
   position?: Maybe<Scalars['Int']['output']>;
   projectId?: Maybe<Scalars['String']['output']>;
   result?: Maybe<Scalars['String']['output']>;
@@ -1504,6 +1514,7 @@ export type CardMinAggregate = {
   error?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['String']['output']>;
   laneId?: Maybe<Scalars['String']['output']>;
+  parentId?: Maybe<Scalars['String']['output']>;
   position?: Maybe<Scalars['Int']['output']>;
   projectId?: Maybe<Scalars['String']['output']>;
   result?: Maybe<Scalars['String']['output']>;
@@ -1529,6 +1540,7 @@ export type CardOrderBy = {
   /** Order by columns of the related lane row */
   lane?: InputMaybe<LaneOrderBy>;
   laneId?: InputMaybe<InnerOrder>;
+  parentId?: InputMaybe<InnerOrder>;
   position?: InputMaybe<InnerOrder>;
   /** Order by columns of the related project row */
   project?: InputMaybe<ProjectOrderBy>;
@@ -1650,6 +1662,7 @@ export type CreateCardInput = {
   error?: InputMaybe<Scalars['String']['input']>;
   id?: InputMaybe<Scalars['String']['input']>;
   laneId: Scalars['String']['input'];
+  parentId?: InputMaybe<Scalars['String']['input']>;
   position?: InputMaybe<Scalars['Int']['input']>;
   projectId: Scalars['String']['input'];
   result?: InputMaybe<Scalars['String']['input']>;
@@ -1700,7 +1713,6 @@ export type CreateProjectInput = {
   autoRun?: InputMaybe<Scalars['Boolean']['input']>;
   context?: InputMaybe<Scalars['String']['input']>;
   createdAt?: InputMaybe<Scalars['DateTime']['input']>;
-  decomposeAgentId?: InputMaybe<Scalars['String']['input']>;
   description?: InputMaybe<Scalars['String']['input']>;
   id?: InputMaybe<Scalars['String']['input']>;
   name: Scalars['String']['input'];
@@ -1721,10 +1733,8 @@ export type CreateRoleInput = {
 export type CreateTaskInput = {
   brief?: InputMaybe<Scalars['String']['input']>;
   createdAt?: InputMaybe<Scalars['DateTime']['input']>;
-  error?: InputMaybe<Scalars['String']['input']>;
   id?: InputMaybe<Scalars['String']['input']>;
   projectId: Scalars['String']['input'];
-  status?: InputMaybe<TasksStatusEnum>;
   title?: InputMaybe<Scalars['String']['input']>;
   updatedAt?: InputMaybe<Scalars['DateTime']['input']>;
 };
@@ -2713,8 +2723,6 @@ export type MessagesRoleEnumFilter = {
 };
 
 export type Mutation = {
-  /** Marks a refined task ready for the decomposer, without running it. `decomposeTask` is the next step, and is what actually produces cards. */
-  acceptTask: Task;
   /** Redraws a project's board from a saved template, and answers with the lanes it wrote. Refused once the board has cards on it, archived ones included: replacing lanes takes their cards with them, so this is for a project that has not started rather than a way to rearrange one that has. */
   applyBoardTemplate: Array<Lane>;
   /** Takes a card off the board without deleting it. It stops being drawn in its lane, stops being picked up by that lane's agent, and stops counting as something other cards are waiting on — but it keeps its lane, its status and its result, and `restoreCard` puts it back. This is what a Done pile is for once it is long enough to be in the way. Read the archive with `cards(where: { archivedAt: { isNotNull: true } })`. Refused while an agent is working the card; archiving one already archived leaves the time it was archived alone. */
@@ -2739,8 +2747,6 @@ export type Mutation = {
   createRoles: Array<Role>;
   createTask: Task;
   createTasks: Array<Task>;
-  /** Breaks a task into cards and puts them in the project's intake lane, resolving with the finished run — which means it does not answer until the decomposer is done. The cards it wrote are the ones with this `taskId`. A decomposition that produced nothing readable fails, and says so on the task as well as in the run. */
-  decomposeTask: Run;
   deleteAgent: Array<Agent>;
   deleteAgentServer: Array<AgentServer>;
   deleteAgentServerSingle?: Maybe<AgentServer>;
@@ -2765,11 +2771,13 @@ export type Mutation = {
   deleteRunSingle?: Maybe<Run>;
   deleteTask: Array<Task>;
   deleteTaskSingle?: Maybe<Task>;
+  /** Ends a refining conversation by putting it on the board: writes the task's title and brief as one card in the project's intake lane, linked back to the task. It is one card and not many — breaking work up is a station on the board now, so a card landing in a lane that expands is what turns it into the cards that carry it out. The conversation is left exactly where it is and can go on afterwards. */
+  makeCard: Card;
   /** Puts a card in a lane, at a position, and renumbers the cards around it so the board stays in the order it looks like. Omit `position` to drop it at the end. A card that had failed comes back to `idle` with its attempts forgiven, which is what makes dragging one back a retry; a card an agent is working cannot be moved out from under it, and nor can an archived one — `restoreCard` is what puts that back on the board. Say why in `note` and the agent that picks the card up is told it, the same way a reviewer's rejection reaches one: moving a card back without saying what was wrong with it buys a second attempt identical to the first. */
   moveCard: Card;
   /** Tears down and rebuilds every MCP connection. */
   reconnectMcp: Array<McpServerStatus>;
-  /** One turn of talking a task into shape: says something to the refining agent and resolves once it has answered. The answer is appended to the task's messages and the task's title and brief are rewritten from it, so read the task back after this to see where the brief has got to. Only a `draft` task can be refined. */
+  /** One turn of talking a task into shape: says something to the refining agent and resolves once it has answered. The answer is appended to the task's messages and the task's title and brief are rewritten from it, so read the task back after this to see where the brief has got to. A task can be talked about for as long as you like; `makeCard` is what ends the conversation by putting it on the board. */
   refineTask: Run;
   /** Puts an archived card back on the board, at the end of the lane it was archived from. Its status is left as it was found — a card archived as `error` comes back as one, and `retryCard` is still the way to put that back in play — because what the card was is the reason someone archived it. The end of the lane rather than its old position, which the cards added since have long taken. */
   restoreCard: Card;
@@ -2789,10 +2797,10 @@ export type Mutation = {
   setCardDeps: Array<Scalars['String']['output']>;
   /** Calls off the agent working a card. False means none was — a stale button, not a failure. The run is recorded as `stopped` and the card goes back to `idle` where it is, rather than moving on. */
   stopCard: Scalars['Boolean']['output'];
-  /** Calls off a refinement or decomposition in flight. False means none was running. */
+  /** Calls off a refinement in flight. False means none was running. */
   stopTask: Scalars['Boolean']['output'];
-  /** The short way in, for a caller that already knows what it wants: writes the task and decomposes it in one call, resolving with the task once its cards are on the board. Skips refinement entirely. A decomposition that fails leaves the task in `error` with the reason on it rather than throwing, so the task is still there to retry. */
-  submitTask: Task;
+  /** The way onto a board for a caller that has no lane ids: writes one card at the project's front door — the lane marked `intake`, else the leftmost — and answers with it. Use this rather than `create_card` unless you know exactly which lane you mean. If that lane is a station that expands, the card becomes the cards that carry the work out as soon as it is worked. */
+  submitCard: Card;
   /** Connects to a config that need not be saved yet and lists its tools, so a server can be checked before an agent depends on it. */
   testMcpServer: McpProbe;
   updateAgent: Array<Agent>;
@@ -2839,11 +2847,6 @@ export type Mutation = {
   updateTaskSingle?: Maybe<Task>;
   /** Each entry's updated rows, in entry order. An entry whose `where` matched no rows contributes `null` in its slot; an entry that matched several contributes each of its rows. */
   updateTasksMany: Array<Maybe<Task>>;
-};
-
-
-export type MutationAcceptTaskArgs = {
-  taskId: Scalars['String']['input'];
 };
 
 
@@ -2955,11 +2958,6 @@ export type MutationCreateTaskArgs = {
 
 export type MutationCreateTasksArgs = {
   values: Array<CreateTaskInput>;
-};
-
-
-export type MutationDecomposeTaskArgs = {
-  taskId: Scalars['String']['input'];
 };
 
 
@@ -3083,6 +3081,11 @@ export type MutationDeleteTaskSingleArgs = {
 };
 
 
+export type MutationMakeCardArgs = {
+  taskId: Scalars['String']['input'];
+};
+
+
 export type MutationMoveCardArgs = {
   cardId: Scalars['String']['input'];
   laneId: Scalars['String']['input'];
@@ -3153,8 +3156,8 @@ export type MutationStopTaskArgs = {
 };
 
 
-export type MutationSubmitTaskArgs = {
-  brief: Scalars['String']['input'];
+export type MutationSubmitCardArgs = {
+  body: Scalars['String']['input'];
   projectId: Scalars['String']['input'];
   title: Scalars['String']['input'];
 };
@@ -3375,8 +3378,6 @@ export type Project = {
   createdAt: Scalars['DateTime']['output'];
   /** Opaque cursor of this row's position in the query's ordering. Pass it as `after` to resume from here. Only set on rows returned by a list query. */
   cursor?: Maybe<Scalars['String']['output']>;
-  decomposeAgent?: Maybe<Agent>;
-  decomposeAgentId?: Maybe<Scalars['String']['output']>;
   description: Scalars['String']['output'];
   id: Scalars['String']['output'];
   lanes: Array<Lane>;
@@ -3404,11 +3405,6 @@ export type ProjectCardsArgs = {
 
 export type ProjectCardsAggregateArgs = {
   where?: InputMaybe<CardFilters>;
-};
-
-
-export type ProjectDecomposeAgentArgs = {
-  where?: InputMaybe<AgentFilters>;
 };
 
 
@@ -3472,7 +3468,6 @@ export type ProjectAggregate = {
 export type ProjectCountDistinctAggregate = {
   context: Scalars['Int']['output'];
   createdAt: Scalars['Int']['output'];
-  decomposeAgentId: Scalars['Int']['output'];
   description: Scalars['Int']['output'];
   id: Scalars['Int']['output'];
   name: Scalars['Int']['output'];
@@ -3483,7 +3478,6 @@ export type ProjectCountDistinctAggregate = {
 export type ProjectCountDistinctHaving = {
   context?: InputMaybe<AggregateNumberFilter>;
   createdAt?: InputMaybe<AggregateNumberFilter>;
-  decomposeAgentId?: InputMaybe<AggregateNumberFilter>;
   description?: InputMaybe<AggregateNumberFilter>;
   id?: InputMaybe<AggregateNumberFilter>;
   name?: InputMaybe<AggregateNumberFilter>;
@@ -3495,7 +3489,6 @@ export type ProjectCountNonNullAggregate = {
   autoRun: Scalars['Int']['output'];
   context: Scalars['Int']['output'];
   createdAt: Scalars['Int']['output'];
-  decomposeAgentId: Scalars['Int']['output'];
   description: Scalars['Int']['output'];
   id: Scalars['Int']['output'];
   name: Scalars['Int']['output'];
@@ -3507,7 +3500,6 @@ export type ProjectCountNonNullHaving = {
   autoRun?: InputMaybe<AggregateNumberFilter>;
   context?: InputMaybe<AggregateNumberFilter>;
   createdAt?: InputMaybe<AggregateNumberFilter>;
-  decomposeAgentId?: InputMaybe<AggregateNumberFilter>;
   description?: InputMaybe<AggregateNumberFilter>;
   id?: InputMaybe<AggregateNumberFilter>;
   name?: InputMaybe<AggregateNumberFilter>;
@@ -3520,7 +3512,6 @@ export enum ProjectDistinctColumn {
   AutoRun = 'autoRun',
   Context = 'context',
   CreatedAt = 'createdAt',
-  DecomposeAgentId = 'decomposeAgentId',
   Description = 'description',
   Id = 'id',
   Name = 'name',
@@ -3539,9 +3530,6 @@ export type ProjectFilters = {
   cards?: InputMaybe<CardListRelationFilter>;
   context?: InputMaybe<StringFilter>;
   createdAt?: InputMaybe<DateTimeFilter>;
-  /** Matches rows whose decomposeAgent matches these filters */
-  decomposeAgent?: InputMaybe<AgentFilters>;
-  decomposeAgentId?: InputMaybe<StringFilter>;
   description?: InputMaybe<StringFilter>;
   id?: InputMaybe<StringFilter>;
   lanes?: InputMaybe<LaneListRelationFilter>;
@@ -3568,7 +3556,6 @@ export enum ProjectGroupByColumn {
   AutoRun = 'autoRun',
   Context = 'context',
   CreatedAt = 'createdAt',
-  DecomposeAgentId = 'decomposeAgentId',
   Description = 'description',
   Id = 'id',
   Name = 'name',
@@ -3581,7 +3568,6 @@ export type ProjectGroupKeys = {
   autoRun?: Maybe<Scalars['Boolean']['output']>;
   context?: Maybe<Scalars['String']['output']>;
   createdAt?: Maybe<Scalars['DateTime']['output']>;
-  decomposeAgentId?: Maybe<Scalars['String']['output']>;
   description?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['String']['output']>;
   name?: Maybe<Scalars['String']['output']>;
@@ -3600,7 +3586,6 @@ export type ProjectHaving = {
 export type ProjectMaxAggregate = {
   context?: Maybe<Scalars['String']['output']>;
   createdAt?: Maybe<Scalars['DateTime']['output']>;
-  decomposeAgentId?: Maybe<Scalars['String']['output']>;
   description?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['String']['output']>;
   name?: Maybe<Scalars['String']['output']>;
@@ -3611,7 +3596,6 @@ export type ProjectMaxAggregate = {
 export type ProjectMinAggregate = {
   context?: Maybe<Scalars['String']['output']>;
   createdAt?: Maybe<Scalars['DateTime']['output']>;
-  decomposeAgentId?: Maybe<Scalars['String']['output']>;
   description?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['String']['output']>;
   name?: Maybe<Scalars['String']['output']>;
@@ -3623,9 +3607,6 @@ export type ProjectOrderBy = {
   autoRun?: InputMaybe<InnerOrder>;
   context?: InputMaybe<InnerOrder>;
   createdAt?: InputMaybe<InnerOrder>;
-  /** Order by columns of the related decomposeAgent row */
-  decomposeAgent?: InputMaybe<AgentOrderBy>;
-  decomposeAgentId?: InputMaybe<InnerOrder>;
   description?: InputMaybe<InnerOrder>;
   id?: InputMaybe<InnerOrder>;
   name?: InputMaybe<InnerOrder>;
@@ -4925,7 +4906,6 @@ export type Setting = {
   baseUrl: Scalars['String']['output'];
   /** Opaque cursor of this row's position in the query's ordering. Pass it as `after` to resume from here. Only set on rows returned by a list query. */
   cursor?: Maybe<Scalars['String']['output']>;
-  decomposeAgentId?: Maybe<Scalars['String']['output']>;
   id: Scalars['String']['output'];
   maxRetries: Scalars['Int']['output'];
   maxTokens: Scalars['Int']['output'];
@@ -4973,7 +4953,6 @@ export type SettingAvgHaving = {
 
 export type SettingCountDistinctAggregate = {
   baseUrl: Scalars['Int']['output'];
-  decomposeAgentId: Scalars['Int']['output'];
   id: Scalars['Int']['output'];
   maxRetries: Scalars['Int']['output'];
   maxTokens: Scalars['Int']['output'];
@@ -4991,7 +4970,6 @@ export type SettingCountDistinctAggregate = {
 
 export type SettingCountDistinctHaving = {
   baseUrl?: InputMaybe<AggregateNumberFilter>;
-  decomposeAgentId?: InputMaybe<AggregateNumberFilter>;
   id?: InputMaybe<AggregateNumberFilter>;
   maxRetries?: InputMaybe<AggregateNumberFilter>;
   maxTokens?: InputMaybe<AggregateNumberFilter>;
@@ -5009,7 +4987,6 @@ export type SettingCountDistinctHaving = {
 
 export type SettingCountNonNullAggregate = {
   baseUrl: Scalars['Int']['output'];
-  decomposeAgentId: Scalars['Int']['output'];
   id: Scalars['Int']['output'];
   maxRetries: Scalars['Int']['output'];
   maxTokens: Scalars['Int']['output'];
@@ -5027,7 +5004,6 @@ export type SettingCountNonNullAggregate = {
 
 export type SettingCountNonNullHaving = {
   baseUrl?: InputMaybe<AggregateNumberFilter>;
-  decomposeAgentId?: InputMaybe<AggregateNumberFilter>;
   id?: InputMaybe<AggregateNumberFilter>;
   maxRetries?: InputMaybe<AggregateNumberFilter>;
   maxTokens?: InputMaybe<AggregateNumberFilter>;
@@ -5046,7 +5022,6 @@ export type SettingCountNonNullHaving = {
 /** Columns of Setting that a query can be made distinct on */
 export enum SettingDistinctColumn {
   BaseUrl = 'baseUrl',
-  DecomposeAgentId = 'decomposeAgentId',
   Id = 'id',
   MaxRetries = 'maxRetries',
   MaxTokens = 'maxTokens',
@@ -5070,7 +5045,6 @@ export type SettingFilters = {
   /** At least one branch matches; ANDed with any sibling fields */
   OR?: InputMaybe<Array<SettingFilters>>;
   baseUrl?: InputMaybe<StringFilter>;
-  decomposeAgentId?: InputMaybe<StringFilter>;
   id?: InputMaybe<StringFilter>;
   maxRetries?: InputMaybe<IntFilter>;
   maxTokens?: InputMaybe<IntFilter>;
@@ -5100,7 +5074,6 @@ export type SettingGroupBy = {
 /** Columns of Setting that a query can group by */
 export enum SettingGroupByColumn {
   BaseUrl = 'baseUrl',
-  DecomposeAgentId = 'decomposeAgentId',
   Id = 'id',
   MaxRetries = 'maxRetries',
   MaxTokens = 'maxTokens',
@@ -5119,7 +5092,6 @@ export enum SettingGroupByColumn {
 /** The grouped column values of one Setting group. A column the query did not group by is null. */
 export type SettingGroupKeys = {
   baseUrl?: Maybe<Scalars['String']['output']>;
-  decomposeAgentId?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['String']['output']>;
   maxRetries?: Maybe<Scalars['Int']['output']>;
   maxTokens?: Maybe<Scalars['Int']['output']>;
@@ -5149,7 +5121,6 @@ export type SettingHaving = {
 
 export type SettingMaxAggregate = {
   baseUrl?: Maybe<Scalars['String']['output']>;
-  decomposeAgentId?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['String']['output']>;
   maxRetries?: Maybe<Scalars['Int']['output']>;
   maxTokens?: Maybe<Scalars['Int']['output']>;
@@ -5177,7 +5148,6 @@ export type SettingMaxHaving = {
 
 export type SettingMinAggregate = {
   baseUrl?: Maybe<Scalars['String']['output']>;
-  decomposeAgentId?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['String']['output']>;
   maxRetries?: Maybe<Scalars['Int']['output']>;
   maxTokens?: Maybe<Scalars['Int']['output']>;
@@ -5205,7 +5175,6 @@ export type SettingMinHaving = {
 
 export type SettingOrderBy = {
   baseUrl?: InputMaybe<InnerOrder>;
-  decomposeAgentId?: InputMaybe<InnerOrder>;
   id?: InputMaybe<InnerOrder>;
   maxRetries?: InputMaybe<InnerOrder>;
   maxTokens?: InputMaybe<InnerOrder>;
@@ -5374,13 +5343,11 @@ export type Task = {
   createdAt: Scalars['DateTime']['output'];
   /** Opaque cursor of this row's position in the query's ordering. Pass it as `after` to resume from here. Only set on rows returned by a list query. */
   cursor?: Maybe<Scalars['String']['output']>;
-  error: Scalars['String']['output'];
   id: Scalars['String']['output'];
   messages: Array<Message>;
   messagesAggregate: MessageAggregate;
   project: Project;
   projectId: Scalars['String']['output'];
-  status: TasksStatusEnum;
   title: Scalars['String']['output'];
   updatedAt: Scalars['DateTime']['output'];
 };
@@ -5431,10 +5398,8 @@ export type TaskAggregate = {
 export type TaskCountDistinctAggregate = {
   brief: Scalars['Int']['output'];
   createdAt: Scalars['Int']['output'];
-  error: Scalars['Int']['output'];
   id: Scalars['Int']['output'];
   projectId: Scalars['Int']['output'];
-  status: Scalars['Int']['output'];
   title: Scalars['Int']['output'];
   updatedAt: Scalars['Int']['output'];
 };
@@ -5442,10 +5407,8 @@ export type TaskCountDistinctAggregate = {
 export type TaskCountDistinctHaving = {
   brief?: InputMaybe<AggregateNumberFilter>;
   createdAt?: InputMaybe<AggregateNumberFilter>;
-  error?: InputMaybe<AggregateNumberFilter>;
   id?: InputMaybe<AggregateNumberFilter>;
   projectId?: InputMaybe<AggregateNumberFilter>;
-  status?: InputMaybe<AggregateNumberFilter>;
   title?: InputMaybe<AggregateNumberFilter>;
   updatedAt?: InputMaybe<AggregateNumberFilter>;
 };
@@ -5453,10 +5416,8 @@ export type TaskCountDistinctHaving = {
 export type TaskCountNonNullAggregate = {
   brief: Scalars['Int']['output'];
   createdAt: Scalars['Int']['output'];
-  error: Scalars['Int']['output'];
   id: Scalars['Int']['output'];
   projectId: Scalars['Int']['output'];
-  status: Scalars['Int']['output'];
   title: Scalars['Int']['output'];
   updatedAt: Scalars['Int']['output'];
 };
@@ -5464,10 +5425,8 @@ export type TaskCountNonNullAggregate = {
 export type TaskCountNonNullHaving = {
   brief?: InputMaybe<AggregateNumberFilter>;
   createdAt?: InputMaybe<AggregateNumberFilter>;
-  error?: InputMaybe<AggregateNumberFilter>;
   id?: InputMaybe<AggregateNumberFilter>;
   projectId?: InputMaybe<AggregateNumberFilter>;
-  status?: InputMaybe<AggregateNumberFilter>;
   title?: InputMaybe<AggregateNumberFilter>;
   updatedAt?: InputMaybe<AggregateNumberFilter>;
 };
@@ -5476,10 +5435,8 @@ export type TaskCountNonNullHaving = {
 export enum TaskDistinctColumn {
   Brief = 'brief',
   CreatedAt = 'createdAt',
-  Error = 'error',
   Id = 'id',
   ProjectId = 'projectId',
-  Status = 'status',
   Title = 'title',
   UpdatedAt = 'updatedAt'
 }
@@ -5494,13 +5451,11 @@ export type TaskFilters = {
   brief?: InputMaybe<StringFilter>;
   cards?: InputMaybe<CardListRelationFilter>;
   createdAt?: InputMaybe<DateTimeFilter>;
-  error?: InputMaybe<StringFilter>;
   id?: InputMaybe<StringFilter>;
   messages?: InputMaybe<MessageListRelationFilter>;
   /** Matches rows whose project matches these filters */
   project?: InputMaybe<ProjectFilters>;
   projectId?: InputMaybe<StringFilter>;
-  status?: InputMaybe<TasksStatusEnumFilter>;
   title?: InputMaybe<StringFilter>;
   updatedAt?: InputMaybe<DateTimeFilter>;
 };
@@ -5518,10 +5473,8 @@ export type TaskGroupBy = {
 export enum TaskGroupByColumn {
   Brief = 'brief',
   CreatedAt = 'createdAt',
-  Error = 'error',
   Id = 'id',
   ProjectId = 'projectId',
-  Status = 'status',
   Title = 'title',
   UpdatedAt = 'updatedAt'
 }
@@ -5530,10 +5483,8 @@ export enum TaskGroupByColumn {
 export type TaskGroupKeys = {
   brief?: Maybe<Scalars['String']['output']>;
   createdAt?: Maybe<Scalars['DateTime']['output']>;
-  error?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['String']['output']>;
   projectId?: Maybe<Scalars['String']['output']>;
-  status?: Maybe<TasksStatusEnum>;
   title?: Maybe<Scalars['String']['output']>;
   updatedAt?: Maybe<Scalars['DateTime']['output']>;
 };
@@ -5558,10 +5509,8 @@ export type TaskListRelationFilter = {
 export type TaskMaxAggregate = {
   brief?: Maybe<Scalars['String']['output']>;
   createdAt?: Maybe<Scalars['DateTime']['output']>;
-  error?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['String']['output']>;
   projectId?: Maybe<Scalars['String']['output']>;
-  status?: Maybe<TasksStatusEnum>;
   title?: Maybe<Scalars['String']['output']>;
   updatedAt?: Maybe<Scalars['DateTime']['output']>;
 };
@@ -5569,10 +5518,8 @@ export type TaskMaxAggregate = {
 export type TaskMinAggregate = {
   brief?: Maybe<Scalars['String']['output']>;
   createdAt?: Maybe<Scalars['DateTime']['output']>;
-  error?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['String']['output']>;
   projectId?: Maybe<Scalars['String']['output']>;
-  status?: Maybe<TasksStatusEnum>;
   title?: Maybe<Scalars['String']['output']>;
   updatedAt?: Maybe<Scalars['DateTime']['output']>;
 };
@@ -5580,74 +5527,12 @@ export type TaskMinAggregate = {
 export type TaskOrderBy = {
   brief?: InputMaybe<InnerOrder>;
   createdAt?: InputMaybe<InnerOrder>;
-  error?: InputMaybe<InnerOrder>;
   id?: InputMaybe<InnerOrder>;
   /** Order by columns of the related project row */
   project?: InputMaybe<ProjectOrderBy>;
   projectId?: InputMaybe<InnerOrder>;
-  status?: InputMaybe<InnerOrder>;
   title?: InputMaybe<InnerOrder>;
   updatedAt?: InputMaybe<InnerOrder>;
-};
-
-export enum TasksStatusEnum {
-  /** Value: decomposed */
-  Decomposed = 'decomposed',
-  /** Value: decomposing */
-  Decomposing = 'decomposing',
-  /** Value: draft */
-  Draft = 'draft',
-  /** Value: error */
-  Error = 'error',
-  /** Value: ready */
-  Ready = 'ready'
-}
-
-export type TasksStatusEnumFilter = {
-  /** Every branch matches */
-  AND?: InputMaybe<Array<TasksStatusEnumFilter>>;
-  /** Negates the nested operators */
-  NOT?: InputMaybe<TasksStatusEnumFilter>;
-  /** At least one branch matches; ANDed with any sibling operators */
-  OR?: InputMaybe<Array<TasksStatusEnumFilter>>;
-  /** Matches values containing the given string. `%`, `_` and `\` are matched literally. */
-  contains?: InputMaybe<Scalars['String']['input']>;
-  /** Matches values ending with the given string. `%`, `_` and `\` are matched literally. */
-  endsWith?: InputMaybe<Scalars['String']['input']>;
-  /** Equal to */
-  eq?: InputMaybe<TasksStatusEnum>;
-  /** Greater than */
-  gt?: InputMaybe<TasksStatusEnum>;
-  /** Greater than or equal to */
-  gte?: InputMaybe<TasksStatusEnum>;
-  /** Case-insensitive `contains`. */
-  iContains?: InputMaybe<Scalars['String']['input']>;
-  /** Case-insensitive `endsWith`. */
-  iEndsWith?: InputMaybe<Scalars['String']['input']>;
-  /** Case-insensitive `startsWith`. */
-  iStartsWith?: InputMaybe<Scalars['String']['input']>;
-  ilike?: InputMaybe<Scalars['String']['input']>;
-  /** Matches any one of these values (SQL `IN`) */
-  inArray?: InputMaybe<Array<TasksStatusEnum>>;
-  /** When true, every comparison operator in this object matches case-insensitively — `eq`, `ne`, the ordering operators, `inArray`/`notInArray` and the pattern operators all compare `lower(column)` against `lower(operand)`. Applies only to the operators beside it; a nested `AND`/`OR`/`NOT` branch sets its own. */
-  insensitive?: InputMaybe<Scalars['Boolean']['input']>;
-  /** When true, matches rows where the column is not NULL */
-  isNotNull?: InputMaybe<Scalars['Boolean']['input']>;
-  /** When true, matches rows where the column is NULL */
-  isNull?: InputMaybe<Scalars['Boolean']['input']>;
-  like?: InputMaybe<Scalars['String']['input']>;
-  /** Less than */
-  lt?: InputMaybe<TasksStatusEnum>;
-  /** Less than or equal to */
-  lte?: InputMaybe<TasksStatusEnum>;
-  /** Not equal to */
-  ne?: InputMaybe<TasksStatusEnum>;
-  notIlike?: InputMaybe<Scalars['String']['input']>;
-  /** Matches none of these values (SQL `NOT IN`) */
-  notInArray?: InputMaybe<Array<TasksStatusEnum>>;
-  notLike?: InputMaybe<Scalars['String']['input']>;
-  /** Matches values starting with the given string. `%`, `_` and `\` are matched literally. */
-  startsWith?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type UpdateAgentInput = {
@@ -5709,6 +5594,7 @@ export type UpdateCardInput = {
   error?: InputMaybe<Scalars['String']['input']>;
   id?: InputMaybe<Scalars['String']['input']>;
   laneId?: InputMaybe<Scalars['String']['input']>;
+  parentId?: InputMaybe<Scalars['String']['input']>;
   position?: InputMaybe<Scalars['Int']['input']>;
   projectId?: InputMaybe<Scalars['String']['input']>;
   result?: InputMaybe<Scalars['String']['input']>;
@@ -5787,7 +5673,6 @@ export type UpdateProjectInput = {
   autoRun?: InputMaybe<Scalars['Boolean']['input']>;
   context?: InputMaybe<Scalars['String']['input']>;
   createdAt?: InputMaybe<Scalars['DateTime']['input']>;
-  decomposeAgentId?: InputMaybe<Scalars['String']['input']>;
   description?: InputMaybe<Scalars['String']['input']>;
   id?: InputMaybe<Scalars['String']['input']>;
   name?: InputMaybe<Scalars['String']['input']>;
@@ -5821,7 +5706,6 @@ export type UpdateRoleManyInput = {
 
 export type UpdateSettingInput = {
   baseUrl?: InputMaybe<Scalars['String']['input']>;
-  decomposeAgentId?: InputMaybe<Scalars['String']['input']>;
   id?: InputMaybe<Scalars['String']['input']>;
   maxRetries?: InputMaybe<Scalars['Int']['input']>;
   maxTokens?: InputMaybe<Scalars['Int']['input']>;
@@ -5847,10 +5731,8 @@ export type UpdateSettingManyInput = {
 export type UpdateTaskInput = {
   brief?: InputMaybe<Scalars['String']['input']>;
   createdAt?: InputMaybe<Scalars['DateTime']['input']>;
-  error?: InputMaybe<Scalars['String']['input']>;
   id?: InputMaybe<Scalars['String']['input']>;
   projectId?: InputMaybe<Scalars['String']['input']>;
-  status?: InputMaybe<TasksStatusEnum>;
   title?: InputMaybe<Scalars['String']['input']>;
   updatedAt?: InputMaybe<Scalars['DateTime']['input']>;
 };
@@ -6064,7 +5946,7 @@ export type ReconnectMcpMutation = { reconnectMcp: Array<{ id: string, status: s
 export type ProjectsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type ProjectsQuery = { projects: Array<{ id: string, name: string, description: string, context: string, autoRun: boolean, refineAgentId?: string | null, decomposeAgentId?: string | null }> };
+export type ProjectsQuery = { projects: Array<{ id: string, name: string, description: string, context: string, autoRun: boolean, refineAgentId?: string | null }> };
 
 export type CreateProjectMutationVariables = Exact<{
   values: CreateProjectInput;
@@ -6153,7 +6035,7 @@ export type CardRunsQuery = { runs: Array<{ id: string, status: RunsStatusEnum, 
 export type SettingsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type SettingsQuery = { settings: Array<{ id: string, baseUrl: string, model: string, maxTokens: number, temperature: number, maxToolIterations: number, toolDiscovery: SettingsToolDiscoveryEnum, toolSelectModel: string, requestTimeoutSeconds: number, maxRetries: number, runRetentionDays: number, workerIntervalSeconds: number, refineAgentId?: string | null, decomposeAgentId?: string | null, refinePrompt: string }> };
+export type SettingsQuery = { settings: Array<{ id: string, baseUrl: string, model: string, maxTokens: number, temperature: number, maxToolIterations: number, toolDiscovery: SettingsToolDiscoveryEnum, toolSelectModel: string, requestTimeoutSeconds: number, maxRetries: number, runRetentionDays: number, workerIntervalSeconds: number, refineAgentId?: string | null, refinePrompt: string }> };
 
 export type UpdateSettingsMutationVariables = Exact<{
   set: UpdateSettingInput;
@@ -6183,14 +6065,14 @@ export type TasksQueryVariables = Exact<{
 }>;
 
 
-export type TasksQuery = { tasks: Array<{ id: string, title: string, brief: string, status: TasksStatusEnum, error: string, createdAt: string, messages: Array<{ id: string, role: MessagesRoleEnum, content: string }>, cards: Array<{ id: string, title: string, status: CardsStatusEnum }> }> };
+export type TasksQuery = { tasks: Array<{ id: string, title: string, brief: string, createdAt: string, messages: Array<{ id: string, role: MessagesRoleEnum, content: string }>, cards: Array<{ id: string, title: string, status: CardsStatusEnum }> }> };
 
 export type CreateTaskMutationVariables = Exact<{
   values: CreateTaskInput;
 }>;
 
 
-export type CreateTaskMutation = { createTask: { id: string, title: string, brief: string, status: TasksStatusEnum } };
+export type CreateTaskMutation = { createTask: { id: string, title: string, brief: string } };
 
 export type RefineTaskMutationVariables = Exact<{
   taskId: Scalars['String']['input'];
@@ -6200,28 +6082,21 @@ export type RefineTaskMutationVariables = Exact<{
 
 export type RefineTaskMutation = { refineTask: { id: string, status: RunsStatusEnum, error: string } };
 
-export type AcceptTaskMutationVariables = Exact<{
+export type MakeCardMutationVariables = Exact<{
   taskId: Scalars['String']['input'];
 }>;
 
 
-export type AcceptTaskMutation = { acceptTask: { id: string, status: TasksStatusEnum } };
+export type MakeCardMutation = { makeCard: { id: string, title: string, laneId: string } };
 
-export type DecomposeTaskMutationVariables = Exact<{
-  taskId: Scalars['String']['input'];
-}>;
-
-
-export type DecomposeTaskMutation = { decomposeTask: { id: string, status: RunsStatusEnum, error: string } };
-
-export type SubmitTaskMutationVariables = Exact<{
+export type SubmitCardMutationVariables = Exact<{
   projectId: Scalars['String']['input'];
   title: Scalars['String']['input'];
-  brief: Scalars['String']['input'];
+  body: Scalars['String']['input'];
 }>;
 
 
-export type SubmitTaskMutation = { submitTask: { id: string, status: TasksStatusEnum, error: string } };
+export type SubmitCardMutation = { submitCard: { id: string, title: string, laneId: string } };
 
 export type DeleteTaskMutationVariables = Exact<{
   id: Scalars['String']['input'];
@@ -6295,7 +6170,7 @@ export const UpdateMcpServerDocument = {"kind":"Document","definitions":[{"kind"
 export const DeleteMcpServerDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"DeleteMcpServer"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deleteMcpServerSingle"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"id"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<DeleteMcpServerMutation, DeleteMcpServerMutationVariables>;
 export const TestMcpServerDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"TestMcpServer"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"config"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"McpConnectionInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"testMcpServer"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"config"},"value":{"kind":"Variable","name":{"kind":"Name","value":"config"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"ok"}},{"kind":"Field","name":{"kind":"Name","value":"error"}},{"kind":"Field","name":{"kind":"Name","value":"tools"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}}]}}]}}]}}]} as unknown as DocumentNode<TestMcpServerMutation, TestMcpServerMutationVariables>;
 export const ReconnectMcpDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"ReconnectMcp"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"reconnectMcp"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"error"}}]}}]}}]} as unknown as DocumentNode<ReconnectMcpMutation, ReconnectMcpMutationVariables>;
-export const ProjectsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"Projects"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"projects"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"orderBy"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"name"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"direction"},"value":{"kind":"EnumValue","value":"asc"}},{"kind":"ObjectField","name":{"kind":"Name","value":"priority"},"value":{"kind":"IntValue","value":"1"}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"context"}},{"kind":"Field","name":{"kind":"Name","value":"autoRun"}},{"kind":"Field","name":{"kind":"Name","value":"refineAgentId"}},{"kind":"Field","name":{"kind":"Name","value":"decomposeAgentId"}}]}}]}}]} as unknown as DocumentNode<ProjectsQuery, ProjectsQueryVariables>;
+export const ProjectsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"Projects"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"projects"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"orderBy"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"name"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"direction"},"value":{"kind":"EnumValue","value":"asc"}},{"kind":"ObjectField","name":{"kind":"Name","value":"priority"},"value":{"kind":"IntValue","value":"1"}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"context"}},{"kind":"Field","name":{"kind":"Name","value":"autoRun"}},{"kind":"Field","name":{"kind":"Name","value":"refineAgentId"}}]}}]}}]} as unknown as DocumentNode<ProjectsQuery, ProjectsQueryVariables>;
 export const CreateProjectDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CreateProject"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"values"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"CreateProjectInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createProject"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"values"},"value":{"kind":"Variable","name":{"kind":"Name","value":"values"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}}]} as unknown as DocumentNode<CreateProjectMutation, CreateProjectMutationVariables>;
 export const UpdateProjectDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateProject"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"set"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UpdateProjectInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateProjectSingle"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"id"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}}]}},{"kind":"Argument","name":{"kind":"Name","value":"set"},"value":{"kind":"Variable","name":{"kind":"Name","value":"set"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<UpdateProjectMutation, UpdateProjectMutationVariables>;
 export const DeleteProjectDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"DeleteProject"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deleteProjectSingle"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"id"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<DeleteProjectMutation, DeleteProjectMutationVariables>;
@@ -6308,16 +6183,15 @@ export const ActiveRunsDocument = {"kind":"Document","definitions":[{"kind":"Ope
 export const DeleteRunDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"DeleteRun"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deleteRunSingle"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"id"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<DeleteRunMutation, DeleteRunMutationVariables>;
 export const RunEventsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"subscription","name":{"kind":"Name","value":"RunEvents"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"runId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"runEvents"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"runId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"runId"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"seq"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"text"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"ok"}}]}}]}}]} as unknown as DocumentNode<RunEventsSubscription, RunEventsSubscriptionVariables>;
 export const CardRunsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"CardRuns"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"cardId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"runs"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"IntValue","value":"20"}},{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"cardId"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"cardId"}}}]}}]}},{"kind":"Argument","name":{"kind":"Name","value":"orderBy"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"startedAt"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"direction"},"value":{"kind":"EnumValue","value":"desc"}},{"kind":"ObjectField","name":{"kind":"Name","value":"priority"},"value":{"kind":"IntValue","value":"1"}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"verdict"}},{"kind":"Field","name":{"kind":"Name","value":"startedAt"}},{"kind":"Field","name":{"kind":"Name","value":"finishedAt"}},{"kind":"Field","name":{"kind":"Name","value":"output"}},{"kind":"Field","name":{"kind":"Name","value":"error"}},{"kind":"Field","name":{"kind":"Name","value":"totalTokens"}},{"kind":"Field","name":{"kind":"Name","value":"agent"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"lane"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"cardEvents"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"IntValue","value":"50"}},{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"cardId"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"cardId"}}}]}}]}},{"kind":"Argument","name":{"kind":"Name","value":"orderBy"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"createdAt"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"direction"},"value":{"kind":"EnumValue","value":"desc"}},{"kind":"ObjectField","name":{"kind":"Name","value":"priority"},"value":{"kind":"IntValue","value":"1"}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"runId"}},{"kind":"Field","name":{"kind":"Name","value":"note"}},{"kind":"Field","name":{"kind":"Name","value":"actor"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"fromLane"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"toLane"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}}]}}]} as unknown as DocumentNode<CardRunsQuery, CardRunsQueryVariables>;
-export const SettingsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"Settings"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"settings"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"baseUrl"}},{"kind":"Field","name":{"kind":"Name","value":"model"}},{"kind":"Field","name":{"kind":"Name","value":"maxTokens"}},{"kind":"Field","name":{"kind":"Name","value":"temperature"}},{"kind":"Field","name":{"kind":"Name","value":"maxToolIterations"}},{"kind":"Field","name":{"kind":"Name","value":"toolDiscovery"}},{"kind":"Field","name":{"kind":"Name","value":"toolSelectModel"}},{"kind":"Field","name":{"kind":"Name","value":"requestTimeoutSeconds"}},{"kind":"Field","name":{"kind":"Name","value":"maxRetries"}},{"kind":"Field","name":{"kind":"Name","value":"runRetentionDays"}},{"kind":"Field","name":{"kind":"Name","value":"workerIntervalSeconds"}},{"kind":"Field","name":{"kind":"Name","value":"refineAgentId"}},{"kind":"Field","name":{"kind":"Name","value":"decomposeAgentId"}},{"kind":"Field","name":{"kind":"Name","value":"refinePrompt"}}]}}]}}]} as unknown as DocumentNode<SettingsQuery, SettingsQueryVariables>;
+export const SettingsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"Settings"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"settings"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"baseUrl"}},{"kind":"Field","name":{"kind":"Name","value":"model"}},{"kind":"Field","name":{"kind":"Name","value":"maxTokens"}},{"kind":"Field","name":{"kind":"Name","value":"temperature"}},{"kind":"Field","name":{"kind":"Name","value":"maxToolIterations"}},{"kind":"Field","name":{"kind":"Name","value":"toolDiscovery"}},{"kind":"Field","name":{"kind":"Name","value":"toolSelectModel"}},{"kind":"Field","name":{"kind":"Name","value":"requestTimeoutSeconds"}},{"kind":"Field","name":{"kind":"Name","value":"maxRetries"}},{"kind":"Field","name":{"kind":"Name","value":"runRetentionDays"}},{"kind":"Field","name":{"kind":"Name","value":"workerIntervalSeconds"}},{"kind":"Field","name":{"kind":"Name","value":"refineAgentId"}},{"kind":"Field","name":{"kind":"Name","value":"refinePrompt"}}]}}]}}]} as unknown as DocumentNode<SettingsQuery, SettingsQueryVariables>;
 export const UpdateSettingsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateSettings"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"set"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UpdateSettingInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateSettingSingle"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"id"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"StringValue","value":"default","block":false}}]}}]}},{"kind":"Argument","name":{"kind":"Name","value":"set"},"value":{"kind":"Variable","name":{"kind":"Name","value":"set"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<UpdateSettingsMutation, UpdateSettingsMutationVariables>;
 export const SetApiKeyDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SetApiKey"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"apiKey"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"setApiKey"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"apiKey"},"value":{"kind":"Variable","name":{"kind":"Name","value":"apiKey"}}}]}]}}]} as unknown as DocumentNode<SetApiKeyMutation, SetApiKeyMutationVariables>;
 export const SpendDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"Spend"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"projectId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"taskId"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"days"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"spend"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"projectId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"projectId"}}},{"kind":"Argument","name":{"kind":"Name","value":"taskId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"taskId"}}},{"kind":"Argument","name":{"kind":"Name","value":"days"},"value":{"kind":"Variable","name":{"kind":"Name","value":"days"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"runs"}},{"kind":"Field","name":{"kind":"Name","value":"promptTokens"}},{"kind":"Field","name":{"kind":"Name","value":"completionTokens"}},{"kind":"Field","name":{"kind":"Name","value":"totalTokens"}},{"kind":"Field","name":{"kind":"Name","value":"days"}},{"kind":"Field","name":{"kind":"Name","value":"from"}},{"kind":"Field","name":{"kind":"Name","value":"retentionDays"}}]}}]}}]} as unknown as DocumentNode<SpendQuery, SpendQueryVariables>;
-export const TasksDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"Tasks"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"projectId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"tasks"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"projectId"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"projectId"}}}]}}]}},{"kind":"Argument","name":{"kind":"Name","value":"orderBy"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"createdAt"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"direction"},"value":{"kind":"EnumValue","value":"desc"}},{"kind":"ObjectField","name":{"kind":"Name","value":"priority"},"value":{"kind":"IntValue","value":"1"}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"brief"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"error"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"messages"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"orderBy"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"createdAt"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"direction"},"value":{"kind":"EnumValue","value":"asc"}},{"kind":"ObjectField","name":{"kind":"Name","value":"priority"},"value":{"kind":"IntValue","value":"1"}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"role"}},{"kind":"Field","name":{"kind":"Name","value":"content"}}]}},{"kind":"Field","name":{"kind":"Name","value":"cards"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"status"}}]}}]}}]}}]} as unknown as DocumentNode<TasksQuery, TasksQueryVariables>;
-export const CreateTaskDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CreateTask"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"values"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"CreateTaskInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createTask"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"values"},"value":{"kind":"Variable","name":{"kind":"Name","value":"values"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"brief"}},{"kind":"Field","name":{"kind":"Name","value":"status"}}]}}]}}]} as unknown as DocumentNode<CreateTaskMutation, CreateTaskMutationVariables>;
+export const TasksDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"Tasks"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"projectId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"tasks"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"projectId"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"projectId"}}}]}}]}},{"kind":"Argument","name":{"kind":"Name","value":"orderBy"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"createdAt"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"direction"},"value":{"kind":"EnumValue","value":"desc"}},{"kind":"ObjectField","name":{"kind":"Name","value":"priority"},"value":{"kind":"IntValue","value":"1"}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"brief"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"messages"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"orderBy"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"createdAt"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"direction"},"value":{"kind":"EnumValue","value":"asc"}},{"kind":"ObjectField","name":{"kind":"Name","value":"priority"},"value":{"kind":"IntValue","value":"1"}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"role"}},{"kind":"Field","name":{"kind":"Name","value":"content"}}]}},{"kind":"Field","name":{"kind":"Name","value":"cards"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"status"}}]}}]}}]}}]} as unknown as DocumentNode<TasksQuery, TasksQueryVariables>;
+export const CreateTaskDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CreateTask"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"values"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"CreateTaskInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createTask"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"values"},"value":{"kind":"Variable","name":{"kind":"Name","value":"values"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"brief"}}]}}]}}]} as unknown as DocumentNode<CreateTaskMutation, CreateTaskMutationVariables>;
 export const RefineTaskDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"RefineTask"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"taskId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"message"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"refineTask"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"taskId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"taskId"}}},{"kind":"Argument","name":{"kind":"Name","value":"message"},"value":{"kind":"Variable","name":{"kind":"Name","value":"message"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"error"}}]}}]}}]} as unknown as DocumentNode<RefineTaskMutation, RefineTaskMutationVariables>;
-export const AcceptTaskDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"AcceptTask"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"taskId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"acceptTask"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"taskId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"taskId"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}}]}}]}}]} as unknown as DocumentNode<AcceptTaskMutation, AcceptTaskMutationVariables>;
-export const DecomposeTaskDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"DecomposeTask"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"taskId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"decomposeTask"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"taskId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"taskId"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"error"}}]}}]}}]} as unknown as DocumentNode<DecomposeTaskMutation, DecomposeTaskMutationVariables>;
-export const SubmitTaskDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SubmitTask"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"projectId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"title"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"brief"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"submitTask"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"projectId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"projectId"}}},{"kind":"Argument","name":{"kind":"Name","value":"title"},"value":{"kind":"Variable","name":{"kind":"Name","value":"title"}}},{"kind":"Argument","name":{"kind":"Name","value":"brief"},"value":{"kind":"Variable","name":{"kind":"Name","value":"brief"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"error"}}]}}]}}]} as unknown as DocumentNode<SubmitTaskMutation, SubmitTaskMutationVariables>;
+export const MakeCardDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"MakeCard"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"taskId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"makeCard"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"taskId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"taskId"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"laneId"}}]}}]}}]} as unknown as DocumentNode<MakeCardMutation, MakeCardMutationVariables>;
+export const SubmitCardDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SubmitCard"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"projectId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"title"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"body"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"submitCard"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"projectId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"projectId"}}},{"kind":"Argument","name":{"kind":"Name","value":"title"},"value":{"kind":"Variable","name":{"kind":"Name","value":"title"}}},{"kind":"Argument","name":{"kind":"Name","value":"body"},"value":{"kind":"Variable","name":{"kind":"Name","value":"body"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"laneId"}}]}}]}}]} as unknown as DocumentNode<SubmitCardMutation, SubmitCardMutationVariables>;
 export const DeleteTaskDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"DeleteTask"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deleteTaskSingle"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"id"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<DeleteTaskMutation, DeleteTaskMutationVariables>;
 export const StopTaskDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"StopTask"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"taskId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"stopTask"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"taskId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"taskId"}}}]}]}}]} as unknown as DocumentNode<StopTaskMutation, StopTaskMutationVariables>;
 export const BoardTemplatesDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"BoardTemplates"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"boardTemplates"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"orderBy"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"name"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"direction"},"value":{"kind":"EnumValue","value":"asc"}},{"kind":"ObjectField","name":{"kind":"Name","value":"priority"},"value":{"kind":"IntValue","value":"1"}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"lanes"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}}]}}]} as unknown as DocumentNode<BoardTemplatesQuery, BoardTemplatesQueryVariables>;

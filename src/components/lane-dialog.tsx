@@ -262,7 +262,8 @@ export function LaneDialog({
             <div>
               <Label htmlFor="lane-intake">Intake</Label>
               <p className="mt-1 text-xs text-muted-foreground">
-                Freshly decomposed cards land here.
+                The board's front door: work that arrives without naming a lane lands here. One lane
+                per board, and a kind that expands is the usual choice.
               </p>
             </div>
             <Switch id="lane-intake" checked={intake} onCheckedChange={setIntake} />

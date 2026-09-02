@@ -86,7 +86,14 @@ async function seedProject(name: string) {
     .from(tables.lanes)
     .where(eq(tables.lanes.projectId, projectId))
     .orderBy(tables.lanes.position);
-  return { projectId, backlog: board[0], doing: board[1], review: board[2], done: board[3] };
+  return {
+    projectId,
+    intake: board[0],
+    backlog: board[1],
+    doing: board[2],
+    review: board[3],
+    done: board[4],
+  };
 }
 
 const cardById = async (id: string) => {
@@ -118,11 +125,11 @@ beforeEach(async () => {
   await seedAgent();
 });
 
-test("a decomposition puts the cards in the intake lane, in the order it gave them", async () => {
-  const { projectId, backlog } = await seedProject("shipping");
-  const [task] = await db
-    .insert(tables.tasks)
-    .values({ projectId, title: "ship", brief: "make the thing", status: "ready" })
+test("an expanding station writes its cards down the pass arrow and archives the one it read", async () => {
+  const { projectId, intake, backlog } = await seedProject("shipping");
+  const [parent] = await db
+    .insert(tables.cards)
+    .values({ projectId, laneId: intake.id, title: "ship", body: "make the thing" })
     .returning();
 
   replies = [
@@ -133,42 +140,64 @@ test("a decomposition puts the cards in the intake lane, in the order it gave th
     ]),
   ];
 
-  const run = await runner.decomposeTask(task.id);
+  const run = await runner.runCard(parent.id);
   expect(run.status).toBe("ok");
 
   const written = await db
     .select()
     .from(tables.cards)
-    .where(eq(tables.cards.projectId, projectId))
+    .where(eq(tables.cards.laneId, backlog.id))
     .orderBy(tables.cards.position);
   expect(written.map((card) => card.title)).toEqual(["write it", "test it", "ship it"]);
-  expect(written.every((card) => card.laneId === backlog.id)).toBe(true);
+  expect(written.every((card) => card.parentId === parent.id)).toBe(true);
   expect(written[0].acceptance).toBe("it compiles");
 
   // Two links, not three: the dependency naming a card that was never proposed is dropped
-  // rather than failing a decomposition that was otherwise fine.
+  // rather than failing an expansion that was otherwise fine.
   const deps = await db.select().from(tables.cardDeps);
   expect(deps).toHaveLength(2);
 
-  const [after] = await db.select().from(tables.tasks).where(eq(tables.tasks.id, task.id));
-  expect(after.status).toBe("decomposed");
+  // The card that asked for them goes off the board rather than along it, and the ledger says
+  // what became of it — the run that says so will be pruned long before the children are.
+  const after = await cardById(parent.id);
+  expect(after.status).toBe("done");
+  expect(after.archivedAt).not.toBeNull();
+  expect(after.laneId).toBe(intake.id);
+  expect(await noteOn(parent.id)).toMatch(/broken into 3/);
 });
 
-test("a decomposition that produces nothing readable is an error on the task", async () => {
-  const { projectId } = await seedProject("mumbling");
-  const [task] = await db
-    .insert(tables.tasks)
-    .values({ projectId, title: "vague", brief: "do something", status: "ready" })
+test("an expansion nobody could read cards out of is a failure, not an empty success", async () => {
+  const { projectId, intake } = await seedProject("mumbling");
+  const [parent] = await db
+    .insert(tables.cards)
+    .values({ projectId, laneId: intake.id, title: "vague", body: "do something" })
     .returning();
 
   replies = ["I would rather not."];
-  const run = await runner.decomposeTask(task.id);
+  const run = await runner.runCard(parent.id);
 
   expect(run.status).toBe("error");
-  const [after] = await db.select().from(tables.tasks).where(eq(tables.tasks.id, task.id));
+  const after = await cardById(parent.id);
   expect(after.status).toBe("error");
   expect(after.error).toMatch(/no cards/i);
-  expect(await db.select().from(tables.cards)).toHaveLength(0);
+  expect(after.archivedAt).toBeNull();
+  expect(after.laneId).toBe(intake.id);
+  expect(await db.select().from(tables.cards)).toHaveLength(1);
+});
+
+test("an expanding station with nowhere to put its children is refused before it runs", async () => {
+  const { projectId, intake } = await seedProject("a dead end");
+  await db
+    .update(tables.lanes)
+    .set({ onSuccessLaneId: null })
+    .where(eq(tables.lanes.id, intake.id));
+  const [parent] = await db
+    .insert(tables.cards)
+    .values({ projectId, laneId: intake.id, title: "nowhere to go" })
+    .returning();
+
+  await expect(runner.runCard(parent.id)).rejects.toThrow(/no lane to put them in/);
+  expect(await db.select().from(tables.runs)).toHaveLength(0);
 });
 
 test("a worked card moves to the review lane and waits there rather than counting as done", async () => {

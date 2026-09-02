@@ -45,7 +45,6 @@ interface Draft {
   context: string;
   autoRun: boolean;
   refineAgentId: string;
-  decomposeAgentId: string;
 }
 
 const toDraft = (project?: Project | null): Draft => ({
@@ -54,7 +53,6 @@ const toDraft = (project?: Project | null): Draft => ({
   context: project?.context ?? "",
   autoRun: project?.autoRun ?? false,
   refineAgentId: project?.refineAgentId ?? "",
-  decomposeAgentId: project?.decomposeAgentId ?? "",
 });
 
 /**
@@ -99,7 +97,6 @@ export function ProjectDialog({
         context: draft.context,
         autoRun: draft.autoRun,
         refineAgentId: draft.refineAgentId || null,
-        decomposeAgentId: draft.decomposeAgentId || null,
       };
       if (!values.name) throw new Error("A project needs a name.");
       if (project) return request(UpdateProjectDocument, { id: project.id, set: values });
@@ -209,25 +206,6 @@ export function ProjectDialog({
               <Select
                 value={draft.refineAgentId || ANY}
                 onValueChange={(value) => set({ refineAgentId: value === ANY ? "" : value })}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ANY}>Whatever Settings says</SelectItem>
-                  {enabled.map((agent) => (
-                    <SelectItem key={agent.id} value={agent.id}>
-                      {agent.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label>Decomposing agent</Label>
-              <Select
-                value={draft.decomposeAgentId || ANY}
-                onValueChange={(value) => set({ decomposeAgentId: value === ANY ? "" : value })}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue />
