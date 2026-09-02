@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { type GraphQLSchema, graphql } from "graphql";
 import { afterAll, beforeAll, expect, test } from "vitest";
-import { cyclingCards, type DepGraph } from "../src/lib/cards.ts";
+import { blockingDeps, cyclingCards, type DepGraph } from "../src/lib/cards.ts";
 
 // The schema is built from the live Drizzle tables at import time, so the database has to be
 // pointed somewhere disposable before anything under server/ is loaded.
@@ -97,4 +97,66 @@ test("the picker disables exactly the rows the server would refuse", async () =>
   // the direction that matters: a row drawn live that the save then refuses is the bug.
   expect(cyclingCards(id("E"), graph).size).toBe(0);
   expect(await refused(id("E"), [id("A"), id("B"), id("C"), id("D")])).toBe(false);
+});
+
+test("the card's hint names exactly the cards the server is still waiting on", async () => {
+  const { createProject } = await run(
+    `mutation { createProject(values: { name: "blocked" }) { id } }`,
+  );
+  const projectId = createProject.id as string;
+  const { lanes } = await run(
+    `query Lanes($projectId: String!) {
+       lanes(where: { projectId: { eq: $projectId } }, orderBy: { position: { direction: asc, priority: 1 } }) { id }
+     }`,
+    { projectId },
+  );
+  const laneId = (lanes as { id: string }[])[0].id;
+
+  const ids = new Map<string, string>();
+  for (const title of ["subject", "finished", "waiting", "put away"]) {
+    const { createCard } = await run(
+      `mutation Add($projectId: String!, $laneId: String!, $title: String!) {
+         createCard(values: { projectId: $projectId, laneId: $laneId, title: $title }) { id }
+       }`,
+      { projectId, laneId, title },
+    );
+    ids.set(title, createCard.id as string);
+  }
+  const id = (title: string) => ids.get(title) ?? "";
+
+  await run(SET, {
+    cardId: id("subject"),
+    dependsOn: [id("finished"), id("waiting"), id("put away")],
+  });
+
+  // The three ways a dependency can stand: done, still going, and taken off the board. Only
+  // the middle one is in the way, and the board draws that hint from what it already has in
+  // hand rather than asking.
+  await run(
+    `mutation Done($id: String!) { updateCardSingle(where: { id: { eq: $id } }, set: { status: done }) { id } }`,
+    { id: id("finished") },
+  );
+  await run(`mutation Away($cardId: String!) { archiveCard(cardId: $cardId) { id } }`, {
+    cardId: id("put away"),
+  });
+
+  const { blockers } = await run(
+    `query Blockers($cardId: String!) { blockers(cardId: $cardId) { title } }`,
+    { cardId: id("subject") },
+  );
+  expect((blockers as { title: string }[]).map((card) => card.title)).toEqual(["waiting"]);
+
+  // The board's half of the same answer: it filters archived cards out of what it draws, so a
+  // dependency it cannot find is one that is no longer in the way — which is the server's rule
+  // arrived at from the other side.
+  const { cards } = await run(
+    `query Board($projectId: String!) {
+       cards(where: { projectId: { eq: $projectId }, archivedAt: { isNull: true } }) { id title status }
+     }`,
+    { projectId },
+  );
+  const deps = [id("finished"), id("waiting"), id("put away")].map((dependsOnCardId) => ({
+    dependsOnCardId,
+  }));
+  expect(blockingDeps(deps, cards)).toEqual(["waiting"]);
 });

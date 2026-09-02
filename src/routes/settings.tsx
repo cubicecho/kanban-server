@@ -3,6 +3,7 @@ import { Check, Copy } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Page } from "@/components/app-shell";
+import { useLeaveGuard } from "@/components/leave-guard";
 import { ModelSelect } from "@/components/model-select";
 import { QueryError } from "@/components/query-error";
 import { RowSkeleton } from "@/components/row-skeleton";
@@ -172,6 +173,9 @@ export function SettingsRoute() {
     form && loaded && (JSON.stringify(form) !== JSON.stringify(toForm(loaded)) || apiKey),
   );
   const badNumber = form ? NUMBERS.find(([key]) => !Number.isFinite(form[key])) : undefined;
+  // "Unsaved changes" in the corner is a label, not a guard: every dialog in the app asks before
+  // throwing away what you typed, and the longest form in it did not.
+  const leaving = useLeaveGuard(dirty);
 
   const save = useMutation({
     mutationFn: async () => {
@@ -470,6 +474,8 @@ export function SettingsRoute() {
         <Snippet label=".mcp.json" text={MCP_JSON} />
         <Snippet label="Claude Code" text={CLAUDE_CLI} />
       </Card>
+
+      {leaving}
     </Page>
   );
 }

@@ -82,6 +82,7 @@ export function AgentsRoute() {
   });
 
   const servers = agents.data?.mcpServers ?? [];
+  const lanes = agents.data?.lanes ?? [];
   const settings = agents.data?.settings?.[0];
 
   return (
@@ -108,79 +109,100 @@ export function AgentsRoute() {
         />
       ) : null}
 
-      {agents.data?.agents.map((agent) => (
-        <Card key={agent.id} className="gap-2 p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div className={`min-w-0 ${agent.enabled ? "" : "opacity-50"}`}>
-              <div className="flex items-center gap-2">
-                <span className="font-medium">{agent.name}</span>
-                {agent.servers.length ? (
+      {agents.data?.agents.map((agent) => {
+        const staffed = lanes.filter((lane) => lane.agentId === agent.id);
+        const count = staffed.length;
+        // Unlike a role, this delete is never refused — the foreign key is `set null`, so the
+        // lanes simply stop having an agent. That is the case worth naming before it happens
+        // rather than after: an unstaffed station looks exactly like a resting place.
+        const where = staffed
+          .slice(0, 3)
+          .map((lane) => `${lane.name} on ${lane.project.name}`)
+          .join(", ");
+        return (
+          <Card key={agent.id} className="gap-2 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className={`min-w-0 ${agent.enabled ? "" : "opacity-50"}`}>
+                <div className="flex items-center gap-2">
+                  <span className="font-medium">{agent.name}</span>
                   <span className="text-xs text-muted-foreground">
-                    {agent.servers.length} server{agent.servers.length === 1 ? "" : "s"}
+                    {count} lane{count === 1 ? "" : "s"}
                   </span>
-                ) : (
-                  <span className="text-xs text-muted-foreground">no tools</span>
-                )}
-              </div>
-              <p className="mt-1 truncate font-mono text-xs text-muted-foreground">
-                {agent.model || "model from Settings"} · {agent.baseUrl || "endpoint from Settings"}
-              </p>
-              {/* The seeded agent is a name and nothing else, and inheriting from a Settings
+                  {agent.servers.length ? (
+                    <span className="text-xs text-muted-foreground">
+                      {agent.servers.length} server{agent.servers.length === 1 ? "" : "s"}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">no tools</span>
+                  )}
+                </div>
+                <p className="mt-1 truncate font-mono text-xs text-muted-foreground">
+                  {agent.model || "model from Settings"} ·{" "}
+                  {agent.baseUrl || "endpoint from Settings"}
+                </p>
+                {/* The seeded agent is a name and nothing else, and inheriting from a Settings
                   that was never filled in resolves to no endpoint at all — which showed up
                   as a raw connection error on the first run and nowhere before it. */}
-              {!agent.model || !agent.baseUrl ? (
-                <SettingsNeeded
-                  missing={
-                    !agent.model && !agent.baseUrl
-                      ? "a model and an endpoint"
-                      : agent.model
-                        ? "an endpoint"
-                        : "a model"
-                  }
-                  settings={settings}
-                />
-              ) : null}
-            </div>
-            <div className="flex shrink-0 items-center gap-1">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Switch
-                    checked={agent.enabled}
-                    onCheckedChange={(enabled) => toggle.mutate({ id: agent.id, enabled })}
-                    // `title` on a Radix switch is a hint the accessibility tree does not
-                    // read; the name has to be said outright.
-                    aria-label={`${agent.enabled ? "Disable" : "Enable"} ${agent.name}`}
+                {!agent.model || !agent.baseUrl ? (
+                  <SettingsNeeded
+                    missing={
+                      !agent.model && !agent.baseUrl
+                        ? "a model and an endpoint"
+                        : agent.model
+                          ? "an endpoint"
+                          : "a model"
+                    }
+                    settings={settings}
                   />
-                </TooltipTrigger>
-                <TooltipContent>{agent.enabled ? "Disable" : "Enable"}</TooltipContent>
-              </Tooltip>
-              <ActionButton
-                variant="ghost"
-                size="icon"
-                label={`Edit ${agent.name}`}
-                hint="Edit"
-                onClick={() => setEditing(agent)}
-              >
-                <Pencil className="size-4" aria-hidden />
-              </ActionButton>
-              <ConfirmButton
-                variant="ghost"
-                size="icon"
-                label={`Delete ${agent.name}`}
-                hint="Delete"
-                title={`Delete the agent "${agent.name}"?`}
-                description="Any lane staffed by it stops running until another agent is picked, on every board on this server."
-                onConfirm={() => remove.mutate(agent.id)}
-              >
-                <Trash2 className="size-4" aria-hidden />
-              </ConfirmButton>
+                ) : null}
+              </div>
+              <div className="flex shrink-0 items-center gap-1">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Switch
+                      checked={agent.enabled}
+                      onCheckedChange={(enabled) => toggle.mutate({ id: agent.id, enabled })}
+                      // `title` on a Radix switch is a hint the accessibility tree does not
+                      // read; the name has to be said outright.
+                      aria-label={`${agent.enabled ? "Disable" : "Enable"} ${agent.name}`}
+                    />
+                  </TooltipTrigger>
+                  <TooltipContent>{agent.enabled ? "Disable" : "Enable"}</TooltipContent>
+                </Tooltip>
+                <ActionButton
+                  variant="ghost"
+                  size="icon"
+                  label={`Edit ${agent.name}`}
+                  hint="Edit"
+                  onClick={() => setEditing(agent)}
+                >
+                  <Pencil className="size-4" aria-hidden />
+                </ActionButton>
+                <ConfirmButton
+                  variant="ghost"
+                  size="icon"
+                  label={`Delete ${agent.name}`}
+                  hint={
+                    count ? `Staffs ${where}${count > 3 ? ` and ${count - 3} more` : ""}` : "Delete"
+                  }
+                  title={`Delete the agent "${agent.name}"?`}
+                  description={
+                    count
+                      ? `${count} lane${count === 1 ? "" : "s"} — ${where}${count > 3 ? ` and ${count - 3} more` : ""} — stop running until another agent is picked.`
+                      : "No lane is staffed by it, so nothing on any board stops."
+                  }
+                  onConfirm={() => remove.mutate(agent.id)}
+                >
+                  <Trash2 className="size-4" aria-hidden />
+                </ConfirmButton>
+              </div>
             </div>
-          </div>
-          {agent.systemPrompt ? (
-            <p className="line-clamp-2 text-sm text-muted-foreground">{agent.systemPrompt}</p>
-          ) : null}
-        </Card>
-      ))}
+            {agent.systemPrompt ? (
+              <p className="line-clamp-2 text-sm text-muted-foreground">{agent.systemPrompt}</p>
+            ) : null}
+          </Card>
+        );
+      })}
 
       {creating || editing ? (
         <AgentDialog

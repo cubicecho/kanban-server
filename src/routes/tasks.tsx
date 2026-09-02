@@ -19,6 +19,15 @@ import { useProjectId } from "@/lib/project";
 import { cn } from "@/lib/utils";
 
 /**
+ * How many conversations are asked for at a time — one more than is drawn, as on Runs and in the
+ * archive, so that the end of the page can be told from the end of the list.
+ *
+ * Smaller than either of those, because a task carries its whole message thread: a hundred of
+ * these is a hundred transcripts, and this was the one list in the app that asked for all of them.
+ */
+const PAGE = 25;
+
+/**
  * What has been asked for, and what became of it.
  *
  * The cards are the work and this is the record of where they came from — which is the thing a
@@ -34,10 +43,13 @@ export function TasksRoute() {
   const project = useCurrentProject();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState<string | null>(null);
+  const [limit, setLimit] = useState(PAGE);
 
   const tasks = useQuery({
-    queryKey: ["tasks", projectId],
-    queryFn: () => request(TasksDocument, { projectId }),
+    // A prefix of the key everything else invalidates, as on Runs, so a longer page still
+    // refreshes rather than becoming an entry nothing updates.
+    queryKey: ["tasks", projectId, limit],
+    queryFn: () => request(TasksDocument, { projectId, limit: limit + 1 }),
     enabled: Boolean(projectId),
   });
   const refresh = () => {
@@ -72,6 +84,10 @@ export function TasksRoute() {
     );
   }
 
+  const rows = tasks.data?.tasks ?? [];
+  const more = rows.length > limit;
+  const shown = more ? rows.slice(0, limit) : rows;
+
   return (
     <Page
       title="Tasks"
@@ -82,7 +98,7 @@ export function TasksRoute() {
         <QueryError error={tasks.error} onRetry={() => tasks.refetch()} what="these tasks" />
       ) : null}
       {tasks.isPending ? <RowSkeleton rows={3} /> : null}
-      {tasks.data?.tasks.length === 0 ? (
+      {shown.length === 0 && !tasks.isPending && !tasks.isError ? (
         <EmptyState
           icon={ListChecks}
           title="Nothing asked for yet"
@@ -95,8 +111,11 @@ export function TasksRoute() {
         />
       ) : null}
 
-      {tasks.data?.tasks.map((task) => {
+      {shown.map((task) => {
         const expanded = open === task.id;
+        // Where "on the board" actually goes: a card that is still on it. All of them archived
+        // and the link would scroll to nothing, so it says so instead.
+        const onBoard = task.cards.find((card) => !card.archivedAt);
         return (
           <Card key={task.id} className="gap-2 p-4">
             <div className="flex items-start justify-between gap-3">
@@ -133,9 +152,21 @@ export function TasksRoute() {
                 {/* Only while the conversation has not reached the board. Making a second card
                     out of the same thread is a thing somebody means to do rarely and almost
                     never means to do by pressing the button twice. */}
+                {/* A conversation is not finished when it produces a card, and until now there
+                    was no way back into one: the composer opened whichever task had no cards
+                    yet, and everything else was read-only history. */}
+                <Button variant="ghost" size="sm" asChild>
+                  <Link to="/" search={{ task: task.id }}>
+                    Continue
+                  </Link>
+                </Button>
                 {task.cards.length ? (
                   <Button variant="ghost" size="sm" asChild>
-                    <Link to="/board">On the board</Link>
+                    {/* At the card, not merely at the board — the board draws five lanes and up
+                        to five hundred cards, and "it is somewhere over there" is not an answer. */}
+                    <Link to="/board" search={onBoard ? { card: onBoard.id } : {}}>
+                      {onBoard ? "On the board" : "In the archive"}
+                    </Link>
                   </Button>
                 ) : (
                   <ActionButton
@@ -210,6 +241,12 @@ export function TasksRoute() {
           </Card>
         );
       })}
+
+      {more ? (
+        <Button variant="outline" className="self-center" onClick={() => setLimit(limit + PAGE)}>
+          Show {PAGE} more
+        </Button>
+      ) : null}
     </Page>
   );
 }

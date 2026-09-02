@@ -27,7 +27,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { ProjectsDocument } from "@/gql/graphql";
+import { ActiveRunsDocument, ProjectsDocument } from "@/gql/graphql";
 import { request } from "@/lib/gql";
 import { selectProject, useProjectId } from "@/lib/project";
 import { cn } from "@/lib/utils";
@@ -63,10 +63,13 @@ function NavGroup({
   label,
   items,
   pathname,
+  badges,
 }: {
   label: string;
   items: readonly NavItem[];
   pathname: string;
+  /** How many things are happening behind a destination, by `to`. Zero draws nothing. */
+  badges?: Record<string, number>;
 }) {
   return (
     <nav className="flex flex-col gap-1 px-2" aria-label={label}>
@@ -77,6 +80,7 @@ function NavGroup({
       </p>
       {items.map(({ to, label: text, icon: Icon }) => {
         const active = to === "/" ? pathname === "/" : pathname.startsWith(to);
+        const busy = badges?.[to] ?? 0;
         return (
           <Tooltip key={to}>
             <TooltipTrigger asChild>
@@ -90,14 +94,36 @@ function NavGroup({
                   active && "bg-accent font-medium text-accent-foreground",
                 )}
               >
-                <Icon className="size-4 shrink-0" aria-hidden />
+                <span className="relative shrink-0">
+                  <Icon className="size-4" aria-hidden />
+                  {/* On the rail the count has nowhere to go, so it becomes a dot on the icon
+                      and the number is said in the tooltip and to a screen reader instead. */}
+                  {busy ? (
+                    <span
+                      className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-status-running lg:hidden"
+                      aria-hidden
+                    />
+                  ) : null}
+                </span>
                 <span className="hidden lg:inline">{text}</span>
                 <span className="sr-only lg:hidden">{text}</span>
+                {busy ? (
+                  <>
+                    <span className="ml-auto hidden items-center gap-1.5 text-xs text-status-running lg:inline-flex">
+                      <span
+                        className="size-1.5 animate-pulse rounded-full bg-current"
+                        aria-hidden
+                      />
+                      {busy}
+                    </span>
+                    <span className="sr-only">, {busy} running</span>
+                  </>
+                ) : null}
               </Link>
             </TooltipTrigger>
             {/* Only where the label is not on screen to read. */}
             <TooltipContent side="right" className="lg:hidden">
-              {text}
+              {busy ? `${text} — ${busy} running` : text}
             </TooltipContent>
           </Tooltip>
         );
@@ -205,8 +231,28 @@ function ProjectPicker() {
   );
 }
 
+/**
+ * How much of this project is in flight, for the badge on Runs.
+ *
+ * A run started by the worker, or by an agent over MCP, is the one thing that happens on this
+ * server without anybody here asking for it — and nothing outside the board and the composer
+ * said so. It is the query both of those already keep, so a page that is watching a run pays
+ * nothing for this, and it stops polling the moment there is nothing to count.
+ */
+function useRunningCount() {
+  const projectId = useProjectId();
+  const active = useQuery({
+    queryKey: ["active-runs", projectId],
+    queryFn: () => request(ActiveRunsDocument, { projectId }),
+    enabled: Boolean(projectId),
+    refetchInterval: 5000,
+  });
+  return active.data?.runs.length ?? 0;
+}
+
 export function AppShell() {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const running = useRunningCount();
 
   return (
     <ProjectActions>
@@ -219,7 +265,12 @@ export function AppShell() {
             <span className="hidden lg:inline">kanban-server</span>
           </div>
           <ProjectPicker />
-          <NavGroup label="Project" items={PROJECT_NAV} pathname={pathname} />
+          <NavGroup
+            label="Project"
+            items={PROJECT_NAV}
+            pathname={pathname}
+            badges={{ "/runs": running }}
+          />
           {/* Held at the bottom: the server's settings are the same wherever you are, and a
               group that moves up and down as the one above it grows is a group you hunt for. */}
           <div className="mt-auto border-t pt-1 pb-2">

@@ -1,8 +1,53 @@
-query Tasks($projectId: String!) {
+# Every conversation, newest first — with its transcript and the cards it became, because the
+# whole point of this page is that a board cannot tell you eight cards were one sentence typed on
+# Tuesday. Bounded, as Runs and Archive are: a task carries its entire message thread, so this is
+# the heaviest list in the app and was the only one that asked for all of it.
+query Tasks($projectId: String!, $limit: Int!) {
   tasks(
+    limit: $limit
     where: { projectId: { eq: $projectId } }
     orderBy: { createdAt: { direction: desc, priority: 1 } }
   ) {
+    id
+    title
+    brief
+    createdAt
+    messages(orderBy: { createdAt: { direction: asc, priority: 1 } }) {
+      id
+      role
+      content
+    }
+    cards {
+      id
+      title
+      status
+      archivedAt
+    }
+  }
+}
+
+# Just enough to work out which conversation is still being talked about: a task has no status,
+# so "not yet on the board" is a task with no cards, and that is all this asks. The composer used
+# to read the list above for it — every task, with every message — to answer a question about
+# card counts.
+query RecentTasks($projectId: String!, $limit: Int!) {
+  tasks(
+    limit: $limit
+    where: { projectId: { eq: $projectId } }
+    orderBy: { createdAt: { direction: desc, priority: 1 } }
+  ) {
+    id
+    cards {
+      id
+    }
+  }
+}
+
+# One conversation in full — what the composer draws. Asked for by id so that carrying on a
+# conversation from the Tasks page works however old it is, rather than only while it happens to
+# be among the most recent.
+query Task($id: String!) {
+  tasks(limit: 1, where: { id: { eq: $id } }) {
     id
     title
     brief

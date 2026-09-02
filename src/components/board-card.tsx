@@ -6,15 +6,17 @@ import {
   ArrowRight,
   Clock,
   GripVertical,
+  MessageSquare,
   MoreHorizontal,
   Pencil,
   Play,
   Radio,
   RotateCcw,
   Square,
+  ThumbsDown,
   Trash2,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ActionButton } from "@/components/action-button";
 import { RunStream } from "@/components/run-stream";
 import {
@@ -51,6 +53,9 @@ import { cn } from "@/lib/utils";
 
 type Lane = BoardQuery["lanes"][number];
 type BoardCard = BoardQuery["cards"][number];
+
+/** Which face of the card dialog to open on. */
+export type CardTab = "details" | "deps" | "notes" | "history";
 
 function StatusBadge({ status }: { status: BoardCard["status"] }) {
   return (
@@ -98,6 +103,8 @@ export function SortableCard({
   agentLabel,
   dragDisabled,
   waitingOn,
+  mark,
+  focused,
   watching,
   runId,
   busy,
@@ -115,11 +122,18 @@ export function SortableCard({
    */
   dragDisabled?: boolean;
   waitingOn: string[];
+  /**
+   * What is written on this card that is not the card — a person's notes, and the reason a
+   * reviewer sent it back. Absent for a card nobody has said anything about, which is most.
+   */
+  mark?: { notes: number; rejection: string };
+  /** Arrived at from a link. Ringed and scrolled to, for a few seconds. */
+  focused?: boolean;
   watching: boolean;
   runId?: string;
   busy: { move: boolean; run: boolean; retry: boolean; archive: boolean; remove: boolean };
   on: {
-    edit: () => void;
+    edit: (tab?: CardTab) => void;
     move: (laneId: string) => void;
     archive: () => void;
     retry: () => void;
@@ -140,12 +154,28 @@ export function SortableCard({
     disabled: locked,
   });
 
+  // A second reference to the same node: dnd-kit owns `setNodeRef`, and a linked card has to be
+  // scrolled to — the board is a wide horizontal scroll and a lane is a tall one, so a card
+  // navigated to is very often not on screen at all.
+  const node = useRef<HTMLDivElement | null>(null);
+  const hold = (element: HTMLDivElement | null) => {
+    node.current = element;
+    setNodeRef(element);
+  };
+  useEffect(() => {
+    if (focused) node.current?.scrollIntoView({ block: "nearest", inline: "center" });
+  }, [focused]);
+
   return (
     <Card
-      ref={setNodeRef}
+      ref={hold}
       style={{ transform: CSS.Translate.toString(transform), transition }}
       // Left in place and faded, not removed: the gap it leaves is where the ghost will land.
-      className={cn("group/card gap-2 p-3", isDragging && "opacity-40")}
+      className={cn(
+        "group/card gap-2 p-3",
+        isDragging && "opacity-40",
+        focused && "ring-2 ring-primary",
+      )}
     >
       <div className="flex items-start justify-between gap-2">
         <Tooltip>
@@ -177,7 +207,7 @@ export function SortableCard({
         <button
           type="button"
           className="min-w-0 flex-1 rounded text-left text-sm font-medium hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-          onClick={on.edit}
+          onClick={() => on.edit()}
         >
           {card.title}
         </button>
@@ -188,6 +218,32 @@ export function SortableCard({
         <p className="line-clamp-3 text-xs text-destructive">{card.error}</p>
       ) : card.body ? (
         <p className="line-clamp-3 text-xs text-muted-foreground">{card.body}</p>
+      ) : null}
+
+      {/* Why the card came back, on its face. `cards.error` holds faults and only faults, so
+          until now a rejected card said "rejected" on the board and kept the reason two clicks
+          away in its history — which is the one thing a person needs in order to decide what to
+          do about it. Amber rather than red for the same reason the badge is: a reviewer saying
+          no is the board working. */}
+      {card.status === "rejected" && mark?.rejection ? (
+        <p className="flex items-start gap-1 text-xs text-status-rejected-foreground">
+          <ThumbsDown className="mt-0.5 size-3 shrink-0" aria-hidden />
+          <span className="line-clamp-3">{mark.rejection}</span>
+        </p>
+      ) : null}
+
+      {/* That somebody has written on this card. A count rather than the note itself: a note is
+          written to be read in full by whoever works the card next, and three of them would be
+          the whole lane. Opens the card on the tab they are on. */}
+      {mark?.notes ? (
+        <button
+          type="button"
+          className="flex items-center gap-1 self-start rounded text-xs text-muted-foreground hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          onClick={() => on.edit("notes")}
+        >
+          <MessageSquare className="size-3 shrink-0" aria-hidden />
+          {mark.notes} note{mark.notes === 1 ? "" : "s"}
+        </button>
       ) : null}
 
       {/* An ordering is only useful if it is visible before it bites: a card shows what it
@@ -221,7 +277,7 @@ export function SortableCard({
           size="icon-sm"
           label={`Edit ${card.title}`}
           hint="Edit"
-          onClick={on.edit}
+          onClick={() => on.edit()}
         >
           <Pencil className="size-4" aria-hidden />
         </ActionButton>
