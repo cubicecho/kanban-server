@@ -56,7 +56,14 @@ const FLUSH_MS = 100;
  * The server replays the run from the beginning, so opening this halfway through a long run is
  * the same as having watched it from the start.
  */
-export function RunStream({ runId }: { runId: string }) {
+export function RunStream({
+  runId,
+  className,
+}: {
+  runId: string;
+  /** Overrides the scroller's height, for the places with more room than a card has. */
+  className?: string;
+}) {
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [error, setError] = useState("");
   const [ended, setEnded] = useState(false);
@@ -147,7 +154,7 @@ export function RunStream({ runId }: { runId: string }) {
         role="log"
         aria-live="polite"
         aria-label="Run output"
-        className="max-h-80 overflow-y-auto rounded-md border bg-muted/30 p-3"
+        className={cn("max-h-80 overflow-y-auto rounded-md border bg-muted/30 p-3", className)}
       >
         {blocks.length === 0 ? (
           <p className="text-sm text-muted-foreground">Waiting for the model…</p>

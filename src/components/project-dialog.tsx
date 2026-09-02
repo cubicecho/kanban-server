@@ -3,6 +3,15 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { useDiscardGuard } from "@/components/discard-guard";
 import { useFieldError } from "@/components/field-error";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -28,6 +37,7 @@ import {
   ApplyBoardTemplateDocument,
   BoardTemplatesDocument,
   CreateProjectDocument,
+  DeleteProjectDocument,
   type ProjectsQuery,
   UpdateProjectDocument,
 } from "@/gql/graphql";
@@ -78,6 +88,8 @@ export function ProjectDialog({
   const set = (patch: Partial<Draft>) => setDraft((current) => ({ ...current, ...patch }));
 
   const [templateId, setTemplateId] = useState(SEEDED);
+  const [deleting, setDeleting] = useState(false);
+  const [typed, setTyped] = useState("");
 
   const { close, guard } = useDiscardGuard(useDirty({ ...draft, templateId }), onClose);
   const nameError = useFieldError(
@@ -121,6 +133,25 @@ export function ProjectDialog({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["projects"] });
+      onClose();
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  // The one delete in this app that takes a whole body of work with it, and until now the only
+  // one with no way to do it at all: `deleteProject` existed and nothing called it, so a board
+  // made by mistake stayed in the picker for good. Typing the name rather than pressing a
+  // second button, because everything else that is deleted here can be rebuilt in a minute and
+  // this cannot — the cascade takes the lanes, the cards, the conversations that became them
+  // and every run of the lot.
+  const remove = useMutation({
+    mutationFn: (id: string) => request(DeleteProjectDocument, { id }),
+    onSuccess: () => {
+      // The picker's own effect falls back to the first project that is left; this is what
+      // stops it holding an id that no longer names anything when there are none.
+      selectProject("");
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      toast.success("Project deleted");
       onClose();
     },
     onError: (error: Error) => toast.error(error.message),
@@ -233,14 +264,67 @@ export function ProjectDialog({
           </div>
         </div>
 
-        <DialogFooter>
-          <Button variant="ghost" onClick={close}>
-            Cancel
-          </Button>
-          <Button onClick={() => save.mutate()} disabled={nameError.invalid || save.isPending}>
-            {save.isPending ? "Saving…" : "Save"}
-          </Button>
+        <DialogFooter className="sm:justify-between">
+          {project ? (
+            <Button
+              variant="ghost"
+              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+              onClick={() => {
+                setTyped("");
+                setDeleting(true);
+              }}
+            >
+              Delete project
+            </Button>
+          ) : (
+            <span />
+          )}
+          <div className="flex gap-2">
+            <Button variant="ghost" onClick={close}>
+              Cancel
+            </Button>
+            <Button onClick={() => save.mutate()} disabled={nameError.invalid || save.isPending}>
+              {save.isPending ? "Saving…" : "Save"}
+            </Button>
+          </div>
         </DialogFooter>
+
+        {project ? (
+          <AlertDialog open={deleting} onOpenChange={setDeleting}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete “{project.name}”?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Its lanes go, and its cards with them — along with the conversations they came
+                  from, their dependencies, their history of moves and every run of the lot. This is
+                  the whole project, not a board you can draw again.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="confirm-project">
+                  Type <span className="font-medium text-foreground">{project.name}</span> to
+                  confirm
+                </Label>
+                <Input
+                  id="confirm-project"
+                  value={typed}
+                  onChange={(event) => setTyped(event.target.value)}
+                  autoComplete="off"
+                />
+              </div>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <Button
+                  variant="destructive"
+                  disabled={typed.trim() !== project.name || remove.isPending}
+                  onClick={() => remove.mutate(project.id)}
+                >
+                  {remove.isPending ? "Deleting…" : "Delete project"}
+                </Button>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        ) : null}
         {guard}
       </DialogContent>
     </Dialog>

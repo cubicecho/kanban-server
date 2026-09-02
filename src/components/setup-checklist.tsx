@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { Check, Circle } from "lucide-react";
+import { useProjectActions } from "@/components/project-actions";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { AgentsDocument, ProjectsDocument, TasksDocument } from "@/gql/graphql";
@@ -20,8 +21,9 @@ import { cn } from "@/lib/utils";
  * It reads the queries the rest of the app already has open, so it costs a render rather than a
  * round trip, and each row ticks itself off the live answer rather than remembering being done.
  */
-export function SetupChecklist({ onNewProject }: { onNewProject: () => void }) {
+export function SetupChecklist() {
   const projectId = useProjectId();
+  const { newProject } = useProjectActions();
   const agents = useQuery({ queryKey: ["agents"], queryFn: () => request(AgentsDocument) });
   const projects = useQuery({ queryKey: ["projects"], queryFn: () => request(ProjectsDocument) });
   const tasks = useQuery({
@@ -56,7 +58,7 @@ export function SetupChecklist({ onNewProject }: { onNewProject: () => void }) {
       title: "Make a project",
       detail: "It comes with a board already wired up: intake, doing, review, done.",
       action: (
-        <Button size="sm" variant="ghost" onClick={onNewProject}>
+        <Button size="sm" variant="ghost" onClick={newProject}>
           New project
         </Button>
       ),

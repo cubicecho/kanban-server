@@ -1,0 +1,1 @@
+ALTER TABLE "lanes" ADD COLUMN "archiveOnSuccess" boolean DEFAULT false NOT NULL;

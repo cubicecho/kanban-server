@@ -208,8 +208,9 @@ export const projects = pgTable("projects", {
  *
  * A lane is not only a place a card sits. `roleId` says what sort of station this is,
  * `agentId` which model staffs it, `onSuccessLaneId` where cards go when it succeeds and
- * `onFailureLaneId` where they go when it does not, which is enough to describe
- * "intake → doing → review → done" without a workflow engine. Every one of those may be empty:
+ * `onFailureLaneId` where they go when it does not — or `archiveOnSuccess`, which takes them
+ * off the board altogether — which is enough to describe "intake → doing → review → done"
+ * without a workflow engine. Every one of those may be empty:
  * a lane with no role is a resting place — a backlog, a done column, a bucket for the ones that
  * need a person.
  *
@@ -247,6 +248,18 @@ export const lanes = pgTable(
     agentId: text().references(() => agents.id, { onDelete: "set null" }),
     /** Where a card goes when its run succeeds. Null leaves it where it is. */
     onSuccessLaneId: text().references((): AnyPgColumn => lanes.id, { onDelete: "set null" }),
+    /**
+     * Whether a card that passes here goes off the board instead of along it.
+     *
+     * The end of a pipeline is a Done pile that grows forever and is emptied by hand, which is
+     * a chore the board can do itself. It is a *target* rather than a flag alongside one: a
+     * card either moves somewhere or is archived, never both, so the picker that sets this
+     * clears `onSuccessLaneId`, and the runner reads it first either way.
+     *
+     * The lane is kept, as it is for a card that was broken up — that is where restoring puts
+     * it back.
+     */
+    archiveOnSuccess: boolean().notNull().default(false),
     /** Where a card goes when its run fails. Null leaves it here, marked `error`. */
     onFailureLaneId: text().references((): AnyPgColumn => lanes.id, { onDelete: "set null" }),
     /** How many cards the worker will run here at once. Zero means one — never unbounded. */
@@ -358,19 +371,12 @@ export const cards = pgTable(
       .notNull()
       .default("idle"),
     /**
-     * What the last agent to *work* this card had to say about it.
-     *
-     * A station that judges rather than works leaves this alone: a reviewer's verdict is about
-     * the card's output, not another account of it, and overwriting the report with "PASS"
-     * would lose the one thing the next agent round the loop needs to read.
-     */
-    result: text().notNull().default(""),
-    /**
      * What broke, and only that: a crash, a timeout, a run a restart interrupted.
      *
-     * Never a verdict. A reviewer's reasons are a property of the move it caused, so they live
-     * on the `card_events` row — putting them here made a rejection indistinguishable from a
-     * connection reset, and `cardPrompt` then fed both to the next agent as the same thing.
+     * Never a verdict, and never an account of the work. Both of those are things said about
+     * the card and live in `card_notes`; putting a reviewer's reasons here made a rejection
+     * indistinguishable from a connection reset, and `cardPrompt` then fed both to the next
+     * agent as the same thing.
      */
     error: text().notNull().default(""),
     /**
@@ -430,16 +436,57 @@ export const cardDeps = pgTable(
 );
 
 /**
+ * Something said about a card: an agent's account of the work, a reviewer's ruling, or a
+ * person's own note for whoever picks the card up next.
+ *
+ * These were three separate things and are one, because they are one thing: `cards.result` held
+ * the newest report and lost the one before it, a verdict lived only on the move it caused, and
+ * a person who wanted to tell an agent something had nowhere to write it down. A card is worked
+ * more than once, judged more than once, and talked about in between — so what is said about it
+ * is a list, in order, and the card carries no copy of the last entry.
+ *
+ * `kind` is who it is for rather than a label: `report` is what a working agent produced,
+ * `verdict` is a judging agent's ruling in its own words, and `note` is a person's, which is
+ * the one kind anybody may write, edit or delete. The first two are the account of a run and
+ * are as read-only as the ledger is.
+ *
+ * `author` is stored rather than derived from `runId`, because `runRetentionDays` prunes runs
+ * and a report whose run had been thrown away would otherwise start reading as hand-written.
+ * That is the same reason `card_events` carries `actor`.
+ */
+export const cardNotes = pgTable(
+  "card_notes",
+  {
+    id: id(),
+    cardId: text()
+      .notNull()
+      .references(() => cards.id, { onDelete: "cascade" }),
+    /** The run that wrote it, or null for a person's. Null again once that run is pruned. */
+    runId: text().references(() => runs.id, { onDelete: "set null" }),
+    kind: text({ enum: ["report", "verdict", "note"] })
+      .notNull()
+      .default("note"),
+    author: text({ enum: ["agent", "user"] })
+      .notNull()
+      .default("user"),
+    body: text().notNull().default(""),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [index("card_notes_card_idx").on(table.cardId)],
+);
+
+/**
  * One move of one card: where it went, why, and who decided.
  *
  * "Why is this card here?" is a question about the move that put it here, not about the card,
- * and a column on the card could only ever hold the latest answer to it. A reviewer's reasons,
- * a person's note when they drag something back, the run that caused either — this is where
- * they stay, in order, for as long as the card does.
+ * and a column on the card could only ever hold the latest answer to it. Every move a card
+ * makes, the run that caused it and the note that explains it stay here, in order, for as long
+ * as the card does.
  *
  * `fromLaneId` null is the card being created; `toLaneId` null is it being archived. Nothing
- * else needs saying, so there is no `kind`: from, to, actor and note already say what happened,
- * and an enum here would go stale the way `readVerdict` did.
+ * else needs saying, so there is no `kind`: from, to, actor and the note already say what
+ * happened, and an enum here would go stale the way `readVerdict` did.
  *
  * Unlike runs, these are never pruned. `runRetentionDays` throws away the transcript of the
  * work; the ledger is the durable account of what became of the card, and it has to outlive
@@ -463,8 +510,16 @@ export const cardEvents = pgTable(
     fromLaneId: text().references(() => lanes.id, { onDelete: "set null" }),
     /** Where it went — null when it went off the board, which is only ever archiving. */
     toLaneId: text().references(() => lanes.id, { onDelete: "set null" }),
-    /** Why: a reviewer's verdict in its own words, or the reason a person gave. */
-    note: text().notNull().default(""),
+    /**
+     * Why, by reference: the note that explains this move.
+     *
+     * A reviewer's verdict and a person's reason for dragging a card back are both things said
+     * about the card, so they are `card_notes` rows like any other and this points at one
+     * rather than holding a second copy. The move is a fact about the board; the note is what
+     * somebody said; keeping them apart is what stops a verdict existing twice and disagreeing
+     * with itself.
+     */
+    noteId: text().references((): AnyPgColumn => cardNotes.id, { onDelete: "set null" }),
     /** `system` is the server tidying up after itself — a restart putting a run back. */
     actor: text({ enum: ["agent", "user", "system"] })
       .notNull()
@@ -561,6 +616,11 @@ export interface TemplateLane {
   /** Index into the same list, or null for "leave the card where it is". */
   onSuccess: number | null;
   onFailure: number | null;
+  /**
+   * Whether a card that passes here is archived instead of moved. Absent on templates saved
+   * before a lane could say so, which is the same as saying no.
+   */
+  archiveOnSuccess?: boolean;
 }
 
 /**
@@ -634,6 +694,7 @@ export const schema = {
   messages,
   cards,
   cardDeps,
+  cardNotes,
   cardEvents,
   runs,
   boardTemplates,
@@ -692,6 +753,11 @@ export const relations = defineRelations(schema, (r) => ({
     blocks: r.many.cardDeps({ from: r.cards.id, to: r.cardDeps.dependsOnCardId }),
     runs: r.many.runs({ from: r.cards.id, to: r.runs.cardId }),
     events: r.many.cardEvents({ from: r.cards.id, to: r.cardEvents.cardId }),
+    notes: r.many.cardNotes({ from: r.cards.id, to: r.cardNotes.cardId }),
+  },
+  cardNotes: {
+    card: r.one.cards({ from: r.cardNotes.cardId, to: r.cards.id, optional: false }),
+    run: r.one.runs({ from: r.cardNotes.runId, to: r.runs.id }),
   },
   cardDeps: {
     card: r.one.cards({ from: r.cardDeps.cardId, to: r.cards.id, optional: false }),
@@ -704,6 +770,7 @@ export const relations = defineRelations(schema, (r) => ({
   cardEvents: {
     card: r.one.cards({ from: r.cardEvents.cardId, to: r.cards.id, optional: false }),
     run: r.one.runs({ from: r.cardEvents.runId, to: r.runs.id }),
+    note: r.one.cardNotes({ from: r.cardEvents.noteId, to: r.cardNotes.id }),
     fromLane: r.one.lanes({ from: r.cardEvents.fromLaneId, to: r.lanes.id }),
     toLane: r.one.lanes({ from: r.cardEvents.toLaneId, to: r.lanes.id }),
   },
@@ -727,6 +794,7 @@ export type Task = typeof tasks.$inferSelect;
 export type Message = typeof messages.$inferSelect;
 export type Card = typeof cards.$inferSelect;
 export type CardDep = typeof cardDeps.$inferSelect;
+export type CardNote = typeof cardNotes.$inferSelect;
 export type CardEvent = typeof cardEvents.$inferSelect;
 export type Run = typeof runs.$inferSelect;
 export type BoardTemplate = typeof boardTemplates.$inferSelect;

@@ -120,7 +120,7 @@ export function CardHistory({ cardId }: { cardId: string }) {
           const running = run?.status === "running";
           // The reason a card moved is the whole value of a review, so the first line of it is
           // read without opening anything. The rest is behind the click, with the output.
-          const reason = event?.note.split("\n")[0] ?? "";
+          const reason = event?.note?.body.split("\n")[0] ?? "";
           return (
             <div key={id} className="flex flex-col gap-1">
               <button

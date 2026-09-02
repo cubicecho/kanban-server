@@ -24,13 +24,16 @@ import { cn } from "@/lib/utils";
 
 type Archived = ArchiveQuery["cards"][number];
 
+/** As on Runs: one more is asked for than is drawn, so the end of the page is not the end. */
+const PAGE = 100;
+
 /**
  * The cards that have been put out of the way.
  *
- * An archived card keeps everything it had — its lane, its status, what the agent produced —
- * and this is the only place any of that can still be read. Restoring puts it back at the end
- * of the lane it names, which is why the lane is shown: it is where the card is going, not
- * just where it has been.
+ * An archived card keeps everything it had — its lane, its status, everything ever said about
+ * it — and this is the only place any of that can still be read. Restoring puts it back at
+ * the end of the lane it names, which is why the lane is shown: it is where the card is
+ * going, not just where it has been.
  *
  * The board is the working surface and this is not, so nothing here drags, runs or edits.
  * There are two things to do with an archived card, and they are the two buttons.
@@ -40,10 +43,12 @@ export function ArchiveRoute() {
   const project = useCurrentProject();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState<string | null>(null);
+  const [limit, setLimit] = useState(PAGE);
 
   const archive = useQuery({
-    queryKey: ["archive", projectId],
-    queryFn: () => request(ArchiveDocument, { projectId }),
+    // A prefix of the key everything else invalidates, so a longer page still refreshes.
+    queryKey: ["archive", projectId, limit],
+    queryFn: () => request(ArchiveDocument, { projectId, limit: limit + 1 }),
     enabled: Boolean(projectId),
   });
 
@@ -78,7 +83,9 @@ export function ArchiveRoute() {
     );
   }
 
-  const cards = archive.data?.cards ?? [];
+  const rows = archive.data?.cards ?? [];
+  const more = rows.length > limit;
+  const cards = more ? rows.slice(0, limit) : rows;
 
   return (
     <Page
@@ -137,7 +144,7 @@ export function ArchiveRoute() {
                     </span>
                   </div>
                   <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
-                    {card.error || card.result || card.body || "(nothing written down)"}
+                    {card.error || card.body || "(nothing written down)"}
                   </p>
                 </span>
               </button>
@@ -158,7 +165,7 @@ export function ArchiveRoute() {
                   label={`Delete ${card.title} for good`}
                   hint="Delete for good"
                   title={`Delete "${card.title}" for good?`}
-                  description="This is the only place the card's result still exists. Deleting it also removes it as a dependency from anything that was waiting on it. There is no undo."
+                  description="This is the only place the card and everything said about it still exists. Deleting it also removes it as a dependency from anything that was waiting on it. There is no undo."
                   confirmLabel="Delete for good"
                   onConfirm={() => remove.mutate(card.id)}
                 >
@@ -172,9 +179,9 @@ export function ArchiveRoute() {
                 {card.body ? (
                   <pre className="overflow-x-auto text-sm whitespace-pre-wrap">{card.body}</pre>
                 ) : null}
-                {card.result || card.error ? (
+                {card.error ? (
                   <pre className="overflow-x-auto text-sm whitespace-pre-wrap text-muted-foreground">
-                    {card.error || card.result}
+                    {card.error}
                   </pre>
                 ) : null}
               </div>
@@ -182,6 +189,12 @@ export function ArchiveRoute() {
           </Card>
         );
       })}
+
+      {more ? (
+        <Button variant="outline" className="self-center" onClick={() => setLimit(limit + PAGE)}>
+          Show {PAGE} more
+        </Button>
+      ) : null}
     </Page>
   );
 }

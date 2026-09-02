@@ -7,10 +7,15 @@ query Roles {
     prompt
   }
   # Every lane on the server, for the count beside each kind: a role is deleted by whether
-  # anything is still of that kind, not by whether an agent holds it.
+  # anything is still of that kind, not by whether an agent holds it. The names come with it
+  # because "3 lanes" does not say which board to go and change.
   lanes {
     id
     roleId
+    name
+    project {
+      name
+    }
   }
 }
 

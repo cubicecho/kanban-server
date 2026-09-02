@@ -18,6 +18,7 @@ import {
   Select,
   SelectContent,
   SelectItem,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -37,6 +38,10 @@ type Lane = BoardQuery["lanes"][number];
 
 // Radix refuses an empty item value, so "nothing" carries a sentinel.
 const NONE = "__none__";
+// And so does "off the board", which is a pass target like any other rather than a switch
+// beside one: a card that passes either goes somewhere or is archived, never both, and one
+// picker with three kinds of answer is what makes that true by construction.
+const ARCHIVE = "__archive__";
 
 /** What a lane of each kind does to a card, said in the dialog rather than found out from a run. */
 const CONTRACT_SAYS: Record<string, string> = {
@@ -71,7 +76,9 @@ export function LaneDialog({
   const [roleId, setRoleId] = useState(lane?.roleId ?? "");
   const [prompt, setPrompt] = useState(lane?.prompt ?? "");
   const [agentId, setAgentId] = useState(lane?.agentId ?? "");
-  const [onSuccessLaneId, setOnSuccess] = useState(lane?.onSuccessLaneId ?? "");
+  const [onSuccess, setOnSuccess] = useState(
+    lane?.archiveOnSuccess ? ARCHIVE : (lane?.onSuccessLaneId ?? ""),
+  );
   const [onFailureLaneId, setOnFailure] = useState(lane?.onFailureLaneId ?? "");
   const [wipLimit, setWipLimit] = useState(lane?.wipLimit ?? 1);
   const [maxAttempts, setMaxAttempts] = useState(lane?.maxAttempts ?? 0);
@@ -88,7 +95,7 @@ export function LaneDialog({
       roleId,
       prompt,
       agentId,
-      onSuccessLaneId,
+      onSuccess,
       onFailureLaneId,
       wipLimit,
       maxAttempts,
@@ -105,7 +112,8 @@ export function LaneDialog({
         roleId: roleId || null,
         prompt,
         agentId: agentId || null,
-        onSuccessLaneId: onSuccessLaneId || null,
+        onSuccessLaneId: onSuccess === ARCHIVE ? null : onSuccess || null,
+        archiveOnSuccess: onSuccess === ARCHIVE,
         onFailureLaneId: onFailureLaneId || null,
         wipLimit,
         maxAttempts,
@@ -138,6 +146,7 @@ export function LaneDialog({
     value: string,
     onChange: (next: string) => void,
     empty: string,
+    archive?: boolean,
   ) => (
     <Select value={value || NONE} onValueChange={(next) => onChange(next === NONE ? "" : next)}>
       <SelectTrigger id={id} className="w-full">
@@ -150,6 +159,12 @@ export function LaneDialog({
             {row.name}
           </SelectItem>
         ))}
+        {archive ? (
+          <>
+            <SelectSeparator />
+            <SelectItem value={ARCHIVE}>Archive it</SelectItem>
+          </>
+        ) : null}
       </SelectContent>
     </Select>
   );
@@ -245,11 +260,18 @@ export function LaneDialog({
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-2">
-              <Label htmlFor="lane-success">On success, move to</Label>
-              {laneSelect("lane-success", onSuccessLaneId, setOnSuccess, "Stay here")}
+              <Label htmlFor="lane-success">On success</Label>
+              {laneSelect("lane-success", onSuccess, setOnSuccess, "Stay here", true)}
+              {onSuccess === ARCHIVE ? (
+                <p className="text-xs text-muted-foreground">
+                  A card that passes here goes straight to the archive, keeping this lane —
+                  restoring puts it back at the end of it. The end of a pipeline, without a Done
+                  pile to empty by hand.
+                </p>
+              ) : null}
             </div>
             <div className="flex flex-col gap-2">
-              <Label htmlFor="lane-failure">On failure, move to</Label>
+              <Label htmlFor="lane-failure">On failure</Label>
               {laneSelect("lane-failure", onFailureLaneId, setOnFailure, "Stay here")}
             </div>
           </div>

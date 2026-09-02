@@ -26,6 +26,15 @@ import { cn } from "@/lib/utils";
 
 type Run = RunsQuery["runs"][number];
 
+/**
+ * How many runs are asked for at a time.
+ *
+ * One page more is requested than is drawn, which is how the button below knows there is
+ * anything left: a hundredth row and a hundred-and-first looked identical, and a page that
+ * stops without saying so reads as a server that has forgotten.
+ */
+const PAGE = 100;
+
 /** What the run was about: a card by title, or the task it was refining or breaking up. */
 const subject = (run: Run) => run.card?.title || run.task?.title || "(gone)";
 
@@ -61,10 +70,14 @@ export function RunsRoute() {
   const project = useCurrentProject();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState<string | null>(null);
+  const [limit, setLimit] = useState(PAGE);
 
   const runs = useQuery({
-    queryKey: ["runs", projectId],
-    queryFn: () => request(RunsDocument, { projectId }),
+    // The limit is part of the key, so a longer page is its own entry rather than a refetch
+    // that briefly empties the list. Every `invalidateQueries(["runs", projectId])` in the app
+    // still matches it — the key is a prefix.
+    queryKey: ["runs", projectId, limit],
+    queryFn: () => request(RunsDocument, { projectId, limit: limit + 1 }),
     enabled: Boolean(projectId),
     // A run started elsewhere — by the worker, or by an agent over MCP — should show up without
     // a reload, and this page is cheap enough to poll.
@@ -97,6 +110,10 @@ export function RunsRoute() {
     onError,
   });
 
+  const rows = runs.data?.runs ?? [];
+  const more = rows.length > limit;
+  const shown = more ? rows.slice(0, limit) : rows;
+
   if (!projectId) {
     return (
       <Page title="Runs">
@@ -121,7 +138,7 @@ export function RunsRoute() {
         <QueryError error={runs.error} onRetry={() => runs.refetch()} what="these runs" />
       ) : null}
       {runs.isPending ? <RowSkeleton rows={3} /> : null}
-      {runs.data?.runs.length === 0 ? (
+      {shown.length === 0 && !runs.isPending && !runs.isError ? (
         <EmptyState
           icon={History}
           title="Nothing has run yet"
@@ -129,7 +146,7 @@ export function RunsRoute() {
         />
       ) : null}
 
-      {runs.data?.runs.map((run) => {
+      {shown.map((run) => {
         const expanded = open === run.id;
         const running = run.status === "running";
         return (
@@ -212,6 +229,12 @@ export function RunsRoute() {
           </Card>
         );
       })}
+
+      {more ? (
+        <Button variant="outline" className="self-center" onClick={() => setLimit(limit + PAGE)}>
+          Show {PAGE} more
+        </Button>
+      ) : null}
     </Page>
   );
 }

@@ -50,7 +50,8 @@ field and none of the machinery.
 
 There is no workflow engine here. A lane says what happens to its cards (\`roleId\`), who does it
 (\`agentId\`), how many at once (\`wipLimit\`), and where a card goes when its run succeeds
-(\`onSuccessLaneId\`) or fails (\`onFailureLaneId\`). That is the whole of the automation, and the
+(\`onSuccessLaneId\`, or \`archiveOnSuccess\` to send it off the board) or fails
+(\`onFailureLaneId\`). That is the whole of the automation, and the
 shape of the pipeline is the shape of the board somebody drew. A new project arrives with five
 lanes — Intake, Backlog, Doing, Review, Done — already carrying kinds and an agent, so it works
 without being configured.
@@ -91,7 +92,13 @@ Doing-to-Review loop cannot spin without a person noticing; \`retry_card\` is th
 
 Why a card is where it is, in the words of whoever put it there, is in \`card_events\` — the
 reviewer's reasons, or what a person said when they moved it. Nothing on the card itself carries
-that: \`result\` is the last account of the *work*, and \`error\` is only ever a fault.
+that: \`error\` is only ever a fault.
+
+Everything ever *said* about a card is in \`card_notes\`: what an agent made of it when it worked
+it (\`report\`), what a reviewer ruled (\`verdict\`), and anything a person wants taken into
+account (\`note\`). The last of those is the one you may write, with \`add_card_note\`, and every
+one of them is handed to the next agent that works the card — so it is how you tell that agent
+something the card's body does not say, without editing the card out from under whoever wrote it.
 
 ## When something has gone wrong
 
@@ -229,13 +236,15 @@ Finish by reporting the ids of what you created and which lanes they are sitting
    has failed, what is finished.
 3. For every card in \`rejected\` or \`error\`, say *why* it is stuck rather than that it is. A
    \`rejected\` card failed its acceptance criteria and the reviewer said what was wrong: read it
-   from \`card_events\` for that card, newest first. An \`error\` card broke, and the reason is on
+   from \`card_notes\` for that card, newest first. An \`error\` card broke, and the reason is on
    the run — \`runs\` for the project, newest first.
 4. For every \`idle\` card, check \`blockers\` before proposing anything: a card waiting on an
    unfinished dependency is not stuck, it is queued. One waiting on something already archived,
    or on a card that will never be done, is a stale ordering worth clearing with
    \`set_card_deps\`.
 5. Then propose exactly one move per stuck card:
+   - \`add_card_note\` and then \`retry_card\` — the card is right and the agent went wrong, and
+     what you know about why is worth telling the next one.
    - \`retry_card\` — the failure was transient, or its cause was fixed elsewhere.
    - \`update_card_single\` and then \`retry_card\` — the card itself was wrong: too big, or vague
      about what done means.

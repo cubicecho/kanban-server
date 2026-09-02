@@ -154,30 +154,55 @@ export const projectContext = (project: Project): string =>
     .join("")
     .trim();
 
+/** What has been said about the card, as `cardPrompt` wants it. */
+export interface Said {
+  /** The newest account of the work, from whichever agent last worked it. */
+  report?: string;
+  /** The reason the card is in this lane, off the ledger. */
+  why?: string;
+  /** Every note a person left on the card, oldest first. */
+  notes?: string[];
+}
+
 /**
- * What an agent working a card is given: the card, and its criteria.
+ * What an agent working a card is given: the card, its criteria, and what has been said.
  *
  * Not the project — that is standing context every run of this board shares, so it is the
  * system prompt's `where` layer. Repeating it here would send it twice.
  *
- * `note` is the reason the card is in this lane, off the ledger — a reviewer's FAIL in its own
+ * `why` is the reason the card is in this lane, off the ledger — a reviewer's FAIL in its own
  * words, or what a person said when they dragged it back. An agent picking up a card that came
- * back needs that, or a second attempt is the first one again.
+ * back needs that, or a second attempt is the first one again. It is read off the move rather
+ * than off the notes because it belongs to the move: a rejection stops applying the moment the
+ * card is sent on, which is exactly what a person's note does not do.
+ *
+ * `notes` are a person's own, and they stand until taken back — that is what makes a note
+ * different from a verdict, and it is why they are last: what somebody wants taken into account
+ * is the most recent word on the card, whatever an agent said before it.
+ *
+ * A person who says something *while* moving a card writes both at once: the note stands, and
+ * the move points at it. So the one that is also `why` is dropped from the list — it is the
+ * same sentence, and under the stronger of the two headings it reads as the reason it is.
  *
  * What it is deliberately *not* given is `card.error`. That is where a crash goes, and a crash
  * is not feedback: an endpoint that reset the connection has said nothing about the work, and
  * handing an agent a stack trace under the heading "why this came back" was how a broken
  * network read as a review.
  */
-export const cardPrompt = (card: Card, note = ""): string =>
-  [
+export const cardPrompt = (card: Card, said: Said = {}): string => {
+  const standing = (said.notes ?? []).filter((note) => note !== said.why);
+  return [
     `Card: ${card.title}`,
     card.body ? `\n\n${card.body}` : "",
     card.acceptance ? `\n\nDone when:\n${card.acceptance}` : "",
     // An agent judging a card is reading the same card another just worked, so it needs what
     // came out of that as well as what went in.
-    card.result ? `\n\nWhat the last agent reported:\n${card.result}` : "",
-    note ? `\n\nWhy this came back:\n${note}` : "",
+    said.report ? `\n\nWhat the last agent reported:\n${said.report}` : "",
+    said.why ? `\n\nWhy this came back:\n${said.why}` : "",
+    standing.length
+      ? `\n\nNotes on this card, to take into account:\n${standing.map((note) => `- ${note}`).join("\n")}`
+      : "",
   ]
     .join("")
     .trim();
+};

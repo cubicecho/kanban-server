@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { useDiscardGuard } from "@/components/discard-guard";
 import { useFieldError } from "@/components/field-error";
+import { ToolList, toolCount } from "@/components/tool-list";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -311,24 +312,14 @@ export function McpDialog({
             >
               <div className="flex items-center gap-2 font-medium">
                 {probe.ok ? (
-                  <CheckCircle2 className="size-4" />
+                  <CheckCircle2 className="size-4 text-status-running" />
                 ) : (
                   <XCircle className="size-4 text-destructive" />
                 )}
-                {probe.ok ? `Connected — ${probe.tools.length} tool(s)` : "Could not connect"}
+                {probe.ok ? `Connected — ${toolCount(probe.tools.length)}` : "Could not connect"}
               </div>
               {probe.ok ? (
-                <div className="flex flex-wrap gap-1">
-                  {probe.tools.map((tool) => (
-                    <span
-                      key={tool.name}
-                      title={tool.description}
-                      className="rounded-md border px-2 py-0.5 font-mono text-xs text-muted-foreground"
-                    >
-                      {tool.name}
-                    </span>
-                  ))}
-                </div>
+                <ToolList tools={probe.tools} />
               ) : (
                 <p className="whitespace-pre-wrap font-mono text-xs text-destructive">
                   {probe.error}

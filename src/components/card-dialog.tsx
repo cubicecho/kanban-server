@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { CardDepsField, type DepCard } from "@/components/card-deps-field";
 import { CardHistory } from "@/components/card-history";
+import { CardNotes } from "@/components/card-notes";
 import { useDiscardGuard } from "@/components/discard-guard";
 import { useFieldError } from "@/components/field-error";
 import { Badge } from "@/components/ui/badge";
@@ -167,9 +168,10 @@ export function CardDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {/* Three things a card is: what to do, what it waits on, and what has happened to it.
-            They were one scroll, which meant the deps picker appearing when its query landed
-            shoved the history down the page under whoever was reading it. */}
+        {/* Four things a card is: what to do, what it waits on, what has been said about it
+            and what has happened to it. They were one scroll, which meant the deps picker
+            appearing when its query landed shoved the history down the page under whoever was
+            reading it. */}
         <Tabs defaultValue="details">
           <TabsList>
             <TabsTrigger value="details">Details</TabsTrigger>
@@ -179,8 +181,9 @@ export function CardDialog({
                 <span className="ml-1.5 text-muted-foreground">{dependsOn.length}</span>
               ) : null}
             </TabsTrigger>
-            {/* A card that does not exist yet has no history, and asking for one would be a
-                query for the id of a row nobody has written. */}
+            {/* A card that does not exist yet has neither notes nor a history, and asking
+                for either would be a query for the id of a row nobody has written. */}
+            {card ? <TabsTrigger value="notes">Notes</TabsTrigger> : null}
             {card ? <TabsTrigger value="history">History</TabsTrigger> : null}
           </TabsList>
 
@@ -216,15 +219,6 @@ export function CardDialog({
                 placeholder="What a reviewer checks against. Kept apart from the body so it does not get skipped."
               />
             </div>
-
-            {card?.result ? (
-              <div className="flex flex-col gap-2">
-                <Label>Last result</Label>
-                <pre className="max-h-60 overflow-auto rounded-md border bg-muted/30 p-3 text-xs whitespace-pre-wrap">
-                  {card.result}
-                </pre>
-              </div>
-            ) : null}
           </TabsContent>
 
           <TabsContent value="deps" className="flex flex-col gap-4">
@@ -262,6 +256,12 @@ export function CardDialog({
               </div>
             ) : null}
           </TabsContent>
+
+          {card ? (
+            <TabsContent value="notes">
+              <CardNotes cardId={card.id} />
+            </TabsContent>
+          ) : null}
 
           {card ? (
             <TabsContent value="history">

@@ -31,6 +31,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -89,6 +96,7 @@ export function SortableCard({
   previous,
   next,
   agentLabel,
+  dragDisabled,
   waitingOn,
   watching,
   runId,
@@ -100,6 +108,12 @@ export function SortableCard({
   previous?: Lane;
   next?: Lane;
   agentLabel?: string;
+  /**
+   * The board is showing a subset — a search — so the row a card sits in is not the row it
+   * occupies, and dropping it would land it somewhere nobody aimed at. The arrows in the
+   * overflow still work: they name a lane rather than a position.
+   */
+  dragDisabled?: boolean;
   waitingOn: string[];
   watching: boolean;
   runId?: string;
@@ -120,9 +134,10 @@ export function SortableCard({
   // A card an agent is working cannot be moved out from under it — the server refuses, so the
   // board should not offer.
   const pinned = card.status === "running";
+  const locked = pinned || Boolean(dragDisabled);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: card.id,
-    disabled: pinned,
+    disabled: locked,
   });
 
   return (
@@ -141,10 +156,10 @@ export function SortableCard({
               // every card at full contrast is twenty pieces of furniture on a full board.
               className={cn(
                 "-ml-1 shrink-0 touch-none rounded text-muted-foreground/40 transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none group-focus-within/card:text-muted-foreground group-hover/card:text-muted-foreground",
-                pinned ? "cursor-not-allowed opacity-40" : "cursor-grab active:cursor-grabbing",
+                locked ? "cursor-not-allowed opacity-40" : "cursor-grab active:cursor-grabbing",
               )}
-              aria-label={pinned ? `${card.title} cannot be moved` : `Drag ${card.title}`}
-              disabled={pinned}
+              aria-label={locked ? `${card.title} cannot be dragged` : `Drag ${card.title}`}
+              disabled={locked}
               {...attributes}
               {...listeners}
             >
@@ -152,7 +167,11 @@ export function SortableCard({
             </button>
           </TooltipTrigger>
           <TooltipContent>
-            {pinned ? "An agent is working this card" : "Drag, or press space to lift"}
+            {pinned
+              ? "An agent is working this card"
+              : dragDisabled
+                ? "Clear the search to drag cards"
+                : "Drag, or press space to lift"}
           </TooltipContent>
         </Tooltip>
         <button
@@ -207,6 +226,21 @@ export function SortableCard({
           <Pencil className="size-4" aria-hidden />
         </ActionButton>
 
+        {/* Not in the overflow. What an agent is doing right now is the thing a person came to
+            the board to see, and it was two clicks behind a menu whose other items are all
+            about moving the card. It only appears while there is something to watch. */}
+        {card.status === "running" ? (
+          <ActionButton
+            variant="ghost"
+            size="icon-sm"
+            label={`Watch the run working ${card.title}`}
+            hint="Watch the run"
+            onClick={on.watch}
+          >
+            <Radio className="size-4 text-status-running" aria-hidden />
+          </ActionButton>
+        ) : null}
+
         {/* Everything a card can do that is not the one thing it usually wants. In a menu
             rather than in a row, because eight ghost icons at 32px in a 288px lane is a
             guessing game, and a menu can spell out which lane an arrow meant. */}
@@ -241,12 +275,6 @@ export function SortableCard({
               <ArrowRight className="size-4" aria-hidden />
               {next ? `Move to ${next.name}` : "Nowhere to the right"}
             </DropdownMenuItem>
-            {card.status === "running" ? (
-              <DropdownMenuItem onSelect={on.watch}>
-                <Radio className="size-4" aria-hidden />
-                {watching ? "Hide the run" : "Watch this run"}
-              </DropdownMenuItem>
-            ) : null}
             <DropdownMenuSeparator />
             <DropdownMenuItem disabled={pinned || busy.archive} onSelect={on.archive}>
               <Archive className="size-4" aria-hidden />
@@ -264,16 +292,26 @@ export function SortableCard({
         </DropdownMenu>
       </div>
 
-      {/* The middle of the run, where the run is: what the agent is thinking and which tools it
-          is reaching for, without leaving the board for the Runs page. The stream replays from
-          the start, so opening it late costs nothing. */}
-      {watching ? (
-        runId ? (
-          <RunStream runId={runId} />
-        ) : (
-          <p className="text-xs text-muted-foreground">Looking for the run…</p>
-        )
-      ) : null}
+      {/* The middle of the run — what the agent is thinking and which tools it is reaching for
+          — without leaving the board for the Runs page. In a dialog rather than in the card:
+          model output is prose and tool calls are paths, and 288px of lane wrapped both to
+          three words a line while shoving every card below it down the column. The stream
+          replays from the start, so opening it late costs nothing. */}
+      <Dialog open={watching} onOpenChange={(open) => !open && on.watch()}>
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="truncate">{card.title}</DialogTitle>
+            <DialogDescription>
+              The run as it happens. Closing this leaves it running.
+            </DialogDescription>
+          </DialogHeader>
+          {runId ? (
+            <RunStream runId={runId} className="max-h-[60vh]" />
+          ) : (
+            <p className="text-sm text-muted-foreground">Looking for the run…</p>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={confirming} onOpenChange={setConfirming}>
         <AlertDialogContent>

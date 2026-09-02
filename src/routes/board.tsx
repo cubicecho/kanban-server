@@ -15,12 +15,12 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { KanbanSquare, Plus, Save, Settings2, Trash2 } from "lucide-react";
+import { KanbanSquare, Plus, Save, Search, Settings2, Trash2 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ActionButton } from "@/components/action-button";
-import { Page } from "@/components/app-shell";
+import { Page, useCurrentProject } from "@/components/app-shell";
 import { CardGhost, SortableCard } from "@/components/board-card";
 import { CardDialog } from "@/components/card-dialog";
 import { ConfirmButton } from "@/components/confirm-button";
@@ -30,6 +30,7 @@ import { QueryError } from "@/components/query-error";
 import { SaveTemplateDialog } from "@/components/save-template-dialog";
 import { Spend } from "@/components/spend";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   ActiveRunsDocument,
@@ -41,8 +42,9 @@ import {
   DeleteCardDocument,
   DeleteLaneDocument,
   MoveCardDocument,
-  ProjectsDocument,
+  RestoreCardDocument,
   RetryCardDocument,
+  RolesDocument,
   RunCardDocument,
   StopCardDocument,
 } from "@/gql/graphql";
@@ -55,6 +57,17 @@ type Lane = BoardQuery["lanes"][number];
 type BoardCard = BoardQuery["cards"][number];
 
 /**
+ * How many cards the board will draw.
+ *
+ * It asks for one more than this and shows the first `LIMIT`, which is how it knows there are
+ * others: a board that quietly stopped at five hundred looked exactly like a board with five
+ * hundred cards on it. There is no "show more" here because a board is not a list — the cards
+ * come back in `position` order across the whole project, so what a higher limit would add is
+ * the tail of the longest lanes, and the answer to a board this size is the archive.
+ */
+const LIMIT = 500;
+
+/**
  * The whole lane is a drop target, so a card can be put in an empty one.
  *
  * A hovered lane used to say so in `bg-muted` alone, which on a dark board is one step of
@@ -65,13 +78,16 @@ type BoardCard = BoardQuery["cards"][number];
 function LaneDrop({
   laneId,
   empty,
+  filtered,
   children,
 }: {
   laneId: string;
   empty: boolean;
+  /** A search is on, so this lane is showing a subset and cannot be dropped into. */
+  filtered: boolean;
   children: ReactNode;
 }) {
-  const { setNodeRef, isOver } = useDroppable({ id: `lane:${laneId}` });
+  const { setNodeRef, isOver } = useDroppable({ id: `lane:${laneId}`, disabled: filtered });
   return (
     <div
       ref={setNodeRef}
@@ -83,7 +99,9 @@ function LaneDrop({
     >
       {children}
       {empty ? (
-        <p className="m-auto px-2 text-center text-xs text-muted-foreground">Drop a card here</p>
+        <p className="m-auto px-2 text-center text-xs text-muted-foreground">
+          {filtered ? "Nothing here matches" : "Drop a card here"}
+        </p>
       ) : null}
     </div>
   );
@@ -163,13 +181,13 @@ export function BoardRoute() {
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [watching, setWatching] = useState<string | null>(null);
   const [dragging, setDragging] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
 
-  const projects = useQuery({ queryKey: ["projects"], queryFn: () => request(ProjectsDocument) });
-  const project = projects.data?.projects.find((row) => row.id === projectId);
+  const project = useCurrentProject();
 
   const board = useQuery({
     queryKey: ["board", projectId],
-    queryFn: () => request(BoardDocument, { projectId }),
+    queryFn: () => request(BoardDocument, { projectId, limit: LIMIT + 1 }),
     enabled: Boolean(projectId),
     // A card an agent is working changes without anyone here doing anything — but not while a
     // card is in the air, because a lane that renumbers itself under the cursor is a card
@@ -190,6 +208,28 @@ export function BoardRoute() {
   const agents = useQuery({ queryKey: ["agents"], queryFn: () => request(AgentsDocument) });
   const agentName = (id?: string | null) =>
     agents.data?.agents.find((agent) => agent.id === id)?.name;
+
+  // A lane header said only which agent works here, which is the smaller half of what a lane
+  // is: the role is the kind of station it is — whether cards get worked, ruled on or broken
+  // up — and the same agent in two lanes does two different jobs.
+  const roles = useQuery({ queryKey: ["roles"], queryFn: () => request(RolesDocument) });
+  const roleName = (id?: string | null) => roles.data?.roles.find((role) => role.id === id)?.name;
+
+  const laneSummary = (lane: Lane) => {
+    const role = lane.roleId ? (roleName(lane.roleId) ?? "unknown role") : null;
+    const agent = agentName(lane.agentId);
+    // It takes both to be a station. One without the other never runs, so name the half that
+    // is missing rather than only ever the agent — and a lane with neither is a resting place,
+    // which is one thing to say rather than two absences.
+    const parts = role || agent ? [role ?? "no role", agent ?? "no agent"] : ["resting place"];
+    // A cap on how many run at once is only worth saying where something runs.
+    if (role && agent && lane.wipLimit) parts.push(`${lane.wipLimit} at a time`);
+    if (lane.intake) parts.push("intake");
+    // Where a card goes is otherwise only in the lane dialog, and this one takes it off the
+    // board — a card that vanishes from a lane wants a reason visible on the lane.
+    if (lane.archiveOnSuccess) parts.push("archives what passes");
+    return parts.join(" · ");
+  };
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ["board", projectId] });
@@ -249,11 +289,28 @@ export function BoardRoute() {
     onError,
   });
 
+  const restore = useMutation({
+    mutationFn: (cardId: string) => request(RestoreCardDocument, { cardId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["archive", projectId] });
+      refresh();
+    },
+    onError,
+  });
+
   // Off the board rather than gone: the Done pile that has served its purpose, and the card
-  // nobody is going to do. The archive page is where they are read and where they come back.
+  // nobody is going to do. The archive page is where they are read and where they come back —
+  // but the wrong card archived is noticed here, a second later, so the way back is on the
+  // toast rather than a page away. It is `restoreCard` either way, which puts the card at the
+  // end of its lane rather than the place it held; the toast says so, because an undo that
+  // does not quite undo is worse for going unremarked.
   const archive = useMutation({
     mutationFn: (cardId: string) => request(ArchiveCardDocument, { cardId }),
-    onSuccess: () => {
+    onSuccess: (_data, cardId) => {
+      toast.success("Archived", {
+        description: "Undo puts it back at the end of its lane.",
+        action: { label: "Undo", onClick: () => restore.mutate(cardId) },
+      });
       queryClient.invalidateQueries({ queryKey: ["archive", projectId] });
       refresh();
     },
@@ -273,7 +330,18 @@ export function BoardRoute() {
   });
 
   const lanes = board.data?.lanes ?? [];
-  const cards = board.data?.cards ?? [];
+  const all = board.data?.cards ?? [];
+  const truncated = all.length > LIMIT;
+  const cards = truncated ? all.slice(0, LIMIT) : all;
+
+  // Title and body, because half of what distinguishes two cards called "Migrate the tables"
+  // is in the brief underneath. Nothing here is sent to the server: the board is already in
+  // hand, and a query per keystroke over five hundred rows this process already has would be
+  // slower than reading them.
+  const filter = search.trim().toLowerCase();
+  const matches = (card: BoardCard) =>
+    card.title.toLowerCase().includes(filter) || card.body.toLowerCase().includes(filter);
+  const matched = filter ? cards.filter(matches).length : cards.length;
   // The board draws only the cards on it, so a dependency that has been archived is not in
   // this list — and dropping it silently told a card it was waiting on nothing when it was
   // waiting on something nobody can see. Named rather than omitted.
@@ -349,7 +417,8 @@ export function BoardRoute() {
 
   return (
     <Page
-      title={project?.name ?? "Board"}
+      title="Board"
+      crumb={project?.name}
       description={
         project?.autoRun
           ? "On auto — cards are picked up as they land."
@@ -357,10 +426,24 @@ export function BoardRoute() {
       }
       wide
       actions={
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           {/* Beside the project's own controls, because turning `autoRun` on is the decision
               this number is about. */}
           <Spend projectId={projectId} />
+          <div className="relative">
+            <Search
+              className="pointer-events-none absolute top-1/2 left-2 size-4 -translate-y-1/2 text-muted-foreground"
+              aria-hidden
+            />
+            <Input
+              type="search"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Find a card"
+              aria-label="Find a card on this board"
+              className="w-44 pl-8"
+            />
+          </div>
           <Button variant="outline" onClick={() => setSavingTemplate(true)}>
             <Save className="size-4" />
             Save as template
@@ -383,6 +466,35 @@ export function BoardRoute() {
         </p>
       ) : null}
 
+      {/* A board that stopped at the limit looked like a board that ended there. Said once,
+          above the lanes, with the thing to do about it. */}
+      {truncated ? (
+        <p className="rounded-md border border-dashed px-3 py-2 text-xs text-muted-foreground">
+          This project has more than {LIMIT} cards on the board and only the first {LIMIT} are drawn
+          — they come back in position order, so what is missing is the tail of the longest lanes.
+          Archive what is finished.
+        </p>
+      ) : null}
+
+      {/* Filtering hides cards from the lanes, and the drop arithmetic counts positions within
+          a lane as the board has them — so a card dropped two rows down a filtered lane would
+          land two rows down the real one, somewhere nobody aimed at. Off, and said out loud. */}
+      {filter ? (
+        <p className="flex flex-wrap items-center gap-x-2 rounded-md border border-dashed px-3 py-2 text-xs text-muted-foreground">
+          <span>
+            {matched} of {cards.length} cards match “{search.trim()}”. Dragging is off while the
+            board is filtered.
+          </span>
+          <button
+            type="button"
+            className="rounded font-medium text-foreground underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            onClick={() => setSearch("")}
+          >
+            Clear
+          </button>
+        </p>
+      ) : null}
+
       <DndContext
         sensors={sensors}
         collisionDetection={closestCorners}
@@ -393,7 +505,8 @@ export function BoardRoute() {
       >
         <div className="flex gap-4 overflow-x-auto pb-4">
           {lanes.map((lane, index) => {
-            const here = laneOrder(cards, lane.id);
+            const inLane = laneOrder(cards, lane.id);
+            const here = filter ? inLane.filter(matches) : inLane;
             const previous = lanes[index - 1];
             const next = lanes[index + 1];
             return (
@@ -402,12 +515,11 @@ export function BoardRoute() {
                   <div className="min-w-0">
                     <h2 className="truncate text-sm font-semibold">
                       {lane.name}
-                      <span className="ml-2 text-muted-foreground">{here.length}</span>
+                      <span className="ml-2 font-normal text-muted-foreground">
+                        {filter ? `${here.length} of ${inLane.length}` : inLane.length}
+                      </span>
                     </h2>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {agentName(lane.agentId) ?? "no agent"}
-                      {lane.intake ? " · intake" : ""}
-                    </p>
+                    <p className="truncate text-xs text-muted-foreground">{laneSummary(lane)}</p>
                   </div>
                   <div className="flex shrink-0">
                     <ActionButton
@@ -433,9 +545,9 @@ export function BoardRoute() {
                       size="icon"
                       label={`Delete ${lane.name}`}
                       hint={
-                        here.length ? "Move its cards somewhere else first" : "Delete this lane"
+                        inLane.length ? "Move its cards somewhere else first" : "Delete this lane"
                       }
-                      disabled={here.length > 0}
+                      disabled={inLane.length > 0}
                       title={`Delete the lane "${lane.name}"?`}
                       description="Any other lane whose success or failure arrow pointed here stops pointing anywhere, and cards that land in it will sit still."
                       onConfirm={() => removeLane.mutate(lane.id)}
@@ -445,7 +557,7 @@ export function BoardRoute() {
                   </div>
                 </header>
 
-                <LaneDrop laneId={lane.id} empty={here.length === 0}>
+                <LaneDrop laneId={lane.id} empty={here.length === 0} filtered={Boolean(filter)}>
                   <SortableContext
                     items={here.map((card) => card.id)}
                     strategy={verticalListSortingStrategy}
@@ -458,6 +570,7 @@ export function BoardRoute() {
                         previous={previous}
                         next={next}
                         agentLabel={agentName(lane.agentId)}
+                        dragDisabled={Boolean(filter)}
                         waitingOn={card.deps.map((dep) => title(dep.dependsOnCardId))}
                         watching={watching === card.id}
                         runId={runFor(card.id)}

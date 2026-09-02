@@ -1,10 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { Plus, Send, Settings2, SquarePlus } from "lucide-react";
+import { FolderOpen, Send, SquarePlus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Page } from "@/components/app-shell";
-import { ProjectDialog } from "@/components/project-dialog";
+import { EmptyState } from "@/components/empty-state";
+import { useProjectActions } from "@/components/project-actions";
 import { RunStream } from "@/components/run-stream";
 import { SetupChecklist } from "@/components/setup-checklist";
 import { Badge } from "@/components/ui/badge";
@@ -45,49 +46,28 @@ export function HomeRoute() {
   const projects = useQuery({ queryKey: ["projects"], queryFn: () => request(ProjectsDocument) });
   const project = projects.data?.projects.find((row) => row.id === projectId);
 
-  const [editing, setEditing] = useState<Project | null>(null);
-  const [creating, setCreating] = useState(false);
+  const { newProject } = useProjectActions();
 
   return (
     <Page
       title="New task"
+      crumb={project?.name}
       description="Say what you want. It lands as a card at the front of the board."
-      actions={
-        <div className="flex gap-2">
-          {project ? (
-            <Button variant="outline" onClick={() => setEditing(project)}>
-              <Settings2 className="size-4" />
-              Project
-            </Button>
-          ) : null}
-          <Button onClick={() => setCreating(true)}>
-            <Plus className="size-4" />
-            New project
-          </Button>
-        </div>
-      }
     >
-      <SetupChecklist onNewProject={() => setCreating(true)} />
+      <SetupChecklist />
 
       {project ? (
         <TaskComposer project={project} />
+      ) : projects.isPending ? (
+        <p className="text-sm text-muted-foreground">Loading…</p>
       ) : (
-        <p className="text-sm text-muted-foreground">
-          {projects.isPending
-            ? "Loading…"
-            : "No project yet. Make one — it comes with a board already wired up."}
-        </p>
-      )}
-
-      {creating || editing ? (
-        <ProjectDialog
-          project={editing}
-          onClose={() => {
-            setCreating(false);
-            setEditing(null);
-          }}
+        <EmptyState
+          icon={FolderOpen}
+          title="No project yet"
+          description="A task belongs to a project. Make one — it comes with a board already wired up: intake, doing, review, done."
+          action={<Button onClick={newProject}>New project</Button>}
         />
-      ) : null}
+      )}
     </Page>
   );
 }

@@ -117,7 +117,9 @@ agent could not break up is exactly the case a person needs told about.
 
 **A lane is a station, and the board is the pipeline.** `roleId` says what kind of lane it is
 and `prompt` is anything this board adds to that; `agentId` says which model works the cards
-there; `onSuccessLaneId` and `onFailureLaneId` say where they go afterwards; `wipLimit`
+there; `onSuccessLaneId` and `onFailureLaneId` say where they go afterwards, or
+`archiveOnSuccess` takes what passes off the board instead — the two are answers to one question
+and the archive is the one that is read; `wipLimit`
 caps how many run at once; `maxAttempts` is how many failures it will put back in play before
 stopping. That is the whole of the automation — there is no workflow engine, and the shape of the
 pipeline is the shape of the board someone drew. A lane with no role or no agent is a resting

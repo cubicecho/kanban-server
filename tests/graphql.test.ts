@@ -338,6 +338,61 @@ test("runs are the server's own record: nothing outside it may write one", async
   );
 });
 
+test("a note is a person's to write, and an account of what happened is not", async () => {
+  const project = await newProject("what is known about this card");
+  const lanes = await board(project.id);
+  const [card] = await db
+    .insert(tables.cards)
+    .values({ projectId: project.id, laneId: lanes[0].id, title: "the card" })
+    .returning();
+
+  // Nothing generated writes one: a note says who wrote it, and a generated insert would let
+  // anybody write one signed by an agent.
+  expect(await fails(`mutation { createCardNote(values: { cardId: "x" }) { id } }`)).toMatch(
+    /Cannot query field "createCardNote"|Unknown/,
+  );
+
+  const { addCardNote } = await run(
+    `mutation Add($cardId: String!) {
+       addCardNote(cardId: $cardId, body: "the staging key rotated on Tuesday") { id kind author }
+     }`,
+    { cardId: card.id },
+  );
+  expect(addCardNote.kind).toBe("note");
+  expect(addCardNote.author).toBe("user");
+
+  // A report is what an agent made of the card. It is readable and it is nobody's to rewrite —
+  // an account anybody may go back and correct answers no better than none at all.
+  const [report] = await db
+    .insert(tables.cardNotes)
+    .values({ cardId: card.id, kind: "report", author: "agent", body: "wrote it" })
+    .returning();
+  expect(
+    await fails(`mutation Edit($id: String!) { updateCardNote(id: $id, body: "no") { id } }`, {
+      id: report.id,
+    }),
+  ).toMatch(/is a report/);
+  expect(
+    await fails(`mutation Drop($id: String!) { deleteCardNote(id: $id) }`, { id: report.id }),
+  ).toMatch(/is a report/);
+
+  // The person's own, though, is theirs to take back.
+  await run(`mutation Edit($id: String!) { updateCardNote(id: $id, body: "and back") { id } }`, {
+    id: addCardNote.id,
+  });
+  expect(
+    await run(`mutation Drop($id: String!) { deleteCardNote(id: $id) }`, {
+      id: addCardNote.id,
+    }),
+  ).toEqual({ deleteCardNote: true });
+
+  const left = await run(
+    `query Notes($cardId: String!) { cardNotes(where: { cardId: { eq: $cardId } }) { body } }`,
+    { cardId: card.id },
+  );
+  expect(left.cardNotes).toEqual([{ body: "wrote it" }]);
+});
+
 test("a card submitted with no lane id lands at the front door", async () => {
   const project = await newProject("the front door");
   const { submitCard } = await run(
