@@ -37,7 +37,9 @@ key from the environment instead of the UI.
 - **lane** — a column, and where it names a `roleId` and an `agentId`, a station: the role says
   what kind of lane it is, the agent says which model works it. `prompt` is anything this board
   adds to what the kind says, appended and never replacing it. `onSuccessLaneId` and
-  `onFailureLaneId` are where a card goes when the agent is finished with it, and `wipLimit`
+  `onFailureLaneId` are where a card goes when the agent is finished with it — or, with
+  `archiveOnSuccess`, off the board entirely, which is the end of a pipeline saying so and a
+  Done pile nobody has to empty by hand. `wipLimit`
   caps how many run there at once. `maxAttempts` is how many failures it will put back in play
   before it stops and waits for a person. A lane with no role or no agent is a resting place,
   which is what a backlog and a done pile are.
@@ -135,8 +137,8 @@ expand                     work        verdict
 Intake, Doing and Review are all staffed by whatever agent this server has; what makes them
 different is the kind of lane each one is.
 
-There is no workflow engine here. `roleId`, `agentId`, `onSuccessLaneId` and `onFailureLaneId` on
-the lane rows are the whole of it, which means the pipeline is whatever board someone drew — add
+There is no workflow engine here. `roleId`, `agentId`, `onSuccessLaneId`, `archiveOnSuccess` and
+`onFailureLaneId` on the lane rows are the whole of it, which means the pipeline is whatever board someone drew — add
 a lane called "Needs a human" with no agent on it and cards sent there stop, because that is what
 a lane with no agent is.
 

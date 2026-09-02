@@ -200,6 +200,80 @@ test("an expanding station with nowhere to put its children is refused before it
   expect(await db.select().from(tables.runs)).toHaveLength(0);
 });
 
+test("a lane that archives what passes takes the card off the board rather than along it", async () => {
+  const { projectId, doing, review } = await seedProject("no done pile");
+  // The pass arrow is left pointing at Review on purpose: the two are answers to one question,
+  // and this is the test that the archive is the one that gets read.
+  await db
+    .update(tables.lanes)
+    .set({ archiveOnSuccess: true })
+    .where(eq(tables.lanes.id, doing.id));
+  const [card] = await db
+    .insert(tables.cards)
+    .values({ projectId, laneId: doing.id, title: "the last thing" })
+    .returning();
+
+  replies = ["did it"];
+  const run = await runner.runCard(card.id);
+  expect(run.status).toBe("ok");
+
+  const after = await cardById(card.id);
+  expect(after.archivedAt).not.toBeNull();
+  // Done, not idle: nothing picks an archived card up, whatever lane it names.
+  expect(after.status).toBe("done");
+  expect(after.result).toBe("did it");
+  // The lane it was worked in is kept, which is where restoring puts it back.
+  expect(after.laneId).toBe(doing.id);
+  expect(after.laneId).not.toBe(review.id);
+
+  const [event] = await db
+    .select()
+    .from(tables.cardEvents)
+    .where(eq(tables.cardEvents.cardId, card.id))
+    .orderBy(desc(tables.cardEvents.createdAt))
+    .limit(1);
+  expect(event.toLaneId).toBeNull();
+  expect(event.note).toBe("archived on the way out");
+});
+
+test("a judging lane that archives what it passes keeps the reasons it passed it for", async () => {
+  const { projectId, review } = await seedProject("judge and file");
+  await db
+    .update(tables.lanes)
+    .set({ archiveOnSuccess: true })
+    .where(eq(tables.lanes.id, review.id));
+  const [card] = await db
+    .insert(tables.cards)
+    .values({ projectId, laneId: review.id, title: "judged", result: "what the worker said" })
+    .returning();
+
+  replies = ["PASS — the acceptance criteria are all met."];
+  const run = await runner.runCard(card.id);
+  expect(run.verdict).toBe("pass");
+
+  const after = await cardById(card.id);
+  expect(after.archivedAt).not.toBeNull();
+  expect(after.status).toBe("done");
+  // A verdict is not an account of the work, archived or not.
+  expect(after.result).toBe("what the worker said");
+  expect(await noteOn(card.id)).toMatch(/acceptance criteria/);
+});
+
+test("a lane that both breaks cards up and archives what passes is refused before it runs", async () => {
+  const { projectId, intake } = await seedProject("nowhere for the pieces");
+  await db
+    .update(tables.lanes)
+    .set({ archiveOnSuccess: true })
+    .where(eq(tables.lanes.id, intake.id));
+  const [parent] = await db
+    .insert(tables.cards)
+    .values({ projectId, laneId: intake.id, title: "would vanish" })
+    .returning();
+
+  await expect(runner.runCard(parent.id)).rejects.toThrow(/no lane to put them in/);
+  expect(await db.select().from(tables.runs)).toHaveLength(0);
+});
+
 test("a worked card moves to the review lane and waits there rather than counting as done", async () => {
   const { projectId, doing, review } = await seedProject("pipeline");
   const [card] = await db

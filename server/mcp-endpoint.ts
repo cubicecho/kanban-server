@@ -77,7 +77,9 @@ const HINTS: Record<string, string> = {
   lanes:
     "The columns of a board, in `position` order — and its pipeline. A lane with a `roleId` and " +
     "an `agentId` is a station: `roleId` says what kind of lane it is and `agentId` which model " +
-    "works it, and cards there go to `onSuccessLaneId` or `onFailureLaneId` afterwards. A lane " +
+    "works it, and cards there go to `onSuccessLaneId` or `onFailureLaneId` afterwards — or off " +
+    "the board altogether, where `archiveOnSuccess` is set and a pass is the end of the line. " +
+    "A lane " +
     "with neither is a resting place, which is what a backlog and a done pile are. `prompt` is " +
     "anything this board adds to what its kind says, appended and never replacing it. " +
     "`wipLimit` caps how many cards it works at once, and `maxAttempts` is how many times it " +

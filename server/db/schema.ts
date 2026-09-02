@@ -208,8 +208,9 @@ export const projects = pgTable("projects", {
  *
  * A lane is not only a place a card sits. `roleId` says what sort of station this is,
  * `agentId` which model staffs it, `onSuccessLaneId` where cards go when it succeeds and
- * `onFailureLaneId` where they go when it does not, which is enough to describe
- * "intake → doing → review → done" without a workflow engine. Every one of those may be empty:
+ * `onFailureLaneId` where they go when it does not — or `archiveOnSuccess`, which takes them
+ * off the board altogether — which is enough to describe "intake → doing → review → done"
+ * without a workflow engine. Every one of those may be empty:
  * a lane with no role is a resting place — a backlog, a done column, a bucket for the ones that
  * need a person.
  *
@@ -247,6 +248,18 @@ export const lanes = pgTable(
     agentId: text().references(() => agents.id, { onDelete: "set null" }),
     /** Where a card goes when its run succeeds. Null leaves it where it is. */
     onSuccessLaneId: text().references((): AnyPgColumn => lanes.id, { onDelete: "set null" }),
+    /**
+     * Whether a card that passes here goes off the board instead of along it.
+     *
+     * The end of a pipeline is a Done pile that grows forever and is emptied by hand, which is
+     * a chore the board can do itself. It is a *target* rather than a flag alongside one: a
+     * card either moves somewhere or is archived, never both, so the picker that sets this
+     * clears `onSuccessLaneId`, and the runner reads it first either way.
+     *
+     * The lane is kept, as it is for a card that was broken up — that is where restoring puts
+     * it back.
+     */
+    archiveOnSuccess: boolean().notNull().default(false),
     /** Where a card goes when its run fails. Null leaves it here, marked `error`. */
     onFailureLaneId: text().references((): AnyPgColumn => lanes.id, { onDelete: "set null" }),
     /** How many cards the worker will run here at once. Zero means one — never unbounded. */
@@ -561,6 +574,11 @@ export interface TemplateLane {
   /** Index into the same list, or null for "leave the card where it is". */
   onSuccess: number | null;
   onFailure: number | null;
+  /**
+   * Whether a card that passes here is archived instead of moved. Absent on templates saved
+   * before a lane could say so, which is the same as saying no.
+   */
+  archiveOnSuccess?: boolean;
 }
 
 /**

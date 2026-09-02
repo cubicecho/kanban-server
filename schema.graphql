@@ -53,6 +53,7 @@ enum LaneDistinctColumn {
   prompt
   agentId
   onSuccessLaneId
+  archiveOnSuccess
   onFailureLaneId
   wipLimit
   maxAttempts
@@ -709,6 +710,7 @@ type Lane {
   prompt: String!
   agentId: String
   onSuccessLaneId: String
+  archiveOnSuccess: Boolean!
   onFailureLaneId: String
   wipLimit: Int!
   maxAttempts: Int!
@@ -798,6 +800,7 @@ type LaneCountNonNullAggregate {
   prompt: Int!
   agentId: Int!
   onSuccessLaneId: Int!
+  archiveOnSuccess: Int!
   onFailureLaneId: Int!
   wipLimit: Int!
   maxAttempts: Int!
@@ -847,6 +850,7 @@ type LaneGroupKeys {
   maxAttempts: Int
   createdAt: DateTime
   intake: Boolean
+  archiveOnSuccess: Boolean
 }
 
 type Task {
@@ -3151,6 +3155,7 @@ input CreateLaneInput {
   prompt: String
   agentId: String
   onSuccessLaneId: String
+  archiveOnSuccess: Boolean
   onFailureLaneId: String
   wipLimit: Int
   maxAttempts: Int
@@ -3167,6 +3172,7 @@ input UpdateLaneInput {
   prompt: String
   agentId: String
   onSuccessLaneId: String
+  archiveOnSuccess: Boolean
   onFailureLaneId: String
   wipLimit: Int
   maxAttempts: Int
@@ -3192,6 +3198,7 @@ input LaneFilters {
   prompt: StringFilter
   agentId: StringFilter
   onSuccessLaneId: StringFilter
+  archiveOnSuccess: BooleanFilter
   onFailureLaneId: StringFilter
   wipLimit: IntFilter
   maxAttempts: IntFilter
@@ -3227,6 +3234,7 @@ input LaneOrderBy {
   prompt: InnerOrder
   agentId: InnerOrder
   onSuccessLaneId: InnerOrder
+  archiveOnSuccess: InnerOrder
   onFailureLaneId: InnerOrder
   wipLimit: InnerOrder
   maxAttempts: InnerOrder
@@ -3288,6 +3296,7 @@ input LaneCountNonNullHaving {
   prompt: AggregateNumberFilter
   agentId: AggregateNumberFilter
   onSuccessLaneId: AggregateNumberFilter
+  archiveOnSuccess: AggregateNumberFilter
   onFailureLaneId: AggregateNumberFilter
   wipLimit: AggregateNumberFilter
   maxAttempts: AggregateNumberFilter
@@ -5265,6 +5274,7 @@ enum LaneGroupByColumn {
   prompt
   agentId
   onSuccessLaneId
+  archiveOnSuccess
   onFailureLaneId
   wipLimit
   maxAttempts

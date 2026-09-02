@@ -12,6 +12,7 @@ query Board($projectId: String!, $limit: Int!) {
     agentId
     onSuccessLaneId
     onFailureLaneId
+    archiveOnSuccess
     wipLimit
     maxAttempts
   }

@@ -524,6 +524,7 @@ async function drawTemplate(tx: Tx, projectId: string, plan: TemplateLane[]) {
         // does not say how many times it will put a card back put one back at all.
         prompt: lane.prompt ?? "",
         maxAttempts: lane.maxAttempts ?? 0,
+        archiveOnSuccess: lane.archiveOnSuccess ?? false,
       })),
     )
     .returning();
@@ -1011,6 +1012,7 @@ export const schema = new GraphQLSchema({
             maxAttempts: lane.maxAttempts,
             onSuccess: index.get(lane.onSuccessLaneId ?? "") ?? null,
             onFailure: index.get(lane.onFailureLaneId ?? "") ?? null,
+            archiveOnSuccess: lane.archiveOnSuccess,
           }));
 
           const values = { name, description: args.description ?? "", lanes: plan };

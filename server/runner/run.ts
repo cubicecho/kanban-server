@@ -455,9 +455,9 @@ export async function blockers(cardId: string): Promise<Card[]> {
 /**
  * Works one card with the agent its lane names, and moves it on.
  *
- * Where the card ends up is the lane's business, not the agent's: `onSuccessLaneId` and
- * `onFailureLaneId` are what make a board a pipeline, and a lane that names neither simply
- * keeps its cards. A card with no lane agent cannot be run at all — that is what a backlog is.
+ * Where the card ends up is the lane's business, not the agent's: `onSuccessLaneId`,
+ * `archiveOnSuccess` and `onFailureLaneId` are what make a board a pipeline, and a lane that
+ * names none of them simply keeps its cards. A card with no lane agent cannot be run at all — that is what a backlog is.
  *
  * What the agent is told is composed here and nowhere else: its own identity, the lane's role,
  * and whatever this board adds on top. A lane whose composition comes out empty has no job, and
@@ -471,6 +471,10 @@ export async function blockers(cardId: string): Promise<Card[]> {
  * A lane whose role `expand`s answers with cards instead. They are written down the pass arrow
  * and the card that asked for them is archived: it has become the work rather than waiting on
  * it, and leaving it on the board would be a card nobody can finish.
+ *
+ * A lane may also archive what passes rather than pass it anywhere, which is the end of a
+ * pipeline saying so: the Done pile that grows forever and gets emptied by hand is a chore the
+ * board can do itself.
  */
 export async function runCard(cardId: string, agentId?: string | null): Promise<Run> {
   const card = await loadCard(cardId);
@@ -492,7 +496,7 @@ export async function runCard(cardId: string, agentId?: string | null): Promise<
   // Where an expansion's children would land, asked before the run rather than after it: a
   // station that breaks cards up and has nowhere to put the pieces has no job it can finish,
   // and finding that out after the tokens are spent helps nobody.
-  if (role?.contract === "expand" && !lane.onSuccessLaneId)
+  if (role?.contract === "expand" && (!lane.onSuccessLaneId || lane.archiveOnSuccess))
     throw new Error(`lane "${lane.name}" breaks cards up but has no lane to put them in`);
 
   // The project's background is asked for separately from the job, because a lane that says
@@ -553,7 +557,11 @@ export async function runCard(cardId: string, agentId?: string | null): Promise<
   // A run somebody called off sends the card nowhere. It is not a failure of the work — there
   // is no work yet — and a stopped review dropping the card down the failure arm would put it
   // back in Doing as though it had been rejected by a reviewer that never finished a sentence.
-  const target = stopped ? null : passed ? lane.onSuccessLaneId : lane.onFailureLaneId;
+  // A card that passes out of a lane that archives goes off the board rather than along it, so
+  // it has no target at all: `archiveOnSuccess` and `onSuccessLaneId` are two answers to one
+  // question and this is which of them is read.
+  const archiving = passed && !stopped && lane.archiveOnSuccess;
+  const target = stopped || archiving ? null : passed ? lane.onSuccessLaneId : lane.onFailureLaneId;
   const [next] = target
     ? await db.select().from(lanes).where(eq(lanes.id, target)).limit(1)
     : [undefined];
@@ -598,7 +606,7 @@ export async function runCard(cardId: string, agentId?: string | null): Promise<
             ? verdict === "fail"
               ? "rejected"
               : "error"
-            : children.length
+            : children.length || archiving
               ? "done"
               : next?.agentId
                 ? "idle"
@@ -613,9 +621,10 @@ export async function runCard(cardId: string, agentId?: string | null): Promise<
       // answered with nothing readable did break, and this is where it says so.
       error: barren ? "the agent produced no cards this server could read" : run.error,
       attempts,
-      // A card that has become other cards goes off the board rather than along it. Its own
-      // lane is kept, which is where restoring would put it back.
-      ...(children.length
+      // A card that has become other cards, or one whose lane archives what it passes, goes
+      // off the board rather than along it. Its own lane is kept, which is where restoring
+      // would put it back.
+      ...(children.length || archiving
         ? { archivedAt: new Date() }
         : target
           ? { laneId: target, position: await nextPosition(target) }
@@ -635,6 +644,18 @@ export async function runCard(cardId: string, agentId?: string | null): Promise<
       fromLaneId: lane.id,
       toLaneId: null,
       note: `broken into ${children.length} card(s)`,
+      actor: "agent",
+    });
+  else if (archiving)
+    await recordMove({
+      cardId,
+      runId: run.id,
+      fromLaneId: lane.id,
+      toLaneId: null,
+      // A verdict says why it was let through, which outlives the run that said so. Without
+      // one there is nothing to quote, and the null above is already the ledger saying where
+      // the card went — but not that it went there finished rather than in pieces.
+      note: verdict === "none" ? "archived on the way out" : output,
       actor: "agent",
     });
   else if (verdict !== "none" || next)

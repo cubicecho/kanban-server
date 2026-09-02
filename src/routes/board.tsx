@@ -225,6 +225,9 @@ export function BoardRoute() {
     // A cap on how many run at once is only worth saying where something runs.
     if (role && agent && lane.wipLimit) parts.push(`${lane.wipLimit} at a time`);
     if (lane.intake) parts.push("intake");
+    // Where a card goes is otherwise only in the lane dialog, and this one takes it off the
+    // board — a card that vanishes from a lane wants a reason visible on the lane.
+    if (lane.archiveOnSuccess) parts.push("archives what passes");
     return parts.join(" · ");
   };
 

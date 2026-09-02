@@ -50,7 +50,8 @@ field and none of the machinery.
 
 There is no workflow engine here. A lane says what happens to its cards (\`roleId\`), who does it
 (\`agentId\`), how many at once (\`wipLimit\`), and where a card goes when its run succeeds
-(\`onSuccessLaneId\`) or fails (\`onFailureLaneId\`). That is the whole of the automation, and the
+(\`onSuccessLaneId\`, or \`archiveOnSuccess\` to send it off the board) or fails
+(\`onFailureLaneId\`). That is the whole of the automation, and the
 shape of the pipeline is the shape of the board somebody drew. A new project arrives with five
 lanes — Intake, Backlog, Doing, Review, Done — already carrying kinds and an agent, so it works
 without being configured.
