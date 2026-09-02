@@ -1,0 +1,34 @@
+# Everything ever said about one card, oldest first — an agent's report on the work, a
+# reviewer's verdict, and the notes a person left for whoever works it next. One query per
+# card, asked when a card is opened, for the same reason `CardDeps` is its own: the board
+# polls every three seconds over as many as five hundred cards, and this is one card's answer.
+query CardNotes($cardId: String!) {
+  cardNotes(
+    where: { cardId: { eq: $cardId } }
+    orderBy: { createdAt: { direction: asc, priority: 1 } }
+  ) {
+    id
+    kind
+    author
+    body
+    runId
+    createdAt
+    updatedAt
+  }
+}
+
+mutation AddCardNote($cardId: String!, $body: String!) {
+  addCardNote(cardId: $cardId, body: $body) {
+    id
+  }
+}
+
+mutation UpdateCardNote($id: String!, $body: String!) {
+  updateCardNote(id: $id, body: $body) {
+    id
+  }
+}
+
+mutation DeleteCardNote($id: String!) {
+  deleteCardNote(id: $id)
+}

@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, inArray, isNull, notInArray } from "drizzle-orm";
 import { errorMessage } from "../../shared/errors.ts";
 import { db } from "../db/client.ts";
-import { lastMoveNote, recordMove } from "../db/history.ts";
+import { addNote, lastMoveNote, recordMove, saidAbout } from "../db/history.ts";
 import {
   type Card,
   cardDeps,
@@ -518,7 +518,8 @@ export async function runCard(cardId: string, agentId?: string | null): Promise<
   if (waiting.length)
     throw new Error(`"${card.title}" is waiting on ${waiting.length} unfinished card(s)`);
 
-  const note = await lastMoveNote(cardId, card.laneId);
+  const why = await lastMoveNote(cardId, card.laneId);
+  const said = await saidAbout(cardId);
   await db.update(cards).set({ status: "running", error: "" }).where(eq(cards.id, cardId));
 
   const { run, result, ok } = await execute({
@@ -531,7 +532,7 @@ export async function runCard(cardId: string, agentId?: string | null): Promise<
     laneId: lane.id,
     label: `working "${card.title}"`,
     systemPrompt,
-    prompt: cardPrompt(card, note),
+    prompt: cardPrompt(card, { ...said, why }),
   });
 
   const output = result?.output?.trim() ?? "";
@@ -546,9 +547,28 @@ export async function runCard(cardId: string, agentId?: string | null): Promise<
   // An expansion is judged on what it produced. An answer no cards could be read out of is a
   // failure and not an empty success: a card the agent could not break up is exactly the case
   // a person needs telling about, and a board that quietly swallowed it would lose the work.
-  const proposed = role?.contract === "expand" && ok ? proposedCards(output) : [];
+  const expands = role?.contract === "expand";
+  const proposed = expands && ok ? proposedCards(output) : [];
   const barren = role?.contract === "expand" && ok && !proposed.length;
   const passed = ok && verdict !== "fail" && !barren;
+  // What the agent said, written where everything said about this card is written. A judging
+  // station's answer is its ruling and not another account of the work — overwriting the report
+  // with "PASS" would lose the one thing the next agent round the loop has to read — so the two
+  // are different kinds of note rather than one field fought over.
+  //
+  // An expansion says nothing about the card: its answer is the cards it became, and the JSON
+  // it arrived as is not something a person or an agent would ever want to read back.
+  const spoken =
+    ok && output && !expands
+      ? await addNote({
+          cardId,
+          runId: run.id,
+          kind: judges ? "verdict" : "report",
+          author: "agent",
+          body: output,
+        })
+      : null;
+
   // A run somebody called off is not a verdict on the card: it costs it no attempt and leaves
   // it where it was, to be started again whenever.
   const stopped = run.status === "stopped";
@@ -611,10 +631,6 @@ export async function runCard(cardId: string, agentId?: string | null): Promise<
               : next?.agentId
                 ? "idle"
                 : "done",
-      // A station that judges does not overwrite the account of the work with its ruling on it:
-      // that report is the one thing the agent asked to fix the card needs to read. The ruling
-      // goes on the move it caused, where the next prompt picks it up as the reason.
-      result: judges ? card.result : output || card.result,
       // What broke, and only that. A verdict is not a fault and a stopped run is not one
       // either — the sentence that used to be invented here, "the agent did not finish", was
       // written onto every card whose run somebody deliberately called off. An expansion that
@@ -634,9 +650,10 @@ export async function runCard(cardId: string, agentId?: string | null): Promise<
 
   // A ruling that moved nothing is still a ruling, so it is recorded where it stands: `from`
   // and `to` being the same lane is the ledger's way of saying the card was judged and left.
-  // A card that was broken up went nowhere at all — `to` is null, which is this ledger's word
-  // for off the board — and the note says what became of it, since the run that says so will
-  // be pruned long before the children are.
+  // A card that was broken up, or archived on its way out of a lane that archives, went nowhere
+  // at all — `to` is null, which is this ledger's word for off the board. The expansion says
+  // what became of it, since the run that says so will be pruned long before the children are;
+  // the archive needs no note, the row already being the whole of what happened.
   if (children.length)
     await recordMove({
       cardId,
@@ -644,27 +661,20 @@ export async function runCard(cardId: string, agentId?: string | null): Promise<
       fromLaneId: lane.id,
       toLaneId: null,
       note: `broken into ${children.length} card(s)`,
+      noteKind: "report",
       actor: "agent",
     });
-  else if (archiving)
+  else if (verdict !== "none" || next || archiving)
     await recordMove({
       cardId,
       runId: run.id,
       fromLaneId: lane.id,
-      toLaneId: null,
-      // A verdict says why it was let through, which outlives the run that said so. Without
-      // one there is nothing to quote, and the null above is already the ledger saying where
-      // the card went — but not that it went there finished rather than in pieces.
-      note: verdict === "none" ? "archived on the way out" : output,
-      actor: "agent",
-    });
-  else if (verdict !== "none" || next)
-    await recordMove({
-      cardId,
-      runId: run.id,
-      fromLaneId: lane.id,
-      toLaneId: next?.id ?? lane.id,
-      note: verdict === "none" ? "" : output,
+      // Archived and moved are both "off this lane"; only one of them has anywhere to say.
+      toLaneId: archiving ? null : (next?.id ?? lane.id),
+      // The ruling is already written down — this points at it rather than copying it, which
+      // is what stops a verdict existing twice and drifting. Without one there is nothing to
+      // say beyond where the card went, and the row itself says that.
+      noteId: verdict === "none" ? null : (spoken?.id ?? null),
       actor: "agent",
     });
 

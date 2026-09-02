@@ -60,15 +60,23 @@ key from the environment instead of the UI.
 - **message** — one turn of the conversation refining a task. The thread is the task's history.
 - **card** — one piece of work, on the board. `acceptance` is kept apart from `body` because it
   is what a review agent is asked to check against, and a criterion buried in a paragraph is a
-  criterion that gets skipped. `dependsOn` links say which cards must finish first. `result` is
-  the last account of the work and `error` is what broke — a crash, a timeout, an interrupted
-  run, and never a verdict. `status` is `idle`, `running`, `done`, `rejected` or `error`;
+  criterion that gets skipped. `dependsOn` links say which cards must finish first. `error` is
+  what broke — a crash, a timeout, an interrupted run, and never a verdict; what was *said*
+  about the card is in its notes. `status` is `idle`, `running`, `done`, `rejected` or `error`;
   `attempts` counts the failures since a person last put it in play, which is what a lane's
   `maxAttempts` is spent against.
-- **card event** — one move of a card: from a lane, to a lane, why, and who. This is where a
-  reviewer's reasons live, and where a person's do — it is the only record that knows a card was
-  dragged. "Why is this card here?" is a question about the move that brought it, so the answer
-  is kept on the move rather than on the card, where each new reason would erase the last.
+- **card note** — one thing said about a card. `kind` is `report` — what an agent made of it
+  when it worked it — or `verdict`, a reviewing station's ruling, or `note`, something a person
+  wants taken into account. Three names for one thing, because they *are* one thing: what is
+  known about this card that is not the card. Every note is handed to the next agent that works
+  it, so a note is how you tell that agent something without editing the card out from under
+  whoever wrote it. Only a note is anybody's to rewrite; a report and a verdict are an account
+  of what happened.
+- **card event** — one move of a card: from a lane, to a lane, who, and the note that explains
+  it. This is where a reviewer's reasons are pointed at, and where a person's are — it is the
+  only record that knows a card was dragged. "Why is this card here?" is a question about the
+  move that brought it, so the answer is kept on the move rather than on the card, where each
+  new reason would erase the last.
 - **run** — one execution of one agent: `kind` is `refine` or `card` — and `decompose` on rows
   from before breaking work up was a station — and the row
   keeps the status, timings, output or error, the tools called and the tokens spent. A run in
@@ -181,11 +189,15 @@ The review verdict is a property of the output, not of the run: a reviewer that 
 has still run fine, so the run is `ok` and it is the card that failed. An answer that is neither
 counts as a pass. A mumbling reviewer must not be able to wedge a board.
 
-A verdict is also not an account of the work, so a judging station does not overwrite one: the
-executor's report stays in `result` and the ruling goes on the move it caused, where the next
-agent round the loop is handed it as "Why this came back". A second attempt without the reason
-for the first is the first attempt again. A pass is recorded the same way — why a card was let
-through is worth keeping too, and it used to be thrown away.
+A verdict is also not an account of the work, so a judging station does not overwrite one: both
+are notes on the card, of different kinds, and the ruling is additionally pointed at by the move
+it caused — which is how the next agent round the loop is handed it as "Why this came back". A
+second attempt without the reason for the first is the first attempt again. A pass is recorded
+the same way — why a card was let through is worth keeping too, and it used to be thrown away.
+
+The notes a *person* leaves arrive under their own heading, "Notes on this card". A rejection
+explains one move and stops applying once the card is sent on; a note stands until whoever wrote
+it takes it back. That is the whole difference, and it is why they are not the same paragraph.
 
 What a card's prompt never contains is `error`. A crash is not feedback: an endpoint that reset
 the connection has said nothing about the work, and an agent handed a stack trace under that
@@ -471,15 +483,15 @@ somewhere work is handed off. In dev it is on the server's own port (`:8788`); v
 claude mcp add --transport http kanban http://localhost:8788/mcp
 ```
 
-Thirty-two tools, chosen in `server/mcp-endpoint.ts` rather than projected from the whole schema:
+Thirty-six tools, chosen in `server/mcp-endpoint.ts` rather than projected from the whole schema:
 
 - **read** — `projects`, `lanes`, `cards`, `tasks`, `runs`, `agents`, `roles`, `run_events`,
-  `card_events`, `blockers`, `spend`, `board_templates`
+  `card_events`, `card_notes`, `blockers`, `spend`, `board_templates`
 - **projects** — `create_project`, `update_project_single`
 - **tasks** — `create_task`, `refine_task`, `make_card`, `delete_task_single`
 - **cards** — `submit_card`, `create_card`, `update_card_single`, `delete_card_single`,
   `set_card_deps`, `move_card`, `retry_card`, `archive_card`, `restore_card`, `run_card`,
-  `stop_card`, `stop_task`
+  `stop_card`, `stop_task`, `add_card_note`, `update_card_note`, `delete_card_note`
 - **boards** — `save_board_template`, `apply_board_template`
 
 `submit_card` is the one to reach for: describe what you want and it lands at the board's front

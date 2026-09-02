@@ -14,13 +14,14 @@ import {
 } from "graphql";
 import { GraphQLJSON } from "graphql-scalars";
 import { db } from "../db/client.ts";
-import { recordMove } from "../db/history.ts";
+import { addNote, recordMove } from "../db/history.ts";
 import {
   agentServers,
   agents,
   boardTemplates,
   type Card,
   cardDeps,
+  cardNotes,
   cards,
   lanes,
   type Project,
@@ -69,13 +70,23 @@ const { entities } = buildSchema(db, {
     // Its whole worth is that it is an account nobody edited — a row that could be written,
     // corrected or quietly removed answers "why is this card here" no better than the column
     // it replaced. It is written where the move is made, and it is never written anywhere else.
+    //
+    // A card's notes are readable and generated-writable in neither direction, for a narrower
+    // reason: a note says who wrote it, and a generated insert would let anybody write one
+    // signed by an agent. `addCardNote` and its two neighbours below are the way in, and they
+    // only ever write the one kind a person is entitled to.
     insert: (table) =>
       table !== "runs" &&
       table !== "settings" &&
       table !== "boardTemplates" &&
-      table !== "cardEvents",
-    update: (table) => table !== "runs" && table !== "boardTemplates" && table !== "cardEvents",
-    delete: (table) => table !== "settings" && table !== "cardEvents",
+      table !== "cardEvents" &&
+      table !== "cardNotes",
+    update: (table) =>
+      table !== "runs" &&
+      table !== "boardTemplates" &&
+      table !== "cardEvents" &&
+      table !== "cardNotes",
+    delete: (table) => table !== "settings" && table !== "cardEvents" && table !== "cardNotes",
   },
   exclude: {
     // Keys travel one way. They are excluded from the output types, so no client can read one
@@ -333,6 +344,29 @@ async function cardOrThrow(cardId: string) {
     });
   }
   return card;
+}
+
+/**
+ * One note somebody wrote, or the refusal.
+ *
+ * The kind is checked here rather than by the caller because it is the whole of what makes
+ * these three mutations safe: a report and a verdict are an account of what an agent did, and
+ * an account anybody may rewrite afterwards answers nothing.
+ */
+async function noteOrThrow(id: string) {
+  const [note] = await db.select().from(cardNotes).where(eq(cardNotes.id, id)).limit(1);
+  if (!note) {
+    throw new GraphQLError(`There is no note with id ${id}.`, {
+      extensions: { code: "NOT_FOUND" },
+    });
+  }
+  if (note.kind !== "note") {
+    throw new GraphQLError(
+      `That is a ${note.kind}, which is an account of what happened rather than a note. Write your own note instead.`,
+      { extensions: { code: "NOT_A_NOTE" } },
+    );
+  }
+  return note;
 }
 
 /** Generated types are keyed by the mapped name; a rename should fail loudly, not silently. */
@@ -854,9 +888,9 @@ export const schema = new GraphQLSchema({
         description:
           "Takes a card off the board without deleting it. It stops being drawn in its lane, " +
           "stops being picked up by that lane's agent, and stops counting as something other " +
-          "cards are waiting on — but it keeps its lane, its status and its result, and " +
-          "`restoreCard` puts it back. This is what a Done pile is for once it is long enough " +
-          "to be in the way. Read the archive with `cards(where: { archivedAt: { isNotNull: " +
+          "cards are waiting on — but it keeps its lane, its status and everything said " +
+          "about it, and `restoreCard` puts it back. This is what a Done pile is for once it " +
+          "is long enough to be in the way. Read the archive with `cards(where: { archivedAt: { isNotNull: " +
           "true } })`. Refused while an agent is working the card; archiving one already " +
           "archived leaves the time it was archived alone.",
         args: { cardId: { type: new GraphQLNonNull(GraphQLString) } },
@@ -905,6 +939,71 @@ export const schema = new GraphQLSchema({
             .returning();
           await recordMove({ cardId: card.id, toLaneId: card.laneId, actor: "user" });
           return restored;
+        },
+      },
+      addCardNote: {
+        type: new GraphQLNonNull(generatedType("CardNote")),
+        description:
+          "Writes a note on a card. Everything ever said about a card is a note — the report " +
+          "an agent leaves when it has worked one, the verdict a reviewing station rules, and " +
+          "this, a standing note somebody wants taken into account. Every note on the card is " +
+          'handed to the next agent that works it, under "Notes on this card", so this is ' +
+          "how you tell one something the card's body does not say without editing the card " +
+          "out from under whoever wrote it. Reports and verdicts are written by the runner " +
+          "and cannot be written here: a note says who wrote it, and that has to be true. " +
+          'Read them with `card_notes(where: { cardId: { eq: "…" } })`.',
+        args: {
+          cardId: { type: new GraphQLNonNull(GraphQLString) },
+          body: { type: new GraphQLNonNull(GraphQLString) },
+        },
+        resolve: async (_source, args: { cardId: string; body: string }) => {
+          await cardOrThrow(args.cardId);
+          const note = await addNote({ cardId: args.cardId, kind: "note", body: args.body });
+          if (!note) {
+            throw new GraphQLError("A note with nothing in it says nothing.", {
+              extensions: { code: "EMPTY_NOTE" },
+            });
+          }
+          return note;
+        },
+      },
+      updateCardNote: {
+        type: new GraphQLNonNull(generatedType("CardNote")),
+        description:
+          "Rewrites a note. Only a note somebody wrote: an agent's report and a reviewer's " +
+          "verdict are an account of what happened, and an account that can be corrected " +
+          "afterwards is worth no more than no account at all.",
+        args: {
+          id: { type: new GraphQLNonNull(GraphQLString) },
+          body: { type: new GraphQLNonNull(GraphQLString) },
+        },
+        resolve: async (_source, args: { id: string; body: string }) => {
+          const note = await noteOrThrow(args.id);
+          const body = args.body.trim();
+          if (!body) {
+            throw new GraphQLError("A note with nothing in it says nothing.", {
+              extensions: { code: "EMPTY_NOTE" },
+            });
+          }
+          const [updated] = await db
+            .update(cardNotes)
+            .set({ body, updatedAt: new Date() })
+            .where(eq(cardNotes.id, note.id))
+            .returning();
+          return updated;
+        },
+      },
+      deleteCardNote: {
+        type: new GraphQLNonNull(GraphQLBoolean),
+        description:
+          "Takes a note back, so the next agent working the card stops being told it. Only a " +
+          "note somebody wrote, for the same reason `updateCardNote` is. A verdict that " +
+          "explained a move stays readable through that move in `card_events`.",
+        args: { id: { type: new GraphQLNonNull(GraphQLString) } },
+        resolve: async (_source, args: { id: string }) => {
+          const note = await noteOrThrow(args.id);
+          await db.delete(cardNotes).where(eq(cardNotes.id, note.id));
+          return true;
         },
       },
       setCardDeps: {

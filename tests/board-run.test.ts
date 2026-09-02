@@ -2,7 +2,7 @@ import fs from "node:fs";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, expect, test } from "vitest";
 import { replyWith } from "./fixtures/sse.ts";
 
@@ -101,16 +101,37 @@ const cardById = async (id: string) => {
   return card;
 };
 
-/** The reason on the last move of a card — where a rejection lives now that `error` is faults. */
+/**
+ * The reason on the last move of a card — where a rejection lives now that `error` is faults.
+ *
+ * The ledger points at the note rather than carrying a copy of it, so this is a join: the same
+ * verdict a reviewer wrote is one row, read from the card's notes and from the move it caused.
+ */
 const noteOn = async (id: string) => {
-  const events = await db
-    .select()
+  const [event] = await db
+    .select({ body: tables.cardNotes.body })
     .from(tables.cardEvents)
+    .leftJoin(tables.cardNotes, eq(tables.cardEvents.noteId, tables.cardNotes.id))
     .where(eq(tables.cardEvents.cardId, id))
     .orderBy(desc(tables.cardEvents.createdAt))
     .limit(1);
-  return events[0]?.note ?? "";
+  return event?.body ?? "";
 };
+
+/** The newest account of the work on a card, which is where `cards.result` went. */
+const reportOn = async (id: string) => {
+  const [note] = await db
+    .select()
+    .from(tables.cardNotes)
+    .where(and(eq(tables.cardNotes.cardId, id), eq(tables.cardNotes.kind, "report")))
+    .orderBy(desc(tables.cardNotes.createdAt))
+    .limit(1);
+  return note?.body ?? "";
+};
+
+/** A card that has already been worked somewhere, for a test that starts at the reviewer. */
+const reported = (cardId: string, body: string) =>
+  db.insert(tables.cardNotes).values({ cardId, kind: "report", author: "agent", body });
 
 beforeEach(async () => {
   replies = [];
@@ -221,7 +242,7 @@ test("a lane that archives what passes takes the card off the board rather than 
   expect(after.archivedAt).not.toBeNull();
   // Done, not idle: nothing picks an archived card up, whatever lane it names.
   expect(after.status).toBe("done");
-  expect(after.result).toBe("did it");
+  expect(await reportOn(card.id)).toBe("did it");
   // The lane it was worked in is kept, which is where restoring puts it back.
   expect(after.laneId).toBe(doing.id);
   expect(after.laneId).not.toBe(review.id);
@@ -233,7 +254,9 @@ test("a lane that archives what passes takes the card off the board rather than 
     .orderBy(desc(tables.cardEvents.createdAt))
     .limit(1);
   expect(event.toLaneId).toBeNull();
-  expect(event.note).toBe("archived on the way out");
+  // Off the board, with nothing to add: the row itself is the whole of what happened, and a
+  // sentence saying so again would be a note nobody wrote.
+  expect(event.noteId).toBeNull();
 });
 
 test("a judging lane that archives what it passes keeps the reasons it passed it for", async () => {
@@ -244,8 +267,9 @@ test("a judging lane that archives what it passes keeps the reasons it passed it
     .where(eq(tables.lanes.id, review.id));
   const [card] = await db
     .insert(tables.cards)
-    .values({ projectId, laneId: review.id, title: "judged", result: "what the worker said" })
+    .values({ projectId, laneId: review.id, title: "judged" })
     .returning();
+  await reported(card.id, "what the worker said");
 
   replies = ["PASS — the acceptance criteria are all met."];
   const run = await runner.runCard(card.id);
@@ -255,7 +279,7 @@ test("a judging lane that archives what it passes keeps the reasons it passed it
   expect(after.archivedAt).not.toBeNull();
   expect(after.status).toBe("done");
   // A verdict is not an account of the work, archived or not.
-  expect(after.result).toBe("what the worker said");
+  expect(await reportOn(card.id)).toBe("what the worker said");
   expect(await noteOn(card.id)).toMatch(/acceptance criteria/);
 });
 
@@ -287,7 +311,7 @@ test("a worked card moves to the review lane and waits there rather than countin
 
   const after = await cardById(card.id);
   expect(after.laneId).toBe(review.id);
-  expect(after.result).toBe("wrote it");
+  expect(await reportOn(card.id)).toBe("wrote it");
   // Idle, because Review has an agent of its own: a card marked done would never be picked up.
   expect(after.status).toBe("idle");
 });
@@ -601,7 +625,7 @@ test("a verdict is not an account of the work, and does not overwrite one", asyn
   expect(back.laneId).toBe(doing.id);
   // The reviewer said what it thought of the work, not what the work was. Losing the executor's
   // own report here would leave the next attempt starting from nothing.
-  expect(back.result).toBe("wrote it, in src/thing.ts");
+  expect(await reportOn(card.id)).toBe("wrote it, in src/thing.ts");
   expect(back.error).toBe("");
   expect(await noteOn(card.id)).toMatch(/empty case/);
 
@@ -612,6 +636,50 @@ test("a verdict is not an account of the work, and does not overwrite one", asyn
   expect(sent[2]).toContain("Why this came back");
   expect(sent[2]).toContain("empty case");
   bodies = undefined;
+});
+
+test("a note somebody left is handed to the agent, and stops being once it is taken back", async () => {
+  const { graphql } = await import("graphql");
+  const { schema } = await import("../server/graphql/schema.ts");
+  const { projectId, doing } = await seedProject("something worth saying");
+  const [card] = await db
+    .insert(tables.cards)
+    .values({ projectId, laneId: doing.id, title: "the migration" })
+    .returning();
+
+  const added = await graphql({
+    schema,
+    source: `mutation Add($cardId: String!) {
+       addCardNote(cardId: $cardId, body: "the staging key rotated on Tuesday") { id }
+     }`,
+    variableValues: { cardId: card.id },
+  });
+  expect(added.errors).toBeUndefined();
+  const { id: noteId } = (added.data as { addCardNote: { id: string } }).addCardNote;
+
+  const sent: string[] = [];
+  bodies = (body) => sent.push(body.messages[body.messages.length - 1].content);
+  replies = ["minded it"];
+  await runner.runCard(card.id);
+
+  // A note is standing context and not a reason for a move, so it arrives under its own
+  // heading: "why this came back" is about the last attempt and stops applying, and this
+  // does not until whoever wrote it says so.
+  expect(sent[0]).toContain("Notes on this card");
+  expect(sent[0]).toContain("staging key rotated on Tuesday");
+
+  await graphql({
+    schema,
+    source: `mutation Drop($id: String!) { deleteCardNote(id: $id) }`,
+    variableValues: { id: noteId },
+  });
+
+  replies = ["did the next bit"];
+  await runner.runCard(card.id);
+  bodies = undefined;
+  expect(sent[1]).not.toContain("staging key rotated");
+  // And what the agent said the first time is still there, because that is a different thing.
+  expect(sent[1]).toContain("minded it");
 });
 
 test("a lane with no agent runs nothing", async () => {
@@ -628,8 +696,9 @@ test("a reviewer that crashes has ruled on nothing, and its crash is not feedbac
   const { projectId, doing, review } = await seedProject("a broken reviewer");
   const [card] = await db
     .insert(tables.cards)
-    .values({ projectId, laneId: review.id, title: "judge me", result: "wrote it, in src/a.ts" })
+    .values({ projectId, laneId: review.id, title: "judge me" })
     .returning();
+  await reported(card.id, "wrote it, in src/a.ts");
 
   const reviewer = await theAgent();
   await db
@@ -674,8 +743,9 @@ test("a pass keeps the reason it passed", async () => {
   const { projectId, review, done } = await seedProject("passing notes");
   const [card] = await db
     .insert(tables.cards)
-    .values({ projectId, laneId: review.id, title: "check it", result: "wrote the migration" })
+    .values({ projectId, laneId: review.id, title: "check it" })
     .returning();
+  await reported(card.id, "wrote the migration");
 
   replies = ["PASS — every criterion is met, and the migration is reversible"];
   const run = await runner.runCard(card.id);
@@ -685,7 +755,7 @@ test("a pass keeps the reason it passed", async () => {
   expect(forward.laneId).toBe(done.id);
   expect(forward.status).toBe("done");
   // The account of the work stays the executor's: a ruling is not a report.
-  expect(forward.result).toBe("wrote the migration");
+  expect(await reportOn(card.id)).toBe("wrote the migration");
   // But the reasoning behind the ruling survives, on the move it caused. A passing station used
   // to write nothing at all, so why a card was let through lived only in the run until
   // `runRetentionDays` deleted it.
@@ -728,7 +798,7 @@ test("a person moving a card is in its ledger, and what they said reaches the ag
   expect(events[0].toLaneId).toBe(backlog.id);
   expect(events[1].actor).toBe("user");
   expect(events[1].runId).toBeNull();
-  expect(events[1].note).toBe("do the empty case first");
+  expect(await noteOn(cardId)).toBe("do the empty case first");
 
   // And what a person said reaches the agent exactly the way a reviewer's rejection does.
   const sent: string[] = [];
@@ -738,14 +808,19 @@ test("a person moving a card is in its ledger, and what they said reaches the ag
   bodies = undefined;
   expect(sent[0]).toContain("Why this came back");
   expect(sent[0]).toContain("do the empty case first");
+  // And said once. A person writing something while they move a card writes both at once — the
+  // note stands, and the move points at it — so the prompt drops the copy under the weaker
+  // heading rather than asking for the same thing twice.
+  expect(sent[0].match(/do the empty case first/g)).toHaveLength(1);
 });
 
 test("a run somebody called off leaves the card where it stands", async () => {
   const { projectId, review } = await seedProject("second thoughts");
   const [card] = await db
     .insert(tables.cards)
-    .values({ projectId, laneId: review.id, title: "hold on", result: "wrote it" })
+    .values({ projectId, laneId: review.id, title: "hold on" })
     .returning();
+  await reported(card.id, "wrote it");
 
   // The model never answers, so the run is genuinely in flight when it is called off — which is
   // the only state this can be tested from, a finished run having nothing left to stop.

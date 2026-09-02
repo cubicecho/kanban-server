@@ -12,7 +12,6 @@ query Archive($projectId: String!, $limit: Int!) {
     title
     body
     status
-    result
     error
     archivedAt
     lane {

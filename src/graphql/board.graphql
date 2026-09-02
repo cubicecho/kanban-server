@@ -30,7 +30,6 @@ query Board($projectId: String!, $limit: Int!) {
     acceptance
     position
     status
-    result
     error
     attempts
     updatedAt

@@ -620,7 +620,6 @@ enum CardDistinctColumn {
   acceptance
   position
   status
-  result
   error
   attempts
   archivedAt
@@ -1061,7 +1060,6 @@ type Card {
   acceptance: String!
   position: Int!
   status: CardsStatusEnum!
-  result: String!
   error: String!
   attempts: Int!
   archivedAt: DateTime
@@ -1127,6 +1125,19 @@ type Card {
     distinct: [CardEventDistinctColumn!]
   ): [CardEvent!]!
   eventsAggregate(where: CardEventFilters): CardEventAggregate!
+  notes(
+    where: CardNoteFilters
+    orderBy: CardNoteOrderBy
+    offset: Int
+    limit: Int
+
+    """
+    Keyset pagination: only return related rows strictly after this cursor (a row's `cursor` field from a previous page of this relation, under the same orderBy).
+    """
+    after: String
+    distinct: [CardNoteDistinctColumn!]
+  ): [CardNote!]!
+  notesAggregate(where: CardNoteFilters): CardNoteAggregate!
 }
 
 enum CardsStatusEnum {
@@ -1160,9 +1171,21 @@ enum CardEventDistinctColumn {
   runId
   fromLaneId
   toLaneId
-  note
+  noteId
   actor
   createdAt
+}
+
+"""Columns of CardNote that a query can be made distinct on"""
+enum CardNoteDistinctColumn {
+  id
+  cardId
+  runId
+  kind
+  author
+  body
+  createdAt
+  updatedAt
 }
 
 type CardAggregate {
@@ -1196,7 +1219,6 @@ type CardMinAggregate {
   acceptance: String
   position: Int
   status: CardsStatusEnum
-  result: String
   error: String
   attempts: Int
   archivedAt: DateTime
@@ -1215,7 +1237,6 @@ type CardMaxAggregate {
   acceptance: String
   position: Int
   status: CardsStatusEnum
-  result: String
   error: String
   attempts: Int
   archivedAt: DateTime
@@ -1234,7 +1255,6 @@ type CardCountNonNullAggregate {
   acceptance: Int!
   position: Int!
   status: Int!
-  result: Int!
   error: Int!
   attempts: Int!
   archivedAt: Int!
@@ -1253,7 +1273,6 @@ type CardCountDistinctAggregate {
   acceptance: Int!
   position: Int!
   status: Int!
-  result: Int!
   error: Int!
   attempts: Int!
   archivedAt: Int!
@@ -1286,7 +1305,6 @@ type CardGroupKeys {
   acceptance: String
   position: Int
   status: CardsStatusEnum
-  result: String
   error: String
   attempts: Int
   archivedAt: DateTime
@@ -1357,13 +1375,125 @@ type CardDepGroupKeys {
   dependsOnCardId: String
 }
 
+type CardNote {
+  id: String!
+  cardId: String!
+  runId: String
+  kind: CardNotesKindEnum!
+  author: CardNotesAuthorEnum!
+  body: String!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+
+  """
+  Opaque cursor of this row's position in the query's ordering. Pass it as `after` to resume from here. Only set on rows returned by a list query.
+  """
+  cursor: String
+  card(where: CardFilters): Card!
+  run(where: RunFilters): Run
+}
+
+enum CardNotesKindEnum {
+  """Value: report"""
+  report
+
+  """Value: verdict"""
+  verdict
+
+  """Value: note"""
+  note
+}
+
+enum CardNotesAuthorEnum {
+  """Value: agent"""
+  agent
+
+  """Value: user"""
+  user
+}
+
+type CardNoteAggregate {
+  count: Int!
+  min: CardNoteMinAggregate
+  max: CardNoteMaxAggregate
+  countNonNull: CardNoteCountNonNullAggregate
+  countDistinct: CardNoteCountDistinctAggregate
+}
+
+type CardNoteMinAggregate {
+  id: String
+  cardId: String
+  runId: String
+  kind: CardNotesKindEnum
+  author: CardNotesAuthorEnum
+  body: String
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
+type CardNoteMaxAggregate {
+  id: String
+  cardId: String
+  runId: String
+  kind: CardNotesKindEnum
+  author: CardNotesAuthorEnum
+  body: String
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
+type CardNoteCountNonNullAggregate {
+  id: Int!
+  cardId: Int!
+  runId: Int!
+  kind: Int!
+  author: Int!
+  body: Int!
+  createdAt: Int!
+  updatedAt: Int!
+}
+
+type CardNoteCountDistinctAggregate {
+  id: Int!
+  cardId: Int!
+  runId: Int!
+  kind: Int!
+  author: Int!
+  body: Int!
+  createdAt: Int!
+  updatedAt: Int!
+}
+
+type CardNoteGroupBy {
+  group: CardNoteGroupKeys!
+  count: Int!
+  min: CardNoteMinAggregate
+  max: CardNoteMaxAggregate
+  countNonNull: CardNoteCountNonNullAggregate
+  countDistinct: CardNoteCountDistinctAggregate
+}
+
+"""
+The grouped column values of one CardNote group. A column the query did not group by is null.
+"""
+type CardNoteGroupKeys {
+  id: String
+  cardId: String
+  runId: String
+  kind: CardNotesKindEnum
+  author: CardNotesAuthorEnum
+  body: String
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
 type CardEvent {
   id: String!
   cardId: String!
   runId: String
   fromLaneId: String
   toLaneId: String
-  note: String!
+  noteId: String
   actor: CardEventsActorEnum!
   createdAt: DateTime!
 
@@ -1373,6 +1503,7 @@ type CardEvent {
   cursor: String
   card(where: CardFilters): Card!
   run(where: RunFilters): Run
+  note(where: CardNoteFilters): CardNote
   fromLane(where: LaneFilters): Lane
   toLane(where: LaneFilters): Lane
 }
@@ -1402,7 +1533,7 @@ type CardEventMinAggregate {
   runId: String
   fromLaneId: String
   toLaneId: String
-  note: String
+  noteId: String
   actor: CardEventsActorEnum
   createdAt: DateTime
 }
@@ -1413,7 +1544,7 @@ type CardEventMaxAggregate {
   runId: String
   fromLaneId: String
   toLaneId: String
-  note: String
+  noteId: String
   actor: CardEventsActorEnum
   createdAt: DateTime
 }
@@ -1424,7 +1555,7 @@ type CardEventCountNonNullAggregate {
   runId: Int!
   fromLaneId: Int!
   toLaneId: Int!
-  note: Int!
+  noteId: Int!
   actor: Int!
   createdAt: Int!
 }
@@ -1435,7 +1566,7 @@ type CardEventCountDistinctAggregate {
   runId: Int!
   fromLaneId: Int!
   toLaneId: Int!
-  note: Int!
+  noteId: Int!
   actor: Int!
   createdAt: Int!
 }
@@ -1458,7 +1589,7 @@ type CardEventGroupKeys {
   runId: String
   fromLaneId: String
   toLaneId: String
-  note: String
+  noteId: String
   actor: CardEventsActorEnum
   createdAt: DateTime
 }
@@ -3582,7 +3713,6 @@ input CreateCardInput {
   acceptance: String
   position: Int
   status: CardsStatusEnum
-  result: String
   error: String
   attempts: Int
   archivedAt: DateTime
@@ -3601,7 +3731,6 @@ input UpdateCardInput {
   acceptance: String
   position: Int
   status: CardsStatusEnum
-  result: String
   error: String
   attempts: Int
   archivedAt: DateTime
@@ -3629,7 +3758,6 @@ input CardFilters {
   acceptance: StringFilter
   position: IntFilter
   status: CardsStatusEnumFilter
-  result: StringFilter
   error: StringFilter
   attempts: IntFilter
   archivedAt: DateTimeFilter
@@ -3648,6 +3776,7 @@ input CardFilters {
   blocks: CardDepListRelationFilter
   runs: RunListRelationFilter
   events: CardEventListRelationFilter
+  notes: CardNoteListRelationFilter
 
   """At least one branch matches; ANDed with any sibling fields"""
   OR: [CardFilters!]
@@ -3755,6 +3884,17 @@ input CardEventListRelationFilter {
   every: CardEventFilters
 }
 
+input CardNoteListRelationFilter {
+  """At least one related row matches"""
+  some: CardNoteFilters
+
+  """No related row matches"""
+  none: CardNoteFilters
+
+  """Every related row matches"""
+  every: CardNoteFilters
+}
+
 input CardOrderBy {
   id: InnerOrder
   projectId: InnerOrder
@@ -3766,7 +3906,6 @@ input CardOrderBy {
   acceptance: InnerOrder
   position: InnerOrder
   status: InnerOrder
-  result: InnerOrder
   error: InnerOrder
   attempts: InnerOrder
   archivedAt: InnerOrder
@@ -3826,7 +3965,6 @@ input CardCountNonNullHaving {
   acceptance: AggregateNumberFilter
   position: AggregateNumberFilter
   status: AggregateNumberFilter
-  result: AggregateNumberFilter
   error: AggregateNumberFilter
   attempts: AggregateNumberFilter
   archivedAt: AggregateNumberFilter
@@ -3845,7 +3983,6 @@ input CardCountDistinctHaving {
   acceptance: AggregateNumberFilter
   position: AggregateNumberFilter
   status: AggregateNumberFilter
-  result: AggregateNumberFilter
   error: AggregateNumberFilter
   attempts: AggregateNumberFilter
   archivedAt: AggregateNumberFilter
@@ -3927,13 +4064,234 @@ input CardDepCountDistinctHaving {
   dependsOnCardId: AggregateNumberFilter
 }
 
+input CardNoteFilters {
+  id: StringFilter
+  cardId: StringFilter
+  runId: StringFilter
+  kind: CardNotesKindEnumFilter
+  author: CardNotesAuthorEnumFilter
+  body: StringFilter
+  createdAt: DateTimeFilter
+  updatedAt: DateTimeFilter
+
+  """Matches rows whose card matches these filters"""
+  card: CardFilters
+
+  """Matches rows whose run matches these filters"""
+  run: RunFilters
+
+  """At least one branch matches; ANDed with any sibling fields"""
+  OR: [CardNoteFilters!]
+
+  """Every branch matches"""
+  AND: [CardNoteFilters!]
+
+  """Negates the nested filters"""
+  NOT: CardNoteFilters
+}
+
+input CardNotesKindEnumFilter {
+  """Equal to"""
+  eq: CardNotesKindEnum
+
+  """Not equal to"""
+  ne: CardNotesKindEnum
+
+  """Less than"""
+  lt: CardNotesKindEnum
+
+  """Less than or equal to"""
+  lte: CardNotesKindEnum
+
+  """Greater than"""
+  gt: CardNotesKindEnum
+
+  """Greater than or equal to"""
+  gte: CardNotesKindEnum
+  like: String
+  notLike: String
+  ilike: String
+  notIlike: String
+
+  """
+  Matches values starting with the given string. `%`, `_` and `\` are matched literally.
+  """
+  startsWith: String
+
+  """
+  Matches values ending with the given string. `%`, `_` and `\` are matched literally.
+  """
+  endsWith: String
+
+  """
+  Matches values containing the given string. `%`, `_` and `\` are matched literally.
+  """
+  contains: String
+
+  """Case-insensitive `startsWith`."""
+  iStartsWith: String
+
+  """Case-insensitive `endsWith`."""
+  iEndsWith: String
+
+  """Case-insensitive `contains`."""
+  iContains: String
+
+  """
+  When true, every comparison operator in this object matches case-insensitively — `eq`, `ne`, the ordering operators, `inArray`/`notInArray` and the pattern operators all compare `lower(column)` against `lower(operand)`. Applies only to the operators beside it; a nested `AND`/`OR`/`NOT` branch sets its own.
+  """
+  insensitive: Boolean
+
+  """Matches any one of these values (SQL `IN`)"""
+  inArray: [CardNotesKindEnum!]
+
+  """Matches none of these values (SQL `NOT IN`)"""
+  notInArray: [CardNotesKindEnum!]
+
+  """When true, matches rows where the column is NULL"""
+  isNull: Boolean
+
+  """When true, matches rows where the column is not NULL"""
+  isNotNull: Boolean
+
+  """At least one branch matches; ANDed with any sibling operators"""
+  OR: [CardNotesKindEnumFilter!]
+
+  """Every branch matches"""
+  AND: [CardNotesKindEnumFilter!]
+
+  """Negates the nested operators"""
+  NOT: CardNotesKindEnumFilter
+}
+
+input CardNotesAuthorEnumFilter {
+  """Equal to"""
+  eq: CardNotesAuthorEnum
+
+  """Not equal to"""
+  ne: CardNotesAuthorEnum
+
+  """Less than"""
+  lt: CardNotesAuthorEnum
+
+  """Less than or equal to"""
+  lte: CardNotesAuthorEnum
+
+  """Greater than"""
+  gt: CardNotesAuthorEnum
+
+  """Greater than or equal to"""
+  gte: CardNotesAuthorEnum
+  like: String
+  notLike: String
+  ilike: String
+  notIlike: String
+
+  """
+  Matches values starting with the given string. `%`, `_` and `\` are matched literally.
+  """
+  startsWith: String
+
+  """
+  Matches values ending with the given string. `%`, `_` and `\` are matched literally.
+  """
+  endsWith: String
+
+  """
+  Matches values containing the given string. `%`, `_` and `\` are matched literally.
+  """
+  contains: String
+
+  """Case-insensitive `startsWith`."""
+  iStartsWith: String
+
+  """Case-insensitive `endsWith`."""
+  iEndsWith: String
+
+  """Case-insensitive `contains`."""
+  iContains: String
+
+  """
+  When true, every comparison operator in this object matches case-insensitively — `eq`, `ne`, the ordering operators, `inArray`/`notInArray` and the pattern operators all compare `lower(column)` against `lower(operand)`. Applies only to the operators beside it; a nested `AND`/`OR`/`NOT` branch sets its own.
+  """
+  insensitive: Boolean
+
+  """Matches any one of these values (SQL `IN`)"""
+  inArray: [CardNotesAuthorEnum!]
+
+  """Matches none of these values (SQL `NOT IN`)"""
+  notInArray: [CardNotesAuthorEnum!]
+
+  """When true, matches rows where the column is NULL"""
+  isNull: Boolean
+
+  """When true, matches rows where the column is not NULL"""
+  isNotNull: Boolean
+
+  """At least one branch matches; ANDed with any sibling operators"""
+  OR: [CardNotesAuthorEnumFilter!]
+
+  """Every branch matches"""
+  AND: [CardNotesAuthorEnumFilter!]
+
+  """Negates the nested operators"""
+  NOT: CardNotesAuthorEnumFilter
+}
+
+input CardNoteOrderBy {
+  id: InnerOrder
+  cardId: InnerOrder
+  runId: InnerOrder
+  kind: InnerOrder
+  author: InnerOrder
+  body: InnerOrder
+  createdAt: InnerOrder
+  updatedAt: InnerOrder
+
+  """Order by columns of the related card row"""
+  card: CardOrderBy
+
+  """Order by columns of the related run row"""
+  run: RunOrderBy
+}
+
+"""Filters CardNote groups by their aggregated values"""
+input CardNoteHaving {
+  """Filters groups by how many rows they contain"""
+  count: AggregateNumberFilter
+  countNonNull: CardNoteCountNonNullHaving
+  countDistinct: CardNoteCountDistinctHaving
+}
+
+input CardNoteCountNonNullHaving {
+  id: AggregateNumberFilter
+  cardId: AggregateNumberFilter
+  runId: AggregateNumberFilter
+  kind: AggregateNumberFilter
+  author: AggregateNumberFilter
+  body: AggregateNumberFilter
+  createdAt: AggregateNumberFilter
+  updatedAt: AggregateNumberFilter
+}
+
+input CardNoteCountDistinctHaving {
+  id: AggregateNumberFilter
+  cardId: AggregateNumberFilter
+  runId: AggregateNumberFilter
+  kind: AggregateNumberFilter
+  author: AggregateNumberFilter
+  body: AggregateNumberFilter
+  createdAt: AggregateNumberFilter
+  updatedAt: AggregateNumberFilter
+}
+
 input CardEventFilters {
   id: StringFilter
   cardId: StringFilter
   runId: StringFilter
   fromLaneId: StringFilter
   toLaneId: StringFilter
-  note: StringFilter
+  noteId: StringFilter
   actor: CardEventsActorEnumFilter
   createdAt: DateTimeFilter
 
@@ -3942,6 +4300,9 @@ input CardEventFilters {
 
   """Matches rows whose run matches these filters"""
   run: RunFilters
+
+  """Matches rows whose note matches these filters"""
+  note: CardNoteFilters
 
   """Matches rows whose fromLane matches these filters"""
   fromLane: LaneFilters
@@ -4039,7 +4400,7 @@ input CardEventOrderBy {
   runId: InnerOrder
   fromLaneId: InnerOrder
   toLaneId: InnerOrder
-  note: InnerOrder
+  noteId: InnerOrder
   actor: InnerOrder
   createdAt: InnerOrder
 
@@ -4048,6 +4409,9 @@ input CardEventOrderBy {
 
   """Order by columns of the related run row"""
   run: RunOrderBy
+
+  """Order by columns of the related note row"""
+  note: CardNoteOrderBy
 
   """Order by columns of the related fromLane row"""
   fromLane: LaneOrderBy
@@ -4070,7 +4434,7 @@ input CardEventCountNonNullHaving {
   runId: AggregateNumberFilter
   fromLaneId: AggregateNumberFilter
   toLaneId: AggregateNumberFilter
-  note: AggregateNumberFilter
+  noteId: AggregateNumberFilter
   actor: AggregateNumberFilter
   createdAt: AggregateNumberFilter
 }
@@ -4081,7 +4445,7 @@ input CardEventCountDistinctHaving {
   runId: AggregateNumberFilter
   fromLaneId: AggregateNumberFilter
   toLaneId: AggregateNumberFilter
-  note: AggregateNumberFilter
+  noteId: AggregateNumberFilter
   actor: AggregateNumberFilter
   createdAt: AggregateNumberFilter
 }
@@ -5000,6 +5364,32 @@ type Query {
     """Filters the groups after they are aggregated."""
     having: CardDepHaving
   ): [CardDepGroupBy!]!
+  cardNotes(
+    offset: Int
+    limit: Int
+    orderBy: CardNoteOrderBy
+    where: CardNoteFilters
+
+    """
+    Keyset pagination: only return rows strictly after this cursor (a row's `cursor` field from a previous page, under the same orderBy).
+    """
+    after: String
+    distinct: [CardNoteDistinctColumn!]
+  ): [CardNote!]!
+  cardNote(offset: Int, orderBy: CardNoteOrderBy, where: CardNoteFilters): CardNote
+  cardNotesAggregate(where: CardNoteFilters): CardNoteAggregate!
+  cardNotesGroupBy(
+    """
+    Columns to group by. One result row per distinct combination of their values.
+    """
+    groupBy: [CardNoteGroupByColumn!]!
+
+    """Filters the rows before they are grouped."""
+    where: CardNoteFilters
+
+    """Filters the groups after they are aggregated."""
+    having: CardNoteHaving
+  ): [CardNoteGroupBy!]!
   cardEvents(
     offset: Int
     limit: Int
@@ -5312,7 +5702,6 @@ enum CardGroupByColumn {
   acceptance
   position
   status
-  result
   error
   attempts
   archivedAt
@@ -5327,6 +5716,18 @@ enum CardDepGroupByColumn {
   dependsOnCardId
 }
 
+"""Columns of CardNote that a query can group by"""
+enum CardNoteGroupByColumn {
+  id
+  cardId
+  runId
+  kind
+  author
+  body
+  createdAt
+  updatedAt
+}
+
 """Columns of CardEvent that a query can group by"""
 enum CardEventGroupByColumn {
   id
@@ -5334,7 +5735,7 @@ enum CardEventGroupByColumn {
   runId
   fromLaneId
   toLaneId
-  note
+  noteId
   actor
   createdAt
 }
@@ -5640,7 +6041,7 @@ type Mutation {
   retryCard(cardId: String!): Card!
 
   """
-  Takes a card off the board without deleting it. It stops being drawn in its lane, stops being picked up by that lane's agent, and stops counting as something other cards are waiting on — but it keeps its lane, its status and its result, and `restoreCard` puts it back. This is what a Done pile is for once it is long enough to be in the way. Read the archive with `cards(where: { archivedAt: { isNotNull: true } })`. Refused while an agent is working the card; archiving one already archived leaves the time it was archived alone.
+  Takes a card off the board without deleting it. It stops being drawn in its lane, stops being picked up by that lane's agent, and stops counting as something other cards are waiting on — but it keeps its lane, its status and everything said about it, and `restoreCard` puts it back. This is what a Done pile is for once it is long enough to be in the way. Read the archive with `cards(where: { archivedAt: { isNotNull: true } })`. Refused while an agent is working the card; archiving one already archived leaves the time it was archived alone.
   """
   archiveCard(cardId: String!): Card!
 
@@ -5648,6 +6049,21 @@ type Mutation {
   Puts an archived card back on the board, at the end of the lane it was archived from. Its status is left as it was found — a card archived as `error` comes back as one, and `retryCard` is still the way to put that back in play — because what the card was is the reason someone archived it. The end of the lane rather than its old position, which the cards added since have long taken.
   """
   restoreCard(cardId: String!): Card!
+
+  """
+  Writes a note on a card. Everything ever said about a card is a note — the report an agent leaves when it has worked one, the verdict a reviewing station rules, and this, a standing note somebody wants taken into account. Every note on the card is handed to the next agent that works it, under "Notes on this card", so this is how you tell one something the card's body does not say without editing the card out from under whoever wrote it. Reports and verdicts are written by the runner and cannot be written here: a note says who wrote it, and that has to be true. Read them with `card_notes(where: { cardId: { eq: "…" } })`.
+  """
+  addCardNote(cardId: String!, body: String!): CardNote!
+
+  """
+  Rewrites a note. Only a note somebody wrote: an agent's report and a reviewer's verdict are an account of what happened, and an account that can be corrected afterwards is worth no more than no account at all.
+  """
+  updateCardNote(id: String!, body: String!): CardNote!
+
+  """
+  Takes a note back, so the next agent working the card stops being told it. Only a note somebody wrote, for the same reason `updateCardNote` is. A verdict that explained a move stays readable through that move in `card_events`.
+  """
+  deleteCardNote(id: String!): Boolean!
 
   """
   Replaces what a card waits on, and answers with it. A card with unfinished dependencies is skipped rather than run out of order, so this is how a decomposition that got the order wrong is corrected. Written as a set rather than a row at a time, because half an ordering is not an ordering. Every id has to be a card on the same board, and a cycle is refused — cards that wait on each other would never run, and nothing downstream would say why.

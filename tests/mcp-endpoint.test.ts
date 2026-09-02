@@ -72,16 +72,19 @@ test("offers the board tools, and only those", async () => {
   // snake_case: the driver renames after it filters, so `include` names the GraphQL field and
   // this names the tool.
   expect(names).toEqual([
+    "add_card_note",
     "agents",
     "apply_board_template",
     "archive_card",
     "blockers",
     "board_templates",
     "card_events",
+    "card_notes",
     "cards",
     "create_card",
     "create_project",
     "create_task",
+    "delete_card_note",
     "delete_card_single",
     "delete_task_single",
     "lanes",
@@ -102,6 +105,7 @@ test("offers the board tools, and only those", async () => {
     "stop_task",
     "submit_card",
     "tasks",
+    "update_card_note",
     "update_card_single",
     "update_project_single",
   ]);
@@ -323,12 +327,14 @@ test("marks only the tools that actually destroy something", async () => {
   // gates on this hint should be spending the operator's attention on the deletes.
   expect(flagged("destructiveHint")).toEqual([
     "apply_board_template",
+    "delete_card_note",
     "delete_card_single",
     "delete_task_single",
     "save_board_template",
     "set_card_deps",
     "stop_card",
     "stop_task",
+    "update_card_note",
     "update_card_single",
     "update_project_single",
   ]);
@@ -337,11 +343,13 @@ test("marks only the tools that actually destroy something", async () => {
   // the deletes, and the three that describe a state rather than an action. Decomposing a task
   // twice makes two sets of cards, and refining it twice is two turns, so neither is among them.
   const writes = new Set([
+    "add_card_note",
     "apply_board_template",
     "archive_card",
     "create_card",
     "create_project",
     "create_task",
+    "delete_card_note",
     "delete_card_single",
     "delete_task_single",
     "make_card",
@@ -355,12 +363,14 @@ test("marks only the tools that actually destroy something", async () => {
     "stop_card",
     "stop_task",
     "submit_card",
+    "update_card_note",
     "update_card_single",
     "update_project_single",
   ]);
   expect(flagged("idempotentHint").filter((name) => writes.has(name))).toEqual([
     "apply_board_template",
     "archive_card",
+    "delete_card_note",
     "delete_card_single",
     "delete_task_single",
     "move_card",
@@ -377,6 +387,7 @@ test("marks only the tools that actually destroy something", async () => {
     "blockers",
     "board_templates",
     "card_events",
+    "card_notes",
     "cards",
     "lanes",
     "projects",

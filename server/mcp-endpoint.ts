@@ -34,6 +34,7 @@ const TOOLS = [
   "Query.runs",
   "Query.runEvents",
   "Query.cardEvents",
+  "Query.cardNotes",
   "Query.blockers",
   "Query.agents",
   "Query.roles",
@@ -50,6 +51,9 @@ const TOOLS = [
   "Mutation.updateCardSingle",
   "Mutation.deleteCardSingle",
   "Mutation.setCardDeps",
+  "Mutation.addCardNote",
+  "Mutation.updateCardNote",
+  "Mutation.deleteCardNote",
   "Mutation.moveCard",
   "Mutation.retryCard",
   "Mutation.archiveCard",
@@ -87,9 +91,10 @@ const HINTS: Record<string, string> = {
   cards:
     "The units of work. `status` is `idle`, `running`, `done`, `rejected` or `error` — " +
     "`rejected` is a reviewer having turned the card down, `error` is something having broken, " +
-    "and they are apart because they want different things from you. A card carries the last " +
-    "`result` an agent working it reported; `error` is what broke and never a verdict, so read " +
-    "`card_events` for why a card is where it is. `acceptance` is what it will be judged on, " +
+    "and they are apart because they want different things from you. `error` is what broke and " +
+    "never a verdict: what an agent made of the card, what a reviewer ruled and anything a " +
+    "person wants taken into account are all in `card_notes`, and `card_events` says why the " +
+    "card is where it is. `acceptance` is what it will be judged on, " +
     "`taskId` is the conversation it was written out of and `parentId` the card it was broken " +
     "off — a station that expands archives the card it read and writes its children. A card " +
     "waiting on a dependency is " +
@@ -97,10 +102,19 @@ const HINTS: Record<string, string> = {
     "`laneId` for one column. A card with an `archivedAt` has been put away and is not on the " +
     "board any more, so add `archivedAt: { isNull: true }` to see what the board sees — this " +
     "query does not filter them out for you.",
+  card_notes:
+    "Everything ever said about a card, oldest first. `kind` is `report` — what an agent made " +
+    "of the card when it worked it — or `verdict`, a reviewing station's ruling in its own " +
+    "words, or `note`, something a person wants taken into account. `author` says whether an " +
+    "agent or a person wrote it, and stays true after `runId` is emptied by the run being " +
+    "pruned. Every note of kind `note` is handed to the next agent that works the card, which " +
+    "is what `add_card_note` is for; a report and a verdict are an account of what happened " +
+    "and only the runner writes those. Filter by `cardId`.",
   card_events:
-    "A card's ledger: every move it has made, in `createdAt` order, with the reason given at " +
-    "the time. `note` is why — a reviewer's verdict in its own words, or what a person said " +
-    "when they moved it. `fromLaneId` null is the card being created and `toLaneId` null is it " +
+    "A card's ledger: every move it has made, in `createdAt` order. `noteId` points at what " +
+    "was said about the move — a reviewer's verdict in its own words, or what a person wrote " +
+    "when they moved it — which is a row in `card_notes`. " +
+    "`fromLaneId` null is the card being created and `toLaneId` null is it " +
     "being archived; the two being the same lane is a ruling that left the card where it was. " +
     '`actor` says who decided. This is the answer to "why is this card here", which nothing ' +
     "on the card itself can tell you. Filter by `cardId`.",
@@ -210,7 +224,7 @@ const HINTS: Record<string, string> = {
   archive_card:
     "Takes a card off the board without deleting it — the Done pile once it is long enough to " +
     "be in the way, or the card nobody is going to do. It keeps its lane, its status, its " +
-    "result and its ledger, stops being picked up, and stops counting as something other " +
+    "notes and its ledger, stops being picked up, and stops counting as something other " +
     "cards wait on. Refused while an agent is working it.",
   restore_card:
     "Puts an archived card back, at the end of the lane it was archived from. Its status is " +
@@ -295,7 +309,7 @@ const makeServer = createServerFactory({
   version: pkg.version,
   include: TOOLS,
   // One level: the leaf fields of what a tool returns. Two would pull every card — body,
-  // result and all — into a listing of projects, which is a lot of context for a question
+  // acceptance and all — into a listing of projects, which is a lot of context for a question
   // about names.
   selectionDepth: 1,
   mutationHints: "byName",

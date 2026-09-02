@@ -94,7 +94,9 @@ query CardRuns($cardId: String!) {
   ) {
     id
     runId
-    note
+    note {
+      body
+    }
     actor
     createdAt
     fromLane {
