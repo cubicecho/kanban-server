@@ -71,7 +71,14 @@ export function RolesRoute() {
       ) : null}
 
       {roles.data?.roles.map((role) => {
-        const count = lanes.filter((lane) => lane.roleId === role.id).length;
+        const of = lanes.filter((lane) => lane.roleId === role.id);
+        const count = of.length;
+        // The foreign key is `restrict`, so confirming a delete here could only ever fail.
+        // Naming the lanes is the difference between a refusal and somewhere to go.
+        const where = of
+          .slice(0, 3)
+          .map((lane) => `${lane.name} on ${lane.project.name}`)
+          .join(", ");
         return (
           <Card key={role.id} className="gap-2 p-4">
             <div className="flex items-start justify-between gap-3">
@@ -101,13 +108,14 @@ export function RolesRoute() {
                   variant="ghost"
                   size="icon"
                   label={`Delete ${role.name}`}
-                  hint="Delete"
-                  title={`Delete the role "${role.name}"?`}
-                  description={
+                  disabled={count > 0}
+                  hint={
                     count
-                      ? `${count} lane${count === 1 ? " is" : "s are"} of this kind, on this and any other board. The role cannot be deleted while that is true.`
-                      : "This kind of lane goes for every board on the server, not just this one."
+                      ? `Still in use by ${where}${count > 3 ? ` and ${count - 3} more` : ""}`
+                      : "Delete"
                   }
+                  title={`Delete the role "${role.name}"?`}
+                  description="This kind of lane goes for every board on the server, not just this one."
                   onConfirm={() => remove.mutate(role.id)}
                 >
                   <Trash2 className="size-4" aria-hidden />

@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { SpendDocument } from "@/gql/graphql";
 import { request } from "@/lib/gql";
 
@@ -43,13 +44,19 @@ export function Spend({
       ? `Runs are kept ${total.retentionDays} days, so anything older is not in this.`
       : "Every run is kept, so this is the whole history.";
 
+  // The breakdown was a `title`, which is a slow browser tooltip no keyboard reaches — and
+  // this is the one number in the app a person squints at before deciding to spend more.
   return (
-    <span
-      className="text-xs text-muted-foreground"
-      title={`${total.promptTokens.toLocaleString()} prompt + ${total.completionTokens.toLocaleString()} completion tokens over ${total.runs} run${total.runs === 1 ? "" : "s"}. Added up from the runs themselves. ${kept}`}
-    >
-      {compact(total.totalTokens)} tokens · {total.runs} run{total.runs === 1 ? "" : "s"}
-      {total.from ? ` · since ${date(total.from)}` : ""}
-    </span>
+    <Tooltip>
+      <TooltipTrigger className="text-muted-foreground text-xs">
+        {compact(total.totalTokens)} tokens · {total.runs} run{total.runs === 1 ? "" : "s"}
+        {total.from ? ` · since ${date(total.from)}` : ""}
+      </TooltipTrigger>
+      <TooltipContent>
+        {total.promptTokens.toLocaleString()} prompt + {total.completionTokens.toLocaleString()}{" "}
+        completion tokens over {total.runs} run{total.runs === 1 ? "" : "s"}. Added up from the runs
+        themselves. {kept}
+      </TooltipContent>
+    </Tooltip>
   );
 }

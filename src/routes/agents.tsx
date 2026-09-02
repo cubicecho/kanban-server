@@ -111,7 +111,7 @@ export function AgentsRoute() {
       {agents.data?.agents.map((agent) => (
         <Card key={agent.id} className="gap-2 p-4">
           <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
+            <div className={`min-w-0 ${agent.enabled ? "" : "opacity-50"}`}>
               <div className="flex items-center gap-2">
                 <span className="font-medium">{agent.name}</span>
                 {agent.servers.length ? (

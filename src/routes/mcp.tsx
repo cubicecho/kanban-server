@@ -18,10 +18,12 @@ import { EmptyState } from "@/components/empty-state";
 import { McpDialog } from "@/components/mcp-dialog";
 import { QueryError } from "@/components/query-error";
 import { RowSkeleton } from "@/components/row-skeleton";
+import { ToolList, toolCount } from "@/components/tool-list";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   DeleteMcpServerDocument,
   type McpProbe,
@@ -132,7 +134,7 @@ export function McpRoute() {
                     {status?.status ?? "unknown"}
                   </Badge>
                   {tools.length ? (
-                    <span className="text-xs text-muted-foreground">{tools.length} tool(s)</span>
+                    <span className="text-xs text-muted-foreground">{toolCount(tools.length)}</span>
                   ) : null}
                 </div>
                 <p className="truncate font-mono text-xs text-muted-foreground">
@@ -141,11 +143,18 @@ export function McpRoute() {
                     : server.url}
                 </p>
               </div>
-              <Switch
-                checked={server.enabled}
-                onCheckedChange={(enabled) => toggle.mutate({ id: server.id, enabled })}
-                aria-label={`Enable ${server.slug}`}
-              />
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Switch
+                    checked={server.enabled}
+                    onCheckedChange={(enabled) => toggle.mutate({ id: server.id, enabled })}
+                    // A switch that says "Enable" while it is on names the state rather than
+                    // the action, which is the one thing a toggle must not do.
+                    aria-label={`${server.enabled ? "Disable" : "Enable"} ${server.slug}`}
+                  />
+                </TooltipTrigger>
+                <TooltipContent>{server.enabled ? "Disable" : "Enable"}</TooltipContent>
+              </Tooltip>
               <ActionButton
                 variant="ghost"
                 size="icon"
@@ -188,24 +197,14 @@ export function McpRoute() {
               <div className="flex flex-col gap-2 border-t pt-3 text-sm">
                 <div className="flex items-center gap-2">
                   {probe.ok ? (
-                    <CheckCircle2 className="size-4" />
+                    <CheckCircle2 className="size-4 text-status-running" />
                   ) : (
                     <XCircle className="size-4 text-destructive" />
                   )}
-                  {probe.ok ? `Connected — ${probe.tools.length} tool(s)` : "Could not connect"}
+                  {probe.ok ? `Connected — ${toolCount(probe.tools.length)}` : "Could not connect"}
                 </div>
                 {probe.ok ? (
-                  <div className="flex flex-wrap gap-1">
-                    {probe.tools.map((tool) => (
-                      <span
-                        key={tool.name}
-                        title={tool.description}
-                        className="rounded-md border px-2 py-0.5 font-mono text-xs text-muted-foreground"
-                      >
-                        {tool.name}
-                      </span>
-                    ))}
-                  </div>
+                  <ToolList tools={probe.tools} />
                 ) : (
                   <p className="whitespace-pre-wrap font-mono text-xs text-destructive">
                     {probe.error}
