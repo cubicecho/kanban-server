@@ -224,6 +224,7 @@ enum LaneDistinctColumn {
   onFailureLaneId
   wipLimit
   readVerdict
+  maxAttempts
   createdAt
 }
 
@@ -647,6 +648,7 @@ enum CardDistinctColumn {
   status
   result
   error
+  attempts
   archivedAt
   createdAt
   updatedAt
@@ -740,6 +742,7 @@ type Lane {
   onFailureLaneId: String
   wipLimit: Int!
   readVerdict: Boolean!
+  maxAttempts: Int!
   createdAt: DateTime!
 
   """
@@ -776,11 +779,13 @@ type LaneAggregate {
 type LaneAvgAggregate {
   position: Float
   wipLimit: Float
+  maxAttempts: Float
 }
 
 type LaneSumAggregate {
   position: Float
   wipLimit: Float
+  maxAttempts: Float
 }
 
 type LaneMinAggregate {
@@ -792,6 +797,7 @@ type LaneMinAggregate {
   onSuccessLaneId: String
   onFailureLaneId: String
   wipLimit: Int
+  maxAttempts: Int
   createdAt: DateTime
 }
 
@@ -804,6 +810,7 @@ type LaneMaxAggregate {
   onSuccessLaneId: String
   onFailureLaneId: String
   wipLimit: Int
+  maxAttempts: Int
   createdAt: DateTime
 }
 
@@ -818,6 +825,7 @@ type LaneCountNonNullAggregate {
   onFailureLaneId: Int!
   wipLimit: Int!
   readVerdict: Int!
+  maxAttempts: Int!
   createdAt: Int!
 }
 
@@ -830,6 +838,7 @@ type LaneCountDistinctAggregate {
   onSuccessLaneId: Int!
   onFailureLaneId: Int!
   wipLimit: Int!
+  maxAttempts: Int!
   createdAt: Int!
 }
 
@@ -856,6 +865,7 @@ type LaneGroupKeys {
   onSuccessLaneId: String
   onFailureLaneId: String
   wipLimit: Int
+  maxAttempts: Int
   createdAt: DateTime
   intake: Boolean
   readVerdict: Boolean
@@ -1099,6 +1109,7 @@ type Card {
   status: CardsStatusEnum!
   result: String!
   error: String!
+  attempts: Int!
   archivedAt: DateTime
   createdAt: DateTime!
   updatedAt: DateTime!
@@ -1174,10 +1185,12 @@ type CardAggregate {
 
 type CardAvgAggregate {
   position: Float
+  attempts: Float
 }
 
 type CardSumAggregate {
   position: Float
+  attempts: Float
 }
 
 type CardMinAggregate {
@@ -1192,6 +1205,7 @@ type CardMinAggregate {
   status: CardsStatusEnum
   result: String
   error: String
+  attempts: Int
   archivedAt: DateTime
   createdAt: DateTime
   updatedAt: DateTime
@@ -1209,6 +1223,7 @@ type CardMaxAggregate {
   status: CardsStatusEnum
   result: String
   error: String
+  attempts: Int
   archivedAt: DateTime
   createdAt: DateTime
   updatedAt: DateTime
@@ -1226,6 +1241,7 @@ type CardCountNonNullAggregate {
   status: Int!
   result: Int!
   error: Int!
+  attempts: Int!
   archivedAt: Int!
   createdAt: Int!
   updatedAt: Int!
@@ -1243,6 +1259,7 @@ type CardCountDistinctAggregate {
   status: Int!
   result: Int!
   error: Int!
+  attempts: Int!
   archivedAt: Int!
   createdAt: Int!
   updatedAt: Int!
@@ -1274,6 +1291,7 @@ type CardGroupKeys {
   status: CardsStatusEnum
   result: String
   error: String
+  attempts: Int
   archivedAt: DateTime
   createdAt: DateTime
   updatedAt: DateTime
@@ -3039,6 +3057,7 @@ input CreateLaneInput {
   onFailureLaneId: String
   wipLimit: Int
   readVerdict: Boolean
+  maxAttempts: Int
   createdAt: DateTime
 }
 
@@ -3053,6 +3072,7 @@ input UpdateLaneInput {
   onFailureLaneId: String
   wipLimit: Int
   readVerdict: Boolean
+  maxAttempts: Int
   createdAt: DateTime
 }
 
@@ -3076,6 +3096,7 @@ input LaneFilters {
   onFailureLaneId: StringFilter
   wipLimit: IntFilter
   readVerdict: BooleanFilter
+  maxAttempts: IntFilter
   createdAt: DateTimeFilter
 
   """Matches rows whose project matches these filters"""
@@ -3106,6 +3127,7 @@ input LaneOrderBy {
   onFailureLaneId: InnerOrder
   wipLimit: InnerOrder
   readVerdict: InnerOrder
+  maxAttempts: InnerOrder
   createdAt: InnerOrder
 
   """Order by columns of the related project row"""
@@ -3130,21 +3152,25 @@ input LaneHaving {
 input LaneAvgHaving {
   position: AggregateNumberFilter
   wipLimit: AggregateNumberFilter
+  maxAttempts: AggregateNumberFilter
 }
 
 input LaneSumHaving {
   position: AggregateNumberFilter
   wipLimit: AggregateNumberFilter
+  maxAttempts: AggregateNumberFilter
 }
 
 input LaneMinHaving {
   position: AggregateNumberFilter
   wipLimit: AggregateNumberFilter
+  maxAttempts: AggregateNumberFilter
 }
 
 input LaneMaxHaving {
   position: AggregateNumberFilter
   wipLimit: AggregateNumberFilter
+  maxAttempts: AggregateNumberFilter
 }
 
 input LaneCountNonNullHaving {
@@ -3158,6 +3184,7 @@ input LaneCountNonNullHaving {
   onFailureLaneId: AggregateNumberFilter
   wipLimit: AggregateNumberFilter
   readVerdict: AggregateNumberFilter
+  maxAttempts: AggregateNumberFilter
   createdAt: AggregateNumberFilter
 }
 
@@ -3170,6 +3197,7 @@ input LaneCountDistinctHaving {
   onSuccessLaneId: AggregateNumberFilter
   onFailureLaneId: AggregateNumberFilter
   wipLimit: AggregateNumberFilter
+  maxAttempts: AggregateNumberFilter
   createdAt: AggregateNumberFilter
 }
 
@@ -3524,6 +3552,7 @@ input CreateCardInput {
   status: CardsStatusEnum
   result: String
   error: String
+  attempts: Int
   archivedAt: DateTime
   createdAt: DateTime
   updatedAt: DateTime
@@ -3541,6 +3570,7 @@ input UpdateCardInput {
   status: CardsStatusEnum
   result: String
   error: String
+  attempts: Int
   archivedAt: DateTime
   createdAt: DateTime
   updatedAt: DateTime
@@ -3567,6 +3597,7 @@ input CardFilters {
   status: CardsStatusEnumFilter
   result: StringFilter
   error: StringFilter
+  attempts: IntFilter
   archivedAt: DateTimeFilter
   createdAt: DateTimeFilter
   updatedAt: DateTimeFilter
@@ -3689,6 +3720,7 @@ input CardOrderBy {
   status: InnerOrder
   result: InnerOrder
   error: InnerOrder
+  attempts: InnerOrder
   archivedAt: InnerOrder
   createdAt: InnerOrder
   updatedAt: InnerOrder
@@ -3717,18 +3749,22 @@ input CardHaving {
 
 input CardAvgHaving {
   position: AggregateNumberFilter
+  attempts: AggregateNumberFilter
 }
 
 input CardSumHaving {
   position: AggregateNumberFilter
+  attempts: AggregateNumberFilter
 }
 
 input CardMinHaving {
   position: AggregateNumberFilter
+  attempts: AggregateNumberFilter
 }
 
 input CardMaxHaving {
   position: AggregateNumberFilter
+  attempts: AggregateNumberFilter
 }
 
 input CardCountNonNullHaving {
@@ -3743,6 +3779,7 @@ input CardCountNonNullHaving {
   status: AggregateNumberFilter
   result: AggregateNumberFilter
   error: AggregateNumberFilter
+  attempts: AggregateNumberFilter
   archivedAt: AggregateNumberFilter
   createdAt: AggregateNumberFilter
   updatedAt: AggregateNumberFilter
@@ -3760,6 +3797,7 @@ input CardCountDistinctHaving {
   status: AggregateNumberFilter
   result: AggregateNumberFilter
   error: AggregateNumberFilter
+  attempts: AggregateNumberFilter
   archivedAt: AggregateNumberFilter
   createdAt: AggregateNumberFilter
   updatedAt: AggregateNumberFilter
@@ -4882,6 +4920,7 @@ enum LaneGroupByColumn {
   onFailureLaneId
   wipLimit
   readVerdict
+  maxAttempts
   createdAt
 }
 
@@ -4919,6 +4958,7 @@ enum CardGroupByColumn {
   status
   result
   error
+  attempts
   archivedAt
   createdAt
   updatedAt
@@ -5226,12 +5266,12 @@ type Mutation {
   stopTask(taskId: String!): Boolean!
 
   """
-  Puts a card in a lane, at a position, and renumbers the cards around it so the board stays in the order it looks like. Omit `position` to drop it at the end. A card that had failed comes back to `idle`, which is what makes dragging one back a retry; a card an agent is working cannot be moved out from under it, and nor can an archived one — `restoreCard` is what puts that back on the board.
+  Puts a card in a lane, at a position, and renumbers the cards around it so the board stays in the order it looks like. Omit `position` to drop it at the end. A card that had failed comes back to `idle` with its attempts forgiven, which is what makes dragging one back a retry; a card an agent is working cannot be moved out from under it, and nor can an archived one — `restoreCard` is what puts that back on the board.
   """
   moveCard(cardId: String!, laneId: String!, position: Int): Card!
 
   """
-  Puts a card back in play where it stands: clears its error and returns it to `idle`, which is the status a lane's agent will pick up. This is the way back for a card a reviewer rejected — those stay `error` on purpose, so the board waits for a person rather than looping — and for one interrupted by a restart. It does not run anything itself; `runCard` does that, and `autoRun` does it unasked. Refused while an agent is working the card, and on an archived one — `restoreCard` puts that back on the board first.
+  Puts a card back in play where it stands: clears its error, empties the count of failed attempts against it, and returns it to `idle`, which is the status a lane's agent will pick up. This is the way back for a card that stopped at `error` — one a reviewer rejected once its lane had no attempts left to spend, or one whose lane spends none. It does not run anything itself; `runCard` does that, and `autoRun` does it unasked. Refused while an agent is working the card, and on an archived one — `restoreCard` puts that back on the board first.
   """
   retryCard(cardId: String!): Card!
 

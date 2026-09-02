@@ -469,8 +469,10 @@ async function drawTemplate(tx: Tx, projectId: string, plan: TemplateLane[]) {
         agentId: lane.agentId && known.has(lane.agentId) ? lane.agentId : null,
         wipLimit: lane.wipLimit,
         // Templates saved before stations could judge cards have no such key; a lane that does
-        // not say it reads a verdict does not read one.
+        // not say it reads a verdict does not read one, and one that does not say how many
+        // times it will put a card back does not put one back at all.
         readVerdict: lane.readVerdict ?? false,
+        maxAttempts: lane.maxAttempts ?? 0,
       })),
     )
     .returning();
@@ -696,9 +698,10 @@ export const schema = new GraphQLSchema({
         description:
           "Puts a card in a lane, at a position, and renumbers the cards around it so the " +
           "board stays in the order it looks like. Omit `position` to drop it at the end. " +
-          "A card that had failed comes back to `idle`, which is what makes dragging one back " +
-          "a retry; a card an agent is working cannot be moved out from under it, and nor can " +
-          "an archived one — `restoreCard` is what puts that back on the board.",
+          "A card that had failed comes back to `idle` with its attempts forgiven, which is " +
+          "what makes dragging one back a retry; a card an agent is working cannot be moved " +
+          "out from under it, and nor can an archived one — `restoreCard` is what puts that " +
+          "back on the board.",
         args: {
           cardId: { type: new GraphQLNonNull(GraphQLString) },
           laneId: { type: new GraphQLNonNull(GraphQLString) },
@@ -747,6 +750,9 @@ export const schema = new GraphQLSchema({
                         laneId: args.laneId,
                         status: card.status === "done" ? "done" : ("idle" as const),
                         error: "",
+                        // Somebody moving a card by hand is somebody starting it over, so the
+                        // rework budget its next station spends is a fresh one.
+                        attempts: 0,
                       }
                     : {}),
                 })
@@ -761,13 +767,13 @@ export const schema = new GraphQLSchema({
       retryCard: {
         type: new GraphQLNonNull(generatedType("Card")),
         description:
-          "Puts a card back in play where it stands: clears its error and returns it to " +
-          "`idle`, which is the status a lane's agent will pick up. This is the way back for " +
-          "a card a reviewer rejected — those stay `error` on purpose, so the board waits for " +
-          "a person rather than looping — and for one interrupted by a restart. It does not " +
-          "run anything itself; `runCard` does that, and `autoRun` does it unasked. Refused " +
-          "while an agent is working the card, and on an archived one — `restoreCard` puts " +
-          "that back on the board first.",
+          "Puts a card back in play where it stands: clears its error, empties the count of " +
+          "failed attempts against it, and returns it to `idle`, which is the status a lane's " +
+          "agent will pick up. This is the way back for a card that stopped at `error` — one " +
+          "a reviewer rejected once its lane had no attempts left to spend, or one whose lane " +
+          "spends none. It does not run anything itself; `runCard` does that, and `autoRun` " +
+          "does it unasked. Refused while an agent is working the card, and on an archived " +
+          "one — `restoreCard` puts that back on the board first.",
         args: { cardId: { type: new GraphQLNonNull(GraphQLString) } },
         resolve: async (_source, args: { cardId: string }) => {
           if (isRunning(args.cardId)) {
@@ -785,7 +791,7 @@ export const schema = new GraphQLSchema({
           }
           const [retried] = await db
             .update(cards)
-            .set({ status: "idle", error: "" })
+            .set({ status: "idle", error: "", attempts: 0 })
             .where(eq(cards.id, card.id))
             .returning();
           return retried;
@@ -946,6 +952,7 @@ export const schema = new GraphQLSchema({
             agentId: lane.agentId,
             wipLimit: lane.wipLimit,
             readVerdict: lane.readVerdict,
+            maxAttempts: lane.maxAttempts,
             onSuccess: index.get(lane.onSuccessLaneId ?? "") ?? null,
             onFailure: index.get(lane.onFailureLaneId ?? "") ?? null,
           }));

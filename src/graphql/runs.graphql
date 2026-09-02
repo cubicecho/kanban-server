@@ -58,3 +58,25 @@ subscription RunEvents($runId: String!) {
     ok
   }
 }
+
+# One card's own history, for the dialog that opens on it. The Runs page has the whole board's;
+# this is the account of why this card is where it is — the attempt that failed, and what the
+# reviewer said about the one before.
+query CardRuns($cardId: String!) {
+  runs(
+    limit: 20
+    where: { cardId: { eq: $cardId } }
+    orderBy: { startedAt: { direction: desc, priority: 1 } }
+  ) {
+    id
+    status
+    startedAt
+    finishedAt
+    output
+    error
+    totalTokens
+    agent {
+      name
+    }
+  }
+}

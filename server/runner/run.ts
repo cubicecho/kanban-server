@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, notInArray } from "drizzle-orm";
 import { errorMessage } from "../../shared/errors.ts";
 import { db } from "../db/client.ts";
 import {
@@ -56,6 +56,72 @@ export function stopSubject(subjectId: string): boolean {
   if (!entry) return false;
   entry.controller.abort();
   return true;
+}
+
+/** What a run that was still going when the process went away is recorded as, and left on. */
+const INTERRUPTED = "interrupted by a restart";
+
+/** How much of that there was, for the line the server prints when it finds any. */
+export interface Interrupted {
+  runs: number;
+  cards: number;
+  tasks: number;
+}
+
+/**
+ * Puts back what a restart interrupted.
+ *
+ * `inFlight` is memory, and a run lives only as long as the process that started it. One that
+ * dies mid-run leaves rows saying otherwise, and none of them ever rights itself: the run stays
+ * `running`, which `prune` will not delete, `spend` keeps counting and the board keeps drawing
+ * as live; the card stays `running`, which counts against its lane's WIP limit, so a lane of
+ * one is a station that never starts anything again. A board that quietly stops is worse than
+ * a board that fails, and nothing short of somebody noticing gets it going again.
+ *
+ * So this is called once at boot, before the worker looks at any board: at that moment every
+ * `running` row is stale by definition. The runs are marked `error` rather than `stopped` —
+ * `stopped` is a run somebody called off, and nobody called these off — and their cards go back
+ * to `idle` with the reason on their face, which is where an auto-run board picks them up again
+ * and a manual one shows a person what happened. A task caught mid-decomposition is left
+ * `error` for the opposite reason: nothing decomposes a task unasked, so being told to ask
+ * again is the whole of the recovery.
+ *
+ * Whatever this process is genuinely running is left alone, so calling it later is safe rather
+ * than merely discouraged. It costs an attempt nothing — a restart is not the card's failure.
+ */
+export async function reconcile(): Promise<Interrupted> {
+  const live = [...runningRunIds()];
+  const subjects = [...runningSubjectIds()];
+
+  const abandoned = await db
+    .update(runs)
+    .set({ status: "error", error: INTERRUPTED, finishedAt: new Date() })
+    .where(and(eq(runs.status, "running"), live.length ? notInArray(runs.id, live) : undefined))
+    .returning({ id: runs.id });
+
+  const stranded = await db
+    .update(cards)
+    .set({ status: "idle", error: INTERRUPTED })
+    .where(
+      and(
+        eq(cards.status, "running"),
+        subjects.length ? notInArray(cards.id, subjects) : undefined,
+      ),
+    )
+    .returning({ id: cards.id });
+
+  const halfDone = await db
+    .update(tasks)
+    .set({ status: "error", error: INTERRUPTED })
+    .where(
+      and(
+        eq(tasks.status, "decomposing"),
+        subjects.length ? notInArray(tasks.id, subjects) : undefined,
+      ),
+    )
+    .returning({ id: tasks.id });
+
+  return { runs: abandoned.length, cards: stranded.length, tasks: halfDone.length };
 }
 
 interface ExecuteOptions {
@@ -419,11 +485,24 @@ export async function runCard(cardId: string, agentId?: string | null): Promise<
   // The verdict is the lane's business, not the agent's: a station that judges cards says so,
   // and the same agent works cards elsewhere without its answer being read as a ruling.
   const passed = ok && (!lane.readVerdict || !/^\s*FAIL\b/i.test(output));
+  // A run somebody called off is not a verdict on the card: it costs it no attempt and leaves
+  // it where it was, to be started again whenever.
+  const stopped = run.status === "stopped";
+  const attempts = card.attempts + (passed || stopped ? 0 : 1);
 
   const target = passed ? lane.onSuccessLaneId : lane.onFailureLaneId;
   const [next] = target
     ? await db.select().from(lanes).where(eq(lanes.id, target)).limit(1)
     : [undefined];
+
+  // A failed card goes back in play while this station still has attempts to spend on it — the
+  // board correcting itself, which is what a Doing↔Review loop is for — and only where an agent
+  // will actually pick it up: a card put back `idle` in a lane where nothing runs is not being
+  // retried, it is being lost. Spent, or nowhere to go, it stops at `error` and waits for a
+  // person. With `maxAttempts` left at zero that is every failure, which is how a board behaved
+  // before there was a budget to spend.
+  const landing = next ?? lane;
+  const rework = !passed && !stopped && attempts <= lane.maxAttempts && !!landing.agentId;
 
   // A card that passes into a lane with an agent of its own is not finished — it is waiting for
   // that lane's turn, and only an `idle` card is picked up. `done` is for a card nothing further
@@ -431,10 +510,13 @@ export async function runCard(cardId: string, agentId?: string | null): Promise<
   await db
     .update(cards)
     .set({
-      status:
-        run.status === "stopped" ? "idle" : !passed ? "error" : next?.agentId ? "idle" : "done",
-      result: output || card.result,
+      status: stopped || rework ? "idle" : !passed ? "error" : next?.agentId ? "idle" : "done",
+      // A station that judges does not overwrite the account of the work with its ruling on it:
+      // that report is the one thing the agent asked to fix the card needs to read, and the
+      // verdict is already going into `error` where the same prompt picks it up.
+      result: lane.readVerdict ? card.result : output || card.result,
       error: passed ? "" : run.error || (lane.readVerdict ? output : "the agent did not finish"),
+      attempts,
       ...(target ? { laneId: target, position: await nextPosition(target) } : {}),
     })
     .where(eq(cards.id, cardId));

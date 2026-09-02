@@ -145,6 +145,9 @@ export const cardPrompt = (project: Project, card: Card): string =>
     // An agent judging a card is reading the same card another just worked, so it needs what
     // came out of that as well as what went in.
     card.result ? `\n\nWhat the last agent reported:\n${card.result}` : "",
+    // And an agent picking up a card that came back needs the reason it came back — a reviewer's
+    // FAIL, or the error a run died of. Without it a second attempt is the first one again.
+    card.error ? `\n\nWhy this came back:\n${card.error}` : "",
   ]
     .join("")
     .trim();

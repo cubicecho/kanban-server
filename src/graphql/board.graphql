@@ -12,6 +12,7 @@ query Board($projectId: String!) {
     onFailureLaneId
     wipLimit
     readVerdict
+    maxAttempts
   }
   # Archived cards are off the board by definition — see archive.graphql for the other half.
   cards(
@@ -29,6 +30,7 @@ query Board($projectId: String!) {
     status
     result
     error
+    attempts
     updatedAt
     deps {
       dependsOnCardId

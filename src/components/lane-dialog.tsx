@@ -56,6 +56,7 @@ export function LaneDialog({
   const [onSuccessLaneId, setOnSuccess] = useState(lane?.onSuccessLaneId ?? "");
   const [onFailureLaneId, setOnFailure] = useState(lane?.onFailureLaneId ?? "");
   const [wipLimit, setWipLimit] = useState(lane?.wipLimit ?? 1);
+  const [maxAttempts, setMaxAttempts] = useState(lane?.maxAttempts ?? 0);
   const [intake, setIntake] = useState(lane?.intake ?? false);
   const [readVerdict, setReadVerdict] = useState(lane?.readVerdict ?? false);
 
@@ -70,6 +71,7 @@ export function LaneDialog({
         onSuccessLaneId: onSuccessLaneId || null,
         onFailureLaneId: onFailureLaneId || null,
         wipLimit,
+        maxAttempts,
         intake,
         readVerdict,
       };
@@ -168,15 +170,30 @@ export function LaneDialog({
                 How many cards the worker runs here at once.
               </p>
             </div>
-            <div className="flex items-center justify-between gap-4 rounded-md border p-3">
-              <div>
-                <Label htmlFor="lane-intake">Intake</Label>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Freshly decomposed cards land here.
-                </p>
-              </div>
-              <Switch id="lane-intake" checked={intake} onCheckedChange={setIntake} />
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="lane-attempts">Attempts before a person</Label>
+              <Input
+                id="lane-attempts"
+                type="number"
+                min={0}
+                value={maxAttempts}
+                onChange={(event) => setMaxAttempts(Math.max(0, Number(event.target.value)))}
+              />
+              <p className="text-xs text-muted-foreground">
+                How many times this lane puts a card it failed back in play — the budget a board
+                corrects itself out of. Zero stops at the first failure and waits.
+              </p>
             </div>
+          </div>
+
+          <div className="flex items-center justify-between gap-4 rounded-md border p-3">
+            <div>
+              <Label htmlFor="lane-intake">Intake</Label>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Freshly decomposed cards land here.
+              </p>
+            </div>
+            <Switch id="lane-intake" checked={intake} onCheckedChange={setIntake} />
           </div>
 
           <div className="flex items-center justify-between gap-4 rounded-md border p-3">

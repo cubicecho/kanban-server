@@ -37,8 +37,9 @@ key from the environment instead of the UI.
 - **lane** — a column, and where it names an `agentId`, a station. `onSuccessLaneId` and
   `onFailureLaneId` are where a card goes when that agent is finished with it, and `wipLimit`
   caps how many run there at once. `readVerdict` says this station judges cards rather than
-  working them — its agent's answer is read as `PASS` or `FAIL`, and that word picks the arm. A
-  lane with no agent is a resting place, which is what a backlog and a done pile are.
+  working them — its agent's answer is read as `PASS` or `FAIL`, and that word picks the arm.
+  `maxAttempts` is how many failures it will put back in play before it stops and waits for a
+  person. A lane with no agent is a resting place, which is what a backlog and a done pile are.
 - **role** — a job of work: a name, a `stage`, and the prompt that goes with it. `stage` is
   `refine`, `decompose` or `card`; the first two are fixed stations whose answers this server
   parses, and `card` is every role a lane can point at — an executor, a reviewer, a tester, a
@@ -53,7 +54,10 @@ key from the environment instead of the UI.
 - **message** — one turn of the conversation refining a task. The thread is the task's history.
 - **card** — one piece of work, on the board. `acceptance` is kept apart from `body` because it
   is what a review agent is asked to check against, and a criterion buried in a paragraph is a
-  criterion that gets skipped. `dependsOn` links say which cards must finish first.
+  criterion that gets skipped. `dependsOn` links say which cards must finish first. `result` is
+  the last account of the work and `error` the reason it last came back; `attempts` counts the
+  failures since a person last put it in play, which is what a lane's `maxAttempts` is spent
+  against.
 - **run** — one execution of one agent: `kind` is `refine`, `decompose` or `card`, and the row
   keeps the status, timings, output or error, the tools called and the tokens spent. A run in
   flight can be called off (`stopCard`, `stopTask`), which aborts the request and finishes the
@@ -114,15 +118,37 @@ Two rules are worth knowing because they are what keeps a board from running awa
 it is waiting for that lane's turn. `done` means nothing further will happen to it — it stayed
 put, or it landed where no agent runs.
 
-**A card a reviewer rejected stays `error`.** Review sends it back to Doing, but `error` is a
-status the worker will not pick up, so a rejected card waits for a person rather than looping
-between two agents at whatever a token costs. `retryCard` — the **Retry** button on the card —
-clears the error and returns it to `idle` where it stands, and that is how a failed card is put
-back in play. Moving it does the same thing, since a moved card comes back to `idle` too.
+**A card a reviewer rejected stays `error`, unless the reviewer was given a budget.** `error` is
+a status the worker will not pick up, so by default a rejected card waits for a person rather
+than looping between two agents at whatever a token costs. `retryCard` — the **Retry** button on
+the card — clears the error and returns it to `idle` where it stands, and that is how a failed
+card is put back in play. Moving it does the same thing, since a moved card comes back to `idle`
+too.
+
+**A station can be given attempts to spend, and then the board corrects itself.** `maxAttempts`
+on a lane — **Attempts before a person**, in the lane dialog — is how many times that station
+will send a card it failed back round instead of stopping. Zero, the default, is the behaviour
+above. Set Review to 1 and a rejected card returns to Doing as `idle`, gets worked again with the
+reviewer's reason in its prompt, and comes back for a second ruling; reject it twice and it stops
+as `error`, waiting for a person as before. The budget belongs to the lane that *failed* the
+card, not the one it goes back to, because how many times a thing is worth rejecting is the
+judging station's call. A lane with no failure arm retries in place, which is how a flaky
+executor gets a second go at its own card.
+
+The count is on the card (`attempts`) and it does not reset when a card passes — a Doing↔Review
+loop that refilled its budget every time round would never stop. Only a person resets it: Retry,
+or moving the card. A run somebody stopped costs nothing, and neither does a restart; those are
+nobody's verdict on the work. The card shows how many failed attempts it has had, so an `idle`
+card that is idle for the second time says so.
 
 The review verdict is a property of the output, not of the run: a reviewer that answers `FAIL`
 has still run fine, so the run is `ok` and it is the card that failed. An answer that is neither
 counts as a pass. A mumbling reviewer must not be able to wedge a board.
+
+A verdict is also not an account of the work, so a judging station does not overwrite one: the
+executor's report stays in `result` and the rejection goes to `error`, where the next agent round
+the loop is handed it as "Why this came back". A second attempt without the reason for the first
+is the first attempt again.
 
 Reading an answer as a verdict is the **lane's** setting (`readVerdict`), not the agent's. A new
 board has it on Review and nowhere else, and the lane dialog is where it moves — which is what
@@ -186,8 +212,9 @@ disagree, and nothing ever asks `landing` about it.
 
 The four lanes are a starting point, not the shape most projects end up with, and redrawing the
 same five-lane board by hand for every new project is the kind of work a tool should not ask for.
-`saveBoardTemplate` keeps a project's lanes — their names, their agents, their WIP limits, which
-of them judge cards rather than work them, and the arrows between them — under a name, and
+`saveBoardTemplate` keeps a project's lanes — their names, their agents, their WIP limits, their
+rework budgets, which of them judge cards rather than work them, and the arrows between them —
+under a name, and
 `applyBoardTemplate` draws them onto another project.
 **Save as template** on the board and the **Board** picker in the new-project dialog are the two
 ends of it.
@@ -221,6 +248,15 @@ few seconds of latency on work measured in model round-trips is not worth the bo
 the interval to `0` to stop it entirely.
 
 Runs are started but not awaited, so one slow agent does not hold up every other board.
+
+Nothing survives the process that started it: an agent runs in memory, so a server killed
+mid-run leaves rows saying `running` with nothing left alive to finish them — a run retention
+will not prune and spend keeps counting, and a card holding a place under its lane's WIP limit
+for good. The server puts those back on boot. Runs it cannot possibly still be doing are closed
+as `error`, their cards return to `idle` to be picked up again, and a task caught
+mid-decomposition is left `error` for someone to ask for again, because nothing decomposes a task
+unasked. It costs a card no attempt: a restart is not a verdict on the work. The line the server
+prints on the way up says how much it found.
 
 ## Agents and their tools
 
@@ -291,6 +327,11 @@ card and a task each know they are being worked but not by which run, so the pag
 
 It is debugging output, not the record: nothing is persisted, nothing survives a restart, and a
 finished run is forgotten a minute later. The row remains the lasting account of what happened.
+
+The rows are also where a card's own history is. Opening a card shows every run against it,
+newest first — the agent, when, how long, how many tokens — and any of them expands to what it
+said or the error it died of. The Runs page asks the same question of a whole project; this asks
+it of the one card, which is the question somebody has the card open to ask.
 
 ## What it has cost
 

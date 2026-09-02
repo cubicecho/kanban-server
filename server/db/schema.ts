@@ -245,6 +245,17 @@ export const lanes = pgTable(
      * a board.
      */
     readVerdict: boolean().notNull().default(false),
+    /**
+     * How many times this station will put a card it failed back in play, before it stops and
+     * waits for a person.
+     *
+     * Zero — the default — is never, which is the behaviour a board has always had: a failed
+     * card is left `error` where it lands, so a Doing↔Review loop cannot spin on its own. Any
+     * number above that is a budget for the board to correct itself with. It belongs to the
+     * lane that *failed* the card rather than the one it goes back to, because how many times
+     * a thing is worth rejecting is a judgement the judging station makes.
+     */
+    maxAttempts: integer().notNull().default(0),
     createdAt: createdAt(),
   },
   (table) => [index("lanes_project_idx").on(table.projectId)],
@@ -330,9 +341,24 @@ export const cards = pgTable(
     status: text({ enum: ["idle", "running", "blocked", "done", "error"] })
       .notNull()
       .default("idle"),
-    /** What the last agent to work this card had to say about it. */
+    /**
+     * What the last agent to *work* this card had to say about it.
+     *
+     * A station that judges rather than works leaves this alone: a reviewer's verdict is about
+     * the card's output, not another account of it, and overwriting the report with "PASS"
+     * would lose the one thing the next agent round the loop needs to read.
+     */
     result: text().notNull().default(""),
     error: text().notNull().default(""),
+    /**
+     * Failed runs since a person last put this card back in play.
+     *
+     * It is what a lane's `maxAttempts` is counted against, so it counts failures rather than
+     * runs: a card that keeps passing is not using anything up. Nothing the board does on its
+     * own resets it — that is the point of a budget — so `retryCard` and `moveCard` do, both
+     * being somebody deciding to start this card over.
+     */
+    attempts: integer().notNull().default(0),
     /**
      * When this card was put out of the way, or null while it is on the board.
      *
@@ -439,6 +465,8 @@ export interface TemplateLane {
   wipLimit: number;
   /** Whether this station reads its agent's answer as a PASS/FAIL verdict on the card. */
   readVerdict: boolean;
+  /** How many times this station puts a card it failed back in play. Zero never does. */
+  maxAttempts: number;
   /** Index into the same list, or null for "leave the card where it is". */
   onSuccess: number | null;
   onFailure: number | null;

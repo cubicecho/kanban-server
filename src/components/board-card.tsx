@@ -154,6 +154,15 @@ export function SortableCard({
         <p className="text-xs text-muted-foreground">After {waitingOn.join(", ")}</p>
       ) : null}
 
+      {/* A card that has been round the loop looks like any other one, and the difference
+          matters: it is why an idle card is idle for the second time. Not counted against the
+          lane's budget here — the attempts were spent by whichever station failed it. */}
+      {card.attempts ? (
+        <p className="text-xs text-muted-foreground">
+          {card.attempts} failed {card.attempts === 1 ? "attempt" : "attempts"}
+        </p>
+      ) : null}
+
       <div className="flex items-center gap-1">
         <Button
           variant="ghost"

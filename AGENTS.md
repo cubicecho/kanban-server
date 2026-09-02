@@ -101,7 +101,8 @@ rather than throwing, so the task survives to be retried.
 **A lane is a station, and the board is the pipeline.** `agentId` says what runs on the cards
 in a lane; `onSuccessLaneId` and `onFailureLaneId` say where they go afterwards; `wipLimit`
 caps how many run at once; `readVerdict` says this station judges cards rather than working
-them. That is the whole of the automation — there is no workflow engine, and the shape of the
+them; `maxAttempts` is how many failures it will put back in play before stopping. That is the
+whole of the automation — there is no workflow engine, and the shape of the
 pipeline is the shape of the board someone drew. A lane with no agent is a resting place, which
 is what a backlog and a done pile are.
 
@@ -136,16 +137,43 @@ template's own list — a lane id belongs to one project and means nothing in an
 one writes the lanes first and the arrows second, in a single transaction, which is the same
 two steps `seedLanes` takes and for the same reason. An `agentId` that no longer exists
 resolves to none rather than failing: a template is a shape, and the agents are whoever happens
-to be on this server. `readVerdict` is read back with `?? false`, because a template saved before
-stations could judge cards has no such key and a lane that does not say it reads a verdict does
-not read one. Applying is refused on a board with cards, because deleting a lane takes its cards
+to be on this server. `readVerdict` is read back with `?? false` and `maxAttempts` with `?? 0`,
+because a template saved before stations could judge cards or spend attempts has no such key, and
+a lane that does not say it reads a verdict does not read one. Applying is refused on a board with cards, because deleting a lane takes its cards
 with it.
 
 **`done` means nothing further will happen.** A card that passes into a lane that has an agent
 of its own is not finished — it is waiting for that lane's turn — so it goes back to `idle`,
 because `readyCards` only picks up `idle`. `done` is for a card that stayed put, or landed
-where no agent runs. A card a reviewer rejected stays `error`, so the Doing↔Review loop cannot
-spin on its own; `retryCard` is the way back, and clears the error where the card stands.
+where no agent runs. A card a reviewer rejected stays `error` unless the rejecting station has a
+budget left to spend on it, so the Doing↔Review loop cannot spin on its own; `retryCard` is the
+way back by hand, and clears the error where the card stands.
+
+**The rework loop is a budget, and the budget is the lane's.** `lanes.maxAttempts` is how many
+times a station will put a card it failed back in play; `cards.attempts` counts the failures
+against it. Zero — the default, and what every board did before this — stops at the first
+failure and waits for a person. The budget belongs to the lane that *failed* the card rather
+than the one it goes back to, because how many times a thing is worth rejecting is the judging
+station's call. `attempts` is not reset by a pass: a Doing↔Review loop that refilled its budget
+every time round would never terminate. Only a person resets it — `retryCard` and `moveCard`,
+both being somebody deciding to start the card over. A stopped run and a restart cost nothing,
+being nobody's verdict on the work. Rework needs the landing lane to have an agent, or an `idle`
+card in a resting place would just be lost; the passing arm still asks after the *success* lane's
+agent, since a card that passes with nowhere to go must not re-run where it stands.
+
+**A verdict is not an account of the work.** A station with `readVerdict` leaves `cards.result`
+alone — overwriting the executor's report with the word `PASS` would lose the one thing the next
+agent round the loop has to read. The rejection lands in `cards.error` instead, and `cardPrompt`
+appends it as "Why this came back", because a second attempt without the reason for the first is
+the first attempt again.
+
+**A restart puts back what it interrupted.** `inFlight` is memory, so a process that dies leaves
+`running` rows that nothing will ever finish: a run `runRetentionDays` will not prune and `spend`
+keeps counting, and a card that holds a place against its lane's WIP limit for good. `reconcile()`
+in `server/runner/run.ts` runs once from `server/index.ts` after `ensureSchema`, and closes
+whatever this process does not genuinely have in flight — runs to `error`, cards back to `idle`,
+tasks caught mid-decomposition to `error`, because nothing decomposes a task unasked. `error`
+rather than `stopped`: nobody called these off. It costs a card no attempt.
 
 **Archiving is off the board, not gone, and it is not a status.** `cards.archivedAt` is a
 timestamp rather than a flag because an archive is a list and a list wants an order; it is kept

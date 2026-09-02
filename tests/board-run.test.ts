@@ -295,6 +295,119 @@ test("a card waiting on an unfinished one does not run", async () => {
   expect((await runner.readyCards(doing.id)).map((card) => card.title)).toEqual(["second"]);
 });
 
+test("a station with attempts to spend puts a rejected card back in play, then stops", async () => {
+  const { projectId, doing, review } = await seedProject("rework");
+  // One attempt: Review will send a card back once, and the second FAIL is where the board
+  // stops guessing and waits for a person.
+  await db.update(tables.lanes).set({ maxAttempts: 1 }).where(eq(tables.lanes.id, review.id));
+
+  const [card] = await db
+    .insert(tables.cards)
+    .values({ projectId, laneId: review.id, title: "check it" })
+    .returning();
+
+  replies = ["FAIL: the tests do not run"];
+  await runner.runCard(card.id);
+  const first = await cardById(card.id);
+  // Back in Doing and idle rather than error: the lane still had an attempt to spend, so the
+  // worker picks this up and has another go without anybody being asked.
+  expect(first.laneId).toBe(doing.id);
+  expect(first.status).toBe("idle");
+  expect(first.attempts).toBe(1);
+  expect(first.error).toMatch(/tests do not run/);
+
+  // Round it goes: worked again, and offered up for review again. A pass does not hand the
+  // attempt back — a budget that refilled every time it was used would never run out.
+  replies = ["fixed the tests"];
+  await runner.runCard(first.id);
+  const second = await cardById(card.id);
+  expect(second.laneId).toBe(review.id);
+  expect(second.status).toBe("idle");
+  expect(second.attempts).toBe(1);
+
+  replies = ["FAIL: still no"];
+  await runner.runCard(second.id);
+  const third = await cardById(card.id);
+  expect(third.laneId).toBe(doing.id);
+  expect(third.status).toBe("error");
+  expect(third.attempts).toBe(2);
+});
+
+test("a lane retries its own failures in place, up to its budget", async () => {
+  const { projectId, doing } = await seedProject("flaky");
+  // No failure arm, so a card that fails here stays here — which is a retry when the lane has
+  // an attempt for it, and where the card stops when it does not.
+  await db
+    .update(tables.lanes)
+    .set({ maxAttempts: 1, onFailureLaneId: null })
+    .where(eq(tables.lanes.id, doing.id));
+
+  const [card] = await db
+    .insert(tables.cards)
+    .values({ projectId, laneId: doing.id, title: "flaky work" })
+    .returning();
+
+  // The endpoint is gone, so the run fails before the model says anything.
+  const [executor] = await db
+    .select()
+    .from(tables.agents)
+    .where(eq(tables.agents.name, "executor"))
+    .limit(1);
+  await db
+    .update(tables.agents)
+    .set({ baseUrl: "http://127.0.0.1:1/v1", maxRetries: 0 })
+    .where(eq(tables.agents.id, executor.id));
+
+  const run = await runner.runCard(card.id);
+  expect(run.status).toBe("error");
+  const once = await cardById(card.id);
+  expect(once.laneId).toBe(doing.id);
+  expect(once.status).toBe("idle");
+  expect(once.attempts).toBe(1);
+
+  await runner.runCard(card.id);
+  const twice = await cardById(card.id);
+  expect(twice.status).toBe("error");
+  expect(twice.attempts).toBe(2);
+
+  await db
+    .update(tables.agents)
+    .set({ baseUrl, maxRetries: -1 })
+    .where(eq(tables.agents.id, executor.id));
+});
+
+test("a verdict is not an account of the work, and does not overwrite one", async () => {
+  const { projectId, doing, review } = await seedProject("reports");
+  await db.update(tables.lanes).set({ maxAttempts: 1 }).where(eq(tables.lanes.id, review.id));
+  const sent: string[] = [];
+  bodies = (body) => sent.push(body.messages[body.messages.length - 1].content);
+
+  const [card] = await db
+    .insert(tables.cards)
+    .values({ projectId, laneId: doing.id, title: "write it" })
+    .returning();
+
+  replies = ["wrote it, in src/thing.ts"];
+  await runner.runCard(card.id);
+  replies = ["FAIL: nothing covers the empty case"];
+  await runner.runCard(card.id);
+
+  const back = await cardById(card.id);
+  expect(back.laneId).toBe(doing.id);
+  // The reviewer said what it thought of the work, not what the work was. Losing the executor's
+  // own report here would leave the next attempt starting from nothing.
+  expect(back.result).toBe("wrote it, in src/thing.ts");
+  expect(back.error).toMatch(/empty case/);
+
+  replies = ["covered it"];
+  await runner.runCard(back.id);
+  // And the agent having another go is told both halves: what was done, and why it came back.
+  expect(sent[2]).toContain("wrote it, in src/thing.ts");
+  expect(sent[2]).toContain("Why this came back");
+  expect(sent[2]).toContain("empty case");
+  bodies = undefined;
+});
+
 test("a lane with no agent runs nothing", async () => {
   const { projectId, backlog } = await seedProject("backlogged");
   const [card] = await db

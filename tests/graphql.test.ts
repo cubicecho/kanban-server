@@ -49,7 +49,7 @@ const board = async (projectId: string) => {
   const { lanes } = await run(
     `query Board($projectId: String!) {
        lanes(where: { projectId: { eq: $projectId } }, orderBy: { position: { direction: asc, priority: 1 } }) {
-         id name position intake wipLimit onSuccessLaneId onFailureLaneId agentId
+         id name position intake wipLimit maxAttempts onSuccessLaneId onFailureLaneId agentId
        }
      }`,
     { projectId },
@@ -60,6 +60,7 @@ const board = async (projectId: string) => {
     position: number;
     intake: boolean;
     wipLimit: number;
+    maxAttempts: number;
     onSuccessLaneId: string | null;
     onFailureLaneId: string | null;
     agentId: string | null;
@@ -145,13 +146,18 @@ test("retryCard puts a rejected card back in play where it stands", async () => 
   // the worker will not pick up.
   await run(
     `mutation Fail($id: String!) {
-       updateCardSingle(where: { id: { eq: $id } }, set: { status: error, error: "no test" }) { id }
+       updateCardSingle(
+         where: { id: { eq: $id } }
+         set: { status: error, error: "no test", attempts: 3 }
+       ) { id }
      }`,
     { id: createCard.id },
   );
 
   const { retryCard } = await run(
-    `mutation Retry($cardId: String!) { retryCard(cardId: $cardId) { id laneId status error } }`,
+    `mutation Retry($cardId: String!) {
+       retryCard(cardId: $cardId) { id laneId status error attempts }
+     }`,
     { cardId: createCard.id },
   );
   expect(retryCard).toMatchObject({
@@ -159,6 +165,9 @@ test("retryCard puts a rejected card back in play where it stands", async () => 
     laneId: doing.id,
     status: "idle",
     error: "",
+    // A person putting a card back in play is a fresh start, budget and all: otherwise a card
+    // that had used up its lane's attempts would come straight back to the same standstill.
+    attempts: 0,
   });
 
   expect(await fails(`mutation { retryCard(cardId: "nope") { id } }`)).toMatch(/no card with id/);
@@ -356,13 +365,20 @@ test("a board saved under a name is drawn onto the next project the same shape",
   const source = await newProject("the one worth keeping");
   const drawn = await board(source.id);
 
-  // A shape worth saving is one somebody changed: a fifth lane, a cap, and an arrow home.
-  const [, doing, , done] = drawn;
+  // A shape worth saving is one somebody changed: a fifth lane, a cap, a rework budget, and an
+  // arrow home.
+  const [, doing, review, done] = drawn;
   await run(
     `mutation Widen($id: String!) {
        updateLaneSingle(where: { id: { eq: $id } }, set: { wipLimit: 3 }) { id }
      }`,
     { id: doing.id },
+  );
+  await run(
+    `mutation Budget($id: String!) {
+       updateLaneSingle(where: { id: { eq: $id } }, set: { maxAttempts: 2 }) { id }
+     }`,
+    { id: review.id },
   );
   const [parked] = await db
     .insert(tables.lanes)
@@ -413,6 +429,9 @@ test("a board saved under a name is drawn onto the next project the same shape",
   expect(newDone.onSuccessLaneId).toBeNull();
   expect(newBacklog.intake).toBe(true);
   expect(newDoing.wipLimit).toBe(3);
+  expect(newReview.maxAttempts).toBe(2);
+  // A lane nobody gave a budget to has none, not the one next door.
+  expect(newDoing.maxAttempts).toBe(0);
   // Nothing of the board it came from: different project, different lanes.
   expect(redrawn.map((lane) => lane.id)).not.toContain(parked.id);
 
