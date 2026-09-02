@@ -201,6 +201,17 @@ by the board, which names them under the card, and by the `blockers` query. A st
 written once and never revisited, so a card sat saying it was waiting long after the thing it
 waited on had finished.
 
+The card dialog is where an ordering is corrected, and it asks for the card's dependencies itself
+rather than reading them off the board. The board does not carry archived cards, so it does not
+carry a dependency on one either — a dialog that trusted it would show a shorter list than the
+truth and then save that shorter list, which is how an archived dependency used to disappear. Here
+they are drawn, marked `archived`, and kept. The list is searchable by title and lane, grouped by
+lane in board order with each card's status beside it, and a card that already waits on this one —
+directly or through a chain of others — is drawn but not selectable, with the reason on it, rather
+than offered and then refused by the server after the save. Underneath the picker is the other
+direction: what is waiting on this card, read-only, because changing that belongs in those cards'
+own dialogs.
+
 ## Moving a card
 
 Cards drag, by the grip on their left, and they also move with the arrows on the card. Both land

@@ -166,6 +166,26 @@ lane would shuffle every other card twice, once each way — and it is safe agai
 arithmetic only because a running card is not a drop target, so nothing is ever dropped onto the
 card whose drawn place and `position` disagree.
 
+**A dependency you cannot see is a dependency you will lose.** The `Board` query filters archived
+cards out, so a card's `deps` as the board carries them are only the visible half — and a dialog
+seeded from that half writes the short list back on the next save, quietly forgetting whichever
+dependency got archived. `CardDeps` in `src/graphql/board.graphql` asks for one card's real edges,
+archived ones included, and `card-dialog.tsx` holds the picker empty until that answer lands rather
+than seeding from the board and correcting itself: the window between the two is a save that drops
+work. It is its own query rather than a field on `Board` because `Board` polls every three seconds
+over as many as five hundred cards, and this is one card's answer, wanted once, when a dialog
+opens. The reverse direction — what waits on *this* card — comes back with it and is drawn
+read-only: editing another card's list from inside this one is a change with no visible cause.
+
+`cyclingCards` in `src/lib/cards.ts` is the same bargain `board-order.ts` strikes, in the other
+direction: it walks the board's edges to find the cards that already lead back to this one, and the
+picker draws those rows disabled with the reason on them. `setCardDeps` stays the authority — it
+reads every card in the project, archived ones included, and names the loop — so the two can only
+differ on a chain running through an archived card the board's graph does not carry, which is a row
+offered and then refused rather than one refused and then allowed. `tests/card-deps.test.ts` asks
+both of them about the same board card for card. The dialog writes `setCardDeps` **before**
+`updateCard` for the same reason: a refusal after the card is written leaves half the dialog saved.
+
 **A board template stores indexes, not ids.** `saveBoardTemplate` snapshots a project's lanes
 into `board_templates.lanes`, turning `onSuccessLaneId`/`onFailureLaneId` into positions in the
 template's own list — a lane id belongs to one project and means nothing in another. Applying

@@ -404,6 +404,7 @@ export function BoardRoute() {
         <CardDialog
           card={editingCard.card}
           cards={cards}
+          lanes={lanes}
           projectId={projectId}
           laneId={editingCard.laneId}
           onClose={() => setEditingCard(null)}

@@ -107,3 +107,28 @@ mutation DeleteLane($id: String!) {
     id
   }
 }
+
+# One card's actual dependencies, archived ones included — which the board query cannot show,
+# because it filters archived cards out and a dep it cannot see is a dep the dialog drops.
+query CardDeps($cardId: String!) {
+  cardDeps(where: { cardId: { eq: $cardId } }) {
+    dependsOnCardId
+    dependsOn {
+      id
+      title
+      status
+      laneId
+      archivedAt
+    }
+  }
+  blockedBy: cardDeps(where: { dependsOnCardId: { eq: $cardId } }) {
+    cardId
+    card {
+      id
+      title
+      status
+      laneId
+      archivedAt
+    }
+  }
+}

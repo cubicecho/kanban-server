@@ -36,3 +36,48 @@ export const CARD_STATUS_CLASS: Partial<Record<CardsStatusEnum, string>> = {
 /** A card waiting on a person: one that was turned down, or one that broke. */
 export const needsAttention = (status: CardsStatusEnum) =>
   status === CardsStatusEnum.Error || status === CardsStatusEnum.Rejected;
+
+/** The board's dependency edges: each row is one card waiting on one other. */
+export type DepGraph = { cardId: string; dependsOnCardId: string }[];
+
+/**
+ * Which cards cannot be waited on without closing a loop — the same walk the server refuses
+ * with, run against the graph the board already fetched.
+ *
+ * This is the bargain `src/lib/board-order.ts` strikes, for the same reason: a cycle drawn as a
+ * disabled row is a mistake somebody cannot make, where a cycle refused after the save is a
+ * toast about a write that already went out. `setCardDeps` stays the authority — it reads every
+ * card in the project, archived ones included, and names the loop — so the one way the two can
+ * differ is a chain that runs through an archived card this graph does not carry: a row offered
+ * that the server then declines, which is the harmless direction.
+ *
+ * Edges point from a card to what it waits on, so a path from a candidate back to `cardId` is
+ * exactly the loop that waiting on it would close. `cardId`'s own edges are left out, because
+ * the picker is about to replace them — and no path *to* `cardId` can use them anyway.
+ */
+export function cyclingCards(cardId: string, graph: DepGraph): Set<string> {
+  const edges = new Map<string, string[]>();
+  for (const link of graph) {
+    if (link.cardId === cardId) continue;
+    edges.set(link.cardId, [...(edges.get(link.cardId) ?? []), link.dependsOnCardId]);
+  }
+
+  // Memoised because a board is a graph and not a tree: without it a diamond is walked twice
+  // over, and a board is allowed 500 cards.
+  const reaches = new Map<string, boolean>();
+  const walk = (from: string): boolean => {
+    if (from === cardId) return true;
+    const known = reaches.get(from);
+    if (known !== undefined) return known;
+    // Written before recursing: a loop that does not pass through `cardId` is somebody else's
+    // problem, and revisiting it here would not terminate.
+    reaches.set(from, false);
+    const found = (edges.get(from) ?? []).some(walk);
+    reaches.set(from, found);
+    return found;
+  };
+
+  // Only a card with an outgoing edge can reach anything, so the keys are the whole candidate
+  // set: everything else is safe to wait on by construction.
+  return new Set([...edges.keys()].filter(walk));
+}
