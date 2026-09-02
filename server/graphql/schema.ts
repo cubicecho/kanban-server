@@ -15,10 +15,12 @@ import {
 import { GraphQLJSON } from "graphql-scalars";
 import { errorMessage } from "../../shared/errors.ts";
 import { db } from "../db/client.ts";
+import { recordMove } from "../db/history.ts";
 import {
   agentServers,
   agents,
   boardTemplates,
+  type Card,
   cardDeps,
   cards,
   lanes,
@@ -34,6 +36,7 @@ import { listModels, loadSettings } from "../runner/llm.ts";
 import { type McpConnection, mcp, probe } from "../runner/mcp.ts";
 import { EXECUTOR_ROLE, REVIEWER_ROLE } from "../runner/prompts.ts";
 import {
+  blockers,
   decomposeTask,
   isRunning,
   refineTask,
@@ -61,9 +64,18 @@ const { entities } = buildSchema(db, {
     // an agent did something it did not. Settings is a singleton the migration creates. A
     // board template is a document whose arrows have to line up with its own lanes, so it is
     // written by `saveBoardTemplate` from a board that already works, never by hand.
-    insert: (table) => table !== "runs" && table !== "settings" && table !== "boardTemplates",
-    update: (table) => table !== "runs" && table !== "boardTemplates",
-    delete: (table) => table !== "settings",
+    //
+    // A card's ledger is the same argument carried further: it is readable, and nothing else.
+    // Its whole worth is that it is an account nobody edited — a row that could be written,
+    // corrected or quietly removed answers "why is this card here" no better than the column
+    // it replaced. It is written where the move is made, and it is never written anywhere else.
+    insert: (table) =>
+      table !== "runs" &&
+      table !== "settings" &&
+      table !== "boardTemplates" &&
+      table !== "cardEvents",
+    update: (table) => table !== "runs" && table !== "boardTemplates" && table !== "cardEvents",
+    delete: (table) => table !== "settings" && table !== "cardEvents",
   },
   exclude: {
     // Keys travel one way. They are excluded from the output types, so no client can read one
@@ -99,6 +111,27 @@ const { entities } = buildSchema(db, {
             args,
             runningSubjectIds(),
             "An agent is working this card. Stop it first, then delete it.",
+          );
+        }
+      },
+      // A card's ledger starts where the card does, so that the first line of its history is
+      // it arriving rather than the first thing an agent did to it.
+      //
+      // The lane is read back rather than taken off `rows`, which carry only the columns the
+      // caller asked for: a client selecting `{ id }` would otherwise write an event saying the
+      // card arrived nowhere. On `tx`, like the lane guard above, and for the same reason.
+      after: async ({ operation, rows, tx }) => {
+        if (operation !== "insert" && operation !== "upsert") return;
+        const ids = (rows as Card[]).map((row) => row.id).filter(Boolean);
+        if (!ids.length) return;
+        const written = await (tx as typeof db)
+          .select({ id: cards.id, laneId: cards.laneId })
+          .from(cards)
+          .where(inArray(cards.id, ids));
+        for (const row of written) {
+          await recordMove(
+            { cardId: row.id, toLaneId: row.laneId, actor: "user" },
+            tx as typeof db,
           );
         }
       },
@@ -515,6 +548,18 @@ export const schema = new GraphQLSchema({
         args: { agentId: { type: GraphQLString } },
         resolve: (_source, args: { agentId?: string | null }) => listModels(args.agentId),
       },
+      blockers: {
+        type: new GraphQLNonNull(new GraphQLList(new GraphQLNonNull(generatedType("Card")))),
+        description:
+          "The cards this one is waiting on that are not finished yet — the reason a card sits " +
+          "in a lane its agent never picks it up from. Empty means nothing is in its way. " +
+          "Worked out from the cards as they stand every time it is asked, rather than read " +
+          "off the card, because the answer changes when some other card finishes and nothing " +
+          "would go back to rewrite it. An archived dependency is not in the way: taking one " +
+          "off the board is a decision that it does not have to happen.",
+        args: { cardId: { type: new GraphQLNonNull(GraphQLString) } },
+        resolve: (_source, args: { cardId: string }) => blockers(args.cardId),
+      },
       mcpStatus: {
         type: new GraphQLNonNull(new GraphQLList(new GraphQLNonNull(McpServerStatusType))),
         description:
@@ -701,15 +746,18 @@ export const schema = new GraphQLSchema({
           "A card that had failed comes back to `idle` with its attempts forgiven, which is " +
           "what makes dragging one back a retry; a card an agent is working cannot be moved " +
           "out from under it, and nor can an archived one — `restoreCard` is what puts that " +
-          "back on the board.",
+          "back on the board. Say why in `note` and the agent that picks the card up is told " +
+          "it, the same way a reviewer's rejection reaches one: moving a card back without " +
+          "saying what was wrong with it buys a second attempt identical to the first.",
         args: {
           cardId: { type: new GraphQLNonNull(GraphQLString) },
           laneId: { type: new GraphQLNonNull(GraphQLString) },
           position: { type: GraphQLInt },
+          note: { type: GraphQLString },
         },
         resolve: async (
           _source,
-          args: { cardId: string; laneId: string; position?: number | null },
+          args: { cardId: string; laneId: string; position?: number | null; note?: string | null },
         ) => {
           if (isRunning(args.cardId)) {
             throw new GraphQLError("An agent is working this card. Stop it first, then move it.", {
@@ -758,6 +806,16 @@ export const schema = new GraphQLSchema({
                 })
                 .where(eq(cards.id, id));
             }
+            await recordMove(
+              {
+                cardId: card.id,
+                fromLaneId: card.laneId,
+                toLaneId: args.laneId,
+                note: args.note ?? "",
+                actor: "user",
+              },
+              tx,
+            );
           });
 
           const [moved] = await db.select().from(cards).where(eq(cards.id, card.id)).limit(1);
@@ -794,6 +852,16 @@ export const schema = new GraphQLSchema({
             .set({ status: "idle", error: "", attempts: 0 })
             .where(eq(cards.id, card.id))
             .returning();
+          // Recorded rather than tidied away: putting a card back in play is a thing a person
+          // did to it, and the ledger is the account of what has been done to it. The note is
+          // left empty on purpose, so the reason the card came back is still the last one
+          // given — a retry is trying again knowing that, not forgetting it.
+          await recordMove({
+            cardId: card.id,
+            fromLaneId: card.laneId,
+            toLaneId: card.laneId,
+            actor: "user",
+          });
           return retried;
         },
       },
@@ -822,6 +890,9 @@ export const schema = new GraphQLSchema({
             .set({ archivedAt: new Date() })
             .where(eq(cards.id, card.id))
             .returning();
+          // No `to`: the archive is not a lane. The card keeps its `laneId` all the same, which
+          // is where restoring puts it back.
+          await recordMove({ cardId: card.id, fromLaneId: card.laneId, actor: "user" });
           return archived;
         },
       },
@@ -848,6 +919,7 @@ export const schema = new GraphQLSchema({
             .set({ archivedAt: null, position: (last?.position ?? -1) + 1 })
             .where(eq(cards.id, card.id))
             .returning();
+          await recordMove({ cardId: card.id, toLaneId: card.laneId, actor: "user" });
           return restored;
         },
       },

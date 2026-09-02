@@ -74,6 +74,10 @@ test("a run the process died in is closed, and its card comes back to the queue"
   expect(back.error).toMatch(/restart/i);
   // And it costs the card nothing: a restart is not a failed attempt at the work.
   expect(back.attempts).toBe(2);
+  // Nor is it a ruling. The run judged nothing, and nothing is written to the card's ledger:
+  // the story of a card is what became of it, and "the server was restarted" is not that.
+  expect(after.verdict).toBe("none");
+  expect(await db.select().from(tables.cardEvents)).toEqual([]);
 });
 
 test("a task caught mid-decomposition is left to be asked for again", async () => {

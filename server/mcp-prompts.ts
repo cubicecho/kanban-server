@@ -67,14 +67,23 @@ Whatever you put in the brief is all the decomposer gets. Constraints, where the
 
 ## Reading a status
 
-\`idle\` is waiting for its lane's agent. \`running\` is being worked now. \`blocked\` is waiting on a
-dependency (\`set_card_deps\`), not a failure. \`error\` is a failure, or a review the card did not
-pass. \`done\` means nothing further will happen — a card that passes into a lane which has an
-agent of its own goes back to \`idle\` instead, because it is not finished, it is waiting for that
-lane's turn.
+\`idle\` is waiting for its lane's agent. \`running\` is being worked now. \`rejected\` is a review
+the card did not pass. \`error\` is something that broke — a crash, a timeout, a run a restart
+interrupted. \`done\` means nothing further will happen — a card that passes into a lane which has
+an agent of its own goes back to \`idle\` instead, because it is not finished, it is waiting for
+that lane's turn.
 
-A card a reviewer rejected keeps its \`error\` on purpose, so a Doing-to-Review loop cannot spin
-without a person noticing. \`retry_card\` is the way back.
+There is no status for waiting on a dependency: a card with unfinished dependencies is \`idle\`,
+and \`blockers\` says what it is waiting on, worked out when you ask rather than stored and left
+to go stale.
+
+\`rejected\` and \`error\` are kept apart because they want different things from you: one is a
+decision to make, the other is a fault to look at. A rejected card stays rejected so a
+Doing-to-Review loop cannot spin without a person noticing; \`retry_card\` is the way back.
+
+Why a card is where it is, in the words of whoever put it there, is in \`card_events\` — the
+reviewer's reasons, or what a person said when they moved it. Nothing on the card itself carries
+that: \`result\` is the last account of the *work*, and \`error\` is only ever a fault.
 
 ## When something has gone wrong
 
@@ -193,8 +202,9 @@ Finish by reporting the ids of what you created and which lanes they are sitting
     name: "triage_board",
     title: "Find out what is stuck on a board",
     description:
-      "Reads a board's lanes, cards and runs, explains why each failed or blocked card is where " +
-      "it is, and proposes one move per stuck card — retry, edit, move, archive or delete.",
+      "Reads a board's lanes, cards, moves and runs, explains why each rejected, failed or " +
+      "waiting card is where it is, and proposes one move per stuck card — retry, edit, move, " +
+      "archive or delete.",
     args: { project },
     render: (args: Record<string, string | undefined>) =>
       `Work out what is stuck on this board and what should be done about it.
@@ -204,13 +214,14 @@ Finish by reporting the ids of what you created and which lanes they are sitting
 1. Resolve it with \`projects\`, then read \`lanes\` (in \`position\` order) and \`cards\` for it.
 2. Say what the board looks like, grouped by \`status\`: what is running, what is waiting, what
    has failed, what is finished.
-3. For every card in \`error\`, read the run behind it — \`runs\` for the project, newest first —
-   and say *why* it failed rather than that it failed. A card a review agent rejected failed its
-   acceptance criteria and the run itself is \`ok\`; a run that ended in \`error\` failed for some
-   other reason, and the reason is on the run.
-4. For every \`blocked\` card, name what it is waiting on. \`blocked\` is a dependency, not a
-   failure, and a card blocked behind something already \`done\` is a stale dependency worth
-   clearing with \`set_card_deps\`.
+3. For every card in \`rejected\` or \`error\`, say *why* it is stuck rather than that it is. A
+   \`rejected\` card failed its acceptance criteria and the reviewer said what was wrong: read it
+   from \`card_events\` for that card, newest first. An \`error\` card broke, and the reason is on
+   the run — \`runs\` for the project, newest first.
+4. For every \`idle\` card, check \`blockers\` before proposing anything: a card waiting on an
+   unfinished dependency is not stuck, it is queued. One waiting on something already archived,
+   or on a card that will never be done, is a stale ordering worth clearing with
+   \`set_card_deps\`.
 5. Then propose exactly one move per stuck card:
    - \`retry_card\` — the failure was transient, or its cause was fixed elsewhere.
    - \`update_card_single\` and then \`retry_card\` — the card itself was wrong: too big, or vague

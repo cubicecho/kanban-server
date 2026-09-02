@@ -2,7 +2,7 @@ import fs from "node:fs";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, expect, test } from "vitest";
 import { replyWith } from "./fixtures/sse.ts";
 
@@ -12,6 +12,8 @@ process.env.KANBAN_SERVER_DATA_DIR = dir;
 
 /** What the fake model says next, one per request, in order. */
 let replies: string[] = [];
+/** Set by the test that calls a run off: the model never answers, so the run is still live. */
+let hold = false;
 /** Set by a test that cares what was actually sent rather than only what came back. */
 let bodies: ((body: { messages: { role: string; content: string }[] }) => void) | undefined;
 let server: http.Server;
@@ -37,6 +39,7 @@ beforeAll(async () => {
     request.on("end", () => {
       const sent = JSON.parse(body);
       bodies?.(sent);
+      if (hold) return;
       replyWith(response, completion(replies.shift() ?? "ok"), sent);
     });
   });
@@ -90,8 +93,20 @@ const cardById = async (id: string) => {
   return card;
 };
 
+/** The reason on the last move of a card — where a rejection lives now that `error` is faults. */
+const noteOn = async (id: string) => {
+  const events = await db
+    .select()
+    .from(tables.cardEvents)
+    .where(eq(tables.cardEvents.cardId, id))
+    .orderBy(desc(tables.cardEvents.createdAt))
+    .limit(1);
+  return events[0]?.note ?? "";
+};
+
 beforeEach(async () => {
   replies = [];
+  hold = false;
   await db.delete(tables.runs);
   await db.delete(tables.cardDeps);
   await db.delete(tables.cards);
@@ -188,10 +203,14 @@ test("a reviewer that says FAIL sends the card back, and one that rambles does n
   await runner.runCard(rejected.id);
   const back = await cardById(rejected.id);
   expect(back.laneId).toBe(doing.id);
-  // Left in error rather than idle on purpose: the failure arm of a review is a loop, and a
-  // card that goes round it on its own would be worked and rejected forever.
-  expect(back.status).toBe("error");
-  expect(back.error).toMatch(/tests do not run/);
+  // Left stopped rather than idle on purpose: the failure arm of a review is a loop, and a
+  // card that goes round it on its own would be worked and rejected forever. `rejected` and
+  // not `error`, because a reviewer saying no is this working — nothing broke.
+  expect(back.status).toBe("rejected");
+  expect(back.error).toBe("");
+  // The reason is on the move it caused, which is where the next agent to pick the card up
+  // reads it from.
+  expect(await noteOn(rejected.id)).toMatch(/tests do not run/);
 
   const passed = await make();
   replies = ["Looks fine to me, though the naming is a bit off."];
@@ -237,7 +256,7 @@ test("the verdict is the lane's to read, not the agent's to declare", async () =
   await runner.runCard(judged.id);
   const back = await cardById(judged.id);
   expect(back.laneId).toBe(doing.id);
-  expect(back.status).toBe("error");
+  expect(back.status).toBe("rejected");
   expect(done).toBeDefined();
 });
 
@@ -285,7 +304,11 @@ test("a card waiting on an unfinished one does not run", async () => {
   await db.insert(tables.cardDeps).values({ cardId: second.id, dependsOnCardId: first.id });
 
   await expect(runner.runCard(second.id)).rejects.toThrow(/waiting on/);
-  expect((await cardById(second.id)).status).toBe("blocked");
+  // Nothing is written about waiting. The card stays idle like any other, and what it waits on
+  // is worked out from the board whenever anyone asks — a stored answer went stale the moment
+  // the dependency finished, and nothing ever went back to correct it.
+  expect((await cardById(second.id)).status).toBe("idle");
+  expect((await cardById(second.id)).error).toBe("");
 
   // Only the one that can be worked is offered, and no run was started for the other.
   expect((await runner.readyCards(doing.id)).map((card) => card.title)).toEqual(["first"]);
@@ -314,7 +337,8 @@ test("a station with attempts to spend puts a rejected card back in play, then s
   expect(first.laneId).toBe(doing.id);
   expect(first.status).toBe("idle");
   expect(first.attempts).toBe(1);
-  expect(first.error).toMatch(/tests do not run/);
+  expect(first.error).toBe("");
+  expect(await noteOn(card.id)).toMatch(/tests do not run/);
 
   // Round it goes: worked again, and offered up for review again. A pass does not hand the
   // attempt back — a budget that refilled every time it was used would never run out.
@@ -329,7 +353,9 @@ test("a station with attempts to spend puts a rejected card back in play, then s
   await runner.runCard(second.id);
   const third = await cardById(card.id);
   expect(third.laneId).toBe(doing.id);
-  expect(third.status).toBe("error");
+  // The budget is spent, so this one stops — still `rejected` and not `error`, because what
+  // stopped it is a reviewer's decision either way.
+  expect(third.status).toBe("rejected");
   expect(third.attempts).toBe(2);
 });
 
@@ -397,7 +423,8 @@ test("a verdict is not an account of the work, and does not overwrite one", asyn
   // The reviewer said what it thought of the work, not what the work was. Losing the executor's
   // own report here would leave the next attempt starting from nothing.
   expect(back.result).toBe("wrote it, in src/thing.ts");
-  expect(back.error).toMatch(/empty case/);
+  expect(back.error).toBe("");
+  expect(await noteOn(card.id)).toMatch(/empty case/);
 
   replies = ["covered it"];
   await runner.runCard(back.id);
@@ -416,4 +443,153 @@ test("a lane with no agent runs nothing", async () => {
     .returning();
 
   await expect(runner.runCard(card.id)).rejects.toThrow(/no agent/);
+});
+
+test("a reviewer that crashes has ruled on nothing, and its crash is not feedback", async () => {
+  const { projectId, doing, review } = await seedProject("a broken reviewer");
+  const [card] = await db
+    .insert(tables.cards)
+    .values({ projectId, laneId: review.id, title: "judge me", result: "wrote it, in src/a.ts" })
+    .returning();
+
+  const [reviewer] = await db
+    .select()
+    .from(tables.agents)
+    .where(eq(tables.agents.name, "reviewer"))
+    .limit(1);
+  await db
+    .update(tables.agents)
+    .set({ baseUrl: "http://127.0.0.1:1/v1", maxRetries: 0 })
+    .where(eq(tables.agents.id, reviewer.id));
+
+  const run = await runner.runCard(card.id);
+  // A reviewer whose connection dropped ruled on nothing, whatever half a sentence made it out
+  // before the stream died. The run failed; there is no verdict to read off it.
+  expect(run.status).toBe("error");
+  expect(run.verdict).toBe("none");
+
+  const broken = await cardById(card.id);
+  // `error`, not `rejected`. Nobody turned this card down — the endpoint fell over — and the
+  // two words are what let a person tell a decision to make from a fault to look at.
+  expect(broken.status).toBe("error");
+  expect(broken.error).toMatch(/ECONNREFUSED|fetch failed|connect/i);
+  // It still came back down the failure arm, because a station that could not finish has not
+  // passed the card either. What it did not do is leave a reason, because it has not got one.
+  expect(broken.laneId).toBe(doing.id);
+  expect(await noteOn(card.id)).toBe("");
+
+  // And this is the bug the whole distinction exists for: the crash must not reach the next
+  // agent dressed as a review. What that one is sent says nothing about connections.
+  await db
+    .update(tables.agents)
+    .set({ baseUrl, maxRetries: -1 })
+    .where(eq(tables.agents.id, reviewer.id));
+  const sent: string[] = [];
+  bodies = (body) => sent.push(body.messages[body.messages.length - 1].content);
+  replies = ["had another go"];
+  await runner.runCard(card.id);
+  bodies = undefined;
+
+  expect(sent[0]).toContain("wrote it, in src/a.ts");
+  expect(sent[0]).not.toMatch(/ECONNREFUSED|fetch failed/i);
+  expect(sent[0]).not.toContain("Why this came back");
+});
+
+test("a pass keeps the reason it passed", async () => {
+  const { projectId, review, done } = await seedProject("passing notes");
+  const [card] = await db
+    .insert(tables.cards)
+    .values({ projectId, laneId: review.id, title: "check it", result: "wrote the migration" })
+    .returning();
+
+  replies = ["PASS — every criterion is met, and the migration is reversible"];
+  const run = await runner.runCard(card.id);
+
+  expect(run.verdict).toBe("pass");
+  const forward = await cardById(card.id);
+  expect(forward.laneId).toBe(done.id);
+  expect(forward.status).toBe("done");
+  // The account of the work stays the executor's: a ruling is not a report.
+  expect(forward.result).toBe("wrote the migration");
+  // But the reasoning behind the ruling survives, on the move it caused. A passing station used
+  // to write nothing at all, so why a card was let through lived only in the run until
+  // `runRetentionDays` deleted it.
+  expect(await noteOn(card.id)).toMatch(/migration is reversible/);
+});
+
+test("a person moving a card is in its ledger, and what they said reaches the agent", async () => {
+  const { graphql } = await import("graphql");
+  const { schema } = await import("../server/graphql/schema.ts");
+  const { projectId, backlog, doing } = await seedProject("a ledger");
+
+  const made = await graphql({
+    schema,
+    source: `mutation Make($projectId: String!, $laneId: String!) {
+      createCard(values: { projectId: $projectId, laneId: $laneId, title: "carry it" }) { id }
+    }`,
+    variableValues: { projectId, laneId: backlog.id },
+  });
+  expect(made.errors).toBeUndefined();
+  const cardId = (made.data as { createCard: { id: string } }).createCard.id;
+
+  const moved = await graphql({
+    schema,
+    source: `mutation Move($cardId: String!, $laneId: String!, $note: String) {
+      moveCard(cardId: $cardId, laneId: $laneId, note: $note) { id laneId }
+    }`,
+    variableValues: { cardId, laneId: doing.id, note: "do the empty case first" },
+  });
+  expect(moved.errors).toBeUndefined();
+
+  const events = await db
+    .select()
+    .from(tables.cardEvents)
+    .where(eq(tables.cardEvents.cardId, cardId))
+    .orderBy(tables.cardEvents.createdAt);
+  // Two entries, and no run behind either: this is the half of a card's history that runs
+  // cannot record, because nothing ran. It arrived, and then somebody moved it.
+  expect(events).toHaveLength(2);
+  expect(events[0].fromLaneId).toBeNull();
+  expect(events[0].toLaneId).toBe(backlog.id);
+  expect(events[1].actor).toBe("user");
+  expect(events[1].runId).toBeNull();
+  expect(events[1].note).toBe("do the empty case first");
+
+  // And what a person said reaches the agent exactly the way a reviewer's rejection does.
+  const sent: string[] = [];
+  bodies = (body) => sent.push(body.messages[body.messages.length - 1].content);
+  replies = ["did that"];
+  await runner.runCard(cardId);
+  bodies = undefined;
+  expect(sent[0]).toContain("Why this came back");
+  expect(sent[0]).toContain("do the empty case first");
+});
+
+test("a run somebody called off leaves the card where it stands", async () => {
+  const { projectId, review } = await seedProject("second thoughts");
+  const [card] = await db
+    .insert(tables.cards)
+    .values({ projectId, laneId: review.id, title: "hold on", result: "wrote it" })
+    .returning();
+
+  // The model never answers, so the run is genuinely in flight when it is called off — which is
+  // the only state this can be tested from, a finished run having nothing left to stop.
+  hold = true;
+  const running = runner.runCard(card.id);
+  while (!runner.isRunning(card.id)) await new Promise((resolve) => setTimeout(resolve, 5));
+  expect(runner.stopSubject(card.id)).toBe(true);
+
+  const run = await running;
+  expect(run.status).toBe("stopped");
+  expect(run.verdict).toBe("none");
+
+  const stopped = await cardById(card.id);
+  // Where it stands, and idle. A stopped review used to drop the card down the failure arm into
+  // Doing, which reads on the board as a reviewer having turned it down — and the reviewer never
+  // finished a sentence. Nobody ruled on anything, so nothing moves and nothing is recorded.
+  expect(stopped.laneId).toBe(review.id);
+  expect(stopped.status).toBe("idle");
+  expect(stopped.error).toBe("");
+  expect(stopped.attempts).toBe(0);
+  expect(await db.select().from(tables.cardEvents)).toEqual([]);
 });

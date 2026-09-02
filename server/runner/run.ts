@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, inArray, isNull, notInArray } from "drizzle-orm";
 import { errorMessage } from "../../shared/errors.ts";
 import { db } from "../db/client.ts";
+import { lastMoveNote, recordMove } from "../db/history.ts";
 import {
   type Card,
   cardDeps,
@@ -389,6 +390,16 @@ export async function decomposeTask(taskId: string): Promise<Run> {
     )
     .returning();
 
+  // These are the only cards on the board an agent made rather than a person, and their ledgers
+  // say so: the run that wrote them is the first line of each one's history.
+  for (const card of written)
+    await recordMove({
+      cardId: card.id,
+      runId: run.id,
+      toLaneId: lane.id,
+      actor: "agent",
+    });
+
   // Dependencies come back as titles, because a model cannot know the ids of rows that do not
   // exist yet. Anything naming a card outside this batch is dropped rather than failing the
   // decomposition — a hallucinated title is a lost ordering hint, not a lost card.
@@ -458,15 +469,15 @@ export async function runCard(cardId: string, agentId?: string | null): Promise<
   if (!chosen) throw new Error(`lane "${lane.name}" has no agent — nothing runs there`);
   const agent = await resolveAgentId(chosen);
 
+  // Nothing is written about waiting. What a card waits on is a fact about the cards around
+  // it, and the one this used to store went stale the moment a dependency finished — a card
+  // sitting at `blocked` saying "waiting on: X" long after X was done. The caller gets the
+  // reason in the message, and `blockers` answers the question properly whenever it is asked.
   const waiting = await blockers(cardId);
-  if (waiting.length) {
-    await db
-      .update(cards)
-      .set({ status: "blocked", error: `waiting on: ${waiting.map((c) => c.title).join(", ")}` })
-      .where(eq(cards.id, cardId));
+  if (waiting.length)
     throw new Error(`"${card.title}" is waiting on ${waiting.length} unfinished card(s)`);
-  }
 
+  const note = await lastMoveNote(cardId, card.laneId);
   await db.update(cards).set({ status: "running", error: "" }).where(eq(cards.id, cardId));
 
   const { run, result, ok } = await execute({
@@ -478,19 +489,26 @@ export async function runCard(cardId: string, agentId?: string | null): Promise<
     taskId: card.taskId,
     laneId: lane.id,
     label: `working "${card.title}"`,
-    prompt: cardPrompt(project, card),
+    prompt: cardPrompt(project, card, note),
   });
 
   const output = result?.output?.trim() ?? "";
   // The verdict is the lane's business, not the agent's: a station that judges cards says so,
-  // and the same agent works cards elsewhere without its answer being read as a ruling.
-  const passed = ok && (!lane.readVerdict || !/^\s*FAIL\b/i.test(output));
+  // and the same agent works cards elsewhere without its answer being read as a ruling. It
+  // also needs a run that finished — a reviewer whose connection dropped ruled on nothing,
+  // whatever half a sentence made it out before the stream died.
+  const verdict: Run["verdict"] =
+    lane.readVerdict && ok ? (/^\s*FAIL\b/i.test(output) ? "fail" : "pass") : "none";
+  const passed = ok && verdict !== "fail";
   // A run somebody called off is not a verdict on the card: it costs it no attempt and leaves
   // it where it was, to be started again whenever.
   const stopped = run.status === "stopped";
   const attempts = card.attempts + (passed || stopped ? 0 : 1);
 
-  const target = passed ? lane.onSuccessLaneId : lane.onFailureLaneId;
+  // A run somebody called off sends the card nowhere. It is not a failure of the work — there
+  // is no work yet — and a stopped review dropping the card down the failure arm would put it
+  // back in Doing as though it had been rejected by a reviewer that never finished a sentence.
+  const target = stopped ? null : passed ? lane.onSuccessLaneId : lane.onFailureLaneId;
   const [next] = target
     ? await db.select().from(lanes).where(eq(lanes.id, target)).limit(1)
     : [undefined];
@@ -507,21 +525,51 @@ export async function runCard(cardId: string, agentId?: string | null): Promise<
   // A card that passes into a lane with an agent of its own is not finished — it is waiting for
   // that lane's turn, and only an `idle` card is picked up. `done` is for a card nothing further
   // will happen to: one that stayed put, or one that landed where no agent runs.
+  //
+  // A card a reviewer turned down is `rejected` and not `error`. The two want different things
+  // from a person — a decision, or a look at what broke — and telling them apart on the board
+  // is the whole reason there are two words.
   await db
     .update(cards)
     .set({
-      status: stopped || rework ? "idle" : !passed ? "error" : next?.agentId ? "idle" : "done",
+      status:
+        stopped || rework
+          ? "idle"
+          : !passed
+            ? verdict === "fail"
+              ? "rejected"
+              : "error"
+            : next?.agentId
+              ? "idle"
+              : "done",
       // A station that judges does not overwrite the account of the work with its ruling on it:
-      // that report is the one thing the agent asked to fix the card needs to read, and the
-      // verdict is already going into `error` where the same prompt picks it up.
+      // that report is the one thing the agent asked to fix the card needs to read. The ruling
+      // goes on the move it caused, where the next prompt picks it up as the reason.
       result: lane.readVerdict ? card.result : output || card.result,
-      error: passed ? "" : run.error || (lane.readVerdict ? output : "the agent did not finish"),
+      // What broke, and only that. A verdict is not a fault and a stopped run is not one
+      // either — the sentence that used to be invented here, "the agent did not finish", was
+      // written onto every card whose run somebody deliberately called off.
+      error: run.error,
       attempts,
       ...(target ? { laneId: target, position: await nextPosition(target) } : {}),
     })
     .where(eq(cards.id, cardId));
 
-  return run;
+  // A ruling that moved nothing is still a ruling, so it is recorded where it stands: `from`
+  // and `to` being the same lane is the ledger's way of saying the card was judged and left.
+  if (verdict !== "none" || next)
+    await recordMove({
+      cardId,
+      runId: run.id,
+      fromLaneId: lane.id,
+      toLaneId: next?.id ?? lane.id,
+      note: verdict === "none" ? "" : output,
+      actor: "agent",
+    });
+
+  if (verdict !== "none") await db.update(runs).set({ verdict }).where(eq(runs.id, run.id));
+
+  return { ...run, verdict };
 }
 
 /**
@@ -534,13 +582,7 @@ export async function readyCards(laneId: string): Promise<Card[]> {
   const rows = await db
     .select()
     .from(cards)
-    .where(
-      and(
-        eq(cards.laneId, laneId),
-        isNull(cards.archivedAt),
-        inArray(cards.status, ["idle", "blocked"]),
-      ),
-    )
+    .where(and(eq(cards.laneId, laneId), isNull(cards.archivedAt), eq(cards.status, "idle")))
     .orderBy(asc(cards.position));
 
   const ready: Card[] = [];

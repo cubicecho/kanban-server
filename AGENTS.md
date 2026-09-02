@@ -145,9 +145,9 @@ with it.
 **`done` means nothing further will happen.** A card that passes into a lane that has an agent
 of its own is not finished — it is waiting for that lane's turn — so it goes back to `idle`,
 because `readyCards` only picks up `idle`. `done` is for a card that stayed put, or landed
-where no agent runs. A card a reviewer rejected stays `error` unless the rejecting station has a
-budget left to spend on it, so the Doing↔Review loop cannot spin on its own; `retryCard` is the
-way back by hand, and clears the error where the card stands.
+where no agent runs. A card a reviewer rejected stays `rejected` unless the rejecting station has
+a budget left to spend on it, so the Doing↔Review loop cannot spin on its own; `retryCard` is the
+way back by hand, and puts the card back in play where it stands.
 
 **The rework loop is a budget, and the budget is the lane's.** `lanes.maxAttempts` is how many
 times a station will put a card it failed back in play; `cards.attempts` counts the failures
@@ -156,16 +156,51 @@ failure and waits for a person. The budget belongs to the lane that *failed* the
 than the one it goes back to, because how many times a thing is worth rejecting is the judging
 station's call. `attempts` is not reset by a pass: a Doing↔Review loop that refilled its budget
 every time round would never terminate. Only a person resets it — `retryCard` and `moveCard`,
-both being somebody deciding to start the card over. A stopped run and a restart cost nothing,
-being nobody's verdict on the work. Rework needs the landing lane to have an agent, or an `idle`
+both being somebody deciding to start the card over. A stopped run and a restart cost nothing
+and move nothing, being nobody's verdict on the work: a called-off review leaves the card in
+Review rather than dropping it down the failure arm as though it had been turned down. Rework needs the landing lane to have an agent, or an `idle`
 card in a resting place would just be lost; the passing arm still asks after the *success* lane's
 agent, since a card that passes with nowhere to go must not re-run where it stands.
 
 **A verdict is not an account of the work.** A station with `readVerdict` leaves `cards.result`
 alone — overwriting the executor's report with the word `PASS` would lose the one thing the next
-agent round the loop has to read. The rejection lands in `cards.error` instead, and `cardPrompt`
-appends it as "Why this came back", because a second attempt without the reason for the first is
-the first attempt again.
+agent round the loop has to read. The verdict lands on the *move* it caused, as the `note` on a
+`card_events` row, and `cardPrompt` appends that as "Why this came back", because a second
+attempt without the reason for the first is the first attempt again. A pass records its reasons
+the same way: why a card was let through outlives the run that said so.
+
+**A rejection is not an error, and neither is a wait.** `cards.status` has five values and they
+divide the ways a card can be stopped by what a person has to do about it: `rejected` is a
+reviewer saying no, which wants a decision, and `error` is something that broke — a crash, a
+timeout, a run a restart interrupted — which wants looking at. `cards.error` therefore holds
+faults and only faults, and `cardPrompt` deliberately does not read it: handing an agent a stack
+trace under the heading "why this came back" was how a reset connection came to read as a review.
+
+There is no `blocked`. A card waiting on a dependency is `idle`, and `blockers` works out what it
+waits on when it is asked. The stored answer was written once and never revisited, so a card sat
+saying "waiting on X" long after X was done — the same staleness `lanes.readVerdict` has as a
+second place to say a thing the rows already know. Nothing stores what the rows around it say.
+
+**A card's history is a ledger of its moves.** `card_events` records every move a card makes —
+from, to, why, and who — because "why is this card here?" is a question about the move that
+brought it, not about the card. A column on the card could only ever hold the most recent reason
+and lost the one before it; the ledger also catches a person dragging a card back, which no run
+ever records. `server/db/history.ts` is the only writer: `recordMove` takes the transaction it
+belongs to, so a card that moved and the row saying so commit together. `lastMoveNote` reads
+backwards from the newest event and stops at the one that brought the card to this lane —
+anything older happened somewhere else — skipping note-less events on the way, so a person
+hitting retry does not quietly delete the reason the card came back. Moving a card onwards is
+what clears a rejection, which is what stops it following the card around the board for good.
+
+The ledger is written by hand rather than generated, and `features` refuses insert, update and
+delete on it through GraphQL: its whole worth is that it is an account nobody edited. Nothing
+prunes it either — it is small, and it is the durable answer to a question the runs behind it
+stop being able to answer as soon as `runRetentionDays` deletes them.
+
+`runs.verdict` carries the same ruling on the run that made it, because a judging station whose
+failure arm goes nowhere moves nothing and would otherwise leave no trace of having ruled. A run
+that crashed has `none`: a reviewer whose connection dropped ruled on nothing, whatever half a
+sentence made it out before the stream died.
 
 **A restart puts back what it interrupted.** `inFlight` is memory, so a process that dies leaves
 `running` rows that nothing will ever finish: a run `runRetentionDays` will not prune and `spend`
@@ -173,7 +208,9 @@ keeps counting, and a card that holds a place against its lane's WIP limit for g
 in `server/runner/run.ts` runs once from `server/index.ts` after `ensureSchema`, and closes
 whatever this process does not genuinely have in flight — runs to `error`, cards back to `idle`,
 tasks caught mid-decomposition to `error`, because nothing decomposes a task unasked. `error`
-rather than `stopped`: nobody called these off. It costs a card no attempt.
+rather than `stopped`: nobody called these off. It costs a card no attempt, and writes nothing to
+the ledger — a restart is not a ruling, and the story of a card is what became of it rather than
+what the process it was running in did.
 
 **Archiving is off the board, not gone, and it is not a status.** `cards.archivedAt` is a
 timestamp rather than a flag because an archive is a list and a list wants an order; it is kept
@@ -200,15 +237,18 @@ polls rather than waking on writes, because the things that make a card runnable
 writes — a dependency finishing, an agent switched back on, a run stopped.
 
 **Hand-written GraphQL fields go in `server/graphql/`**, beside the generated entities:
-`models`, `mcpStatus`, `runEvents`, `spend` on the query side; `refineTask`, `acceptTask`,
+`models`, `mcpStatus`, `runEvents`, `blockers`, `spend` on the query side; `refineTask`, `acceptTask`,
 `decomposeTask`, `submitTask`, `runCard`, `stopCard`, `stopTask`, `moveCard`, `retryCard`,
 `archiveCard`, `restoreCard`, `setCardDeps`, `setAgentServers`,
 `testMcpServer`, `reconnectMcp`, `setApiKey`, `setAgentApiKey` on the mutation side. Give every
 one of them a `description` — it is what an agent on `/mcp` reads to decide whether to call it.
 
 **Writes go through `onWrite` hooks.** Creating a project seeds its four lanes and their
-success/failure wiring in the same transaction (`payload.tx`), and an edited MCP server
-reconciles the connection pool without a restart. A write that should change either of those
+success/failure wiring in the same transaction (`payload.tx`); a created card gets the first row
+of its ledger; and an edited MCP server reconciles the connection pool without a restart. That
+hook reads the card's lane back from the database rather than off the rows it is handed, which
+carry only the columns the caller selected — a client asking for `{ id }` would otherwise record
+a card arriving nowhere. A write that should change either of those
 belongs in a hook, not in a route handler.
 
 **The API key is never readable.** `exclude.columns` drops `apiKey` from both `settings` and
@@ -216,7 +256,7 @@ belongs in a hook, not in a route handler.
 tests hold that line.
 
 **The `/mcp` surface is curated, not the whole schema.** `server/mcp-endpoint.ts` lists the
-thirty-one tools an outside client gets. Nothing that empties a table in one call, nothing that
+thirty-three tools an outside client gets. Nothing that empties a table in one call, nothing that
 reads or writes the API key, and no editing of agents, roles or MCP servers — a visiting client can
 see which agents and roles exist, because a lane points at one, but which model runs where and on
 whose key is the operator's business. A new tool goes in that list deliberately,

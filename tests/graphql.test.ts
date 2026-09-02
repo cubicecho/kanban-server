@@ -142,13 +142,14 @@ test("retryCard puts a rejected card back in play where it stands", async () => 
     `mutation Make($values: CreateCardInput!) { createCard(values: $values) { id } }`,
     { values: { projectId: project.id, laneId: doing.id, title: "rejected", position: 0 } },
   );
-  // What a reviewer's FAIL leaves behind: back in Doing, holding the reason, and in a status
-  // the worker will not pick up.
+  // What a reviewer's FAIL leaves behind: back in Doing, out of budget, and in a status the
+  // worker will not pick up. Nothing on the card says why — the reason is on the move that
+  // brought it here, which is why a retry can clear the status without erasing the feedback.
   await run(
     `mutation Fail($id: String!) {
        updateCardSingle(
          where: { id: { eq: $id } }
-         set: { status: error, error: "no test", attempts: 3 }
+         set: { status: rejected, attempts: 3 }
        ) { id }
      }`,
     { id: createCard.id },
@@ -170,7 +171,79 @@ test("retryCard puts a rejected card back in play where it stands", async () => 
     attempts: 0,
   });
 
+  // The other thing a person retries is a card that broke rather than one that was turned
+  // down, and that one has a fault written on it for the retry to clear.
+  const { createCard: crashed } = await run(
+    `mutation Make($values: CreateCardInput!) { createCard(values: $values) { id } }`,
+    { values: { projectId: project.id, laneId: doing.id, title: "crashed", position: 1 } },
+  );
+  await run(
+    `mutation Break($id: String!) {
+       updateCardSingle(
+         where: { id: { eq: $id } }
+         set: { status: error, error: "ECONNREFUSED" }
+       ) { id }
+     }`,
+    { id: crashed.id },
+  );
+  const retried = await run(
+    `mutation Retry($cardId: String!) { retryCard(cardId: $cardId) { status error } }`,
+    { cardId: crashed.id },
+  );
+  expect(retried.retryCard).toMatchObject({ status: "idle", error: "" });
+
   expect(await fails(`mutation { retryCard(cardId: "nope") { id } }`)).toMatch(/no card with id/);
+});
+
+test("blockers names what a card is waiting on, and stops naming it when it stops", async () => {
+  const project = await newProject("waiting");
+  const [backlog] = await board(project.id);
+
+  const make = async (title: string) =>
+    (
+      await run(`mutation Make($values: CreateCardInput!) { createCard(values: $values) { id } }`, {
+        values: { projectId: project.id, laneId: backlog.id, title },
+      })
+    ).createCard as { id: string };
+
+  const migration = await make("write the migration");
+  const endpoint = await make("read it from the endpoint");
+  const page = await make("call it from the page");
+
+  await run(
+    `mutation Set($cardId: String!, $dependsOn: [String!]!) { setCardDeps(cardId: $cardId, dependsOn: $dependsOn) }`,
+    { cardId: page.id, dependsOn: [migration.id, endpoint.id] },
+  );
+
+  const waitingOn = async (cardId: string) =>
+    (
+      (await run(`query B($cardId: String!) { blockers(cardId: $cardId) { title } }`, { cardId }))
+        .blockers as { title: string }[]
+    )
+      .map((card) => card.title)
+      .sort();
+
+  expect(await waitingOn(page.id)).toEqual(["read it from the endpoint", "write the migration"]);
+  // A card nothing is ordered against waits on nothing — not on an empty answer meaning
+  // "unknown", which is what a stored `waiting on: …` string decayed into.
+  expect(await waitingOn(migration.id)).toEqual([]);
+
+  await run(
+    `mutation Done($id: String!) {
+       updateCardSingle(where: { id: { eq: $id } }, set: { status: done }) { id }
+     }`,
+    { id: migration.id },
+  );
+  // Nothing was rewritten anywhere for this to change: the answer is worked out when it is
+  // asked for, so it is right the moment the card it is about finishes.
+  expect(await waitingOn(page.id)).toEqual(["read it from the endpoint"]);
+
+  // And an archived card is not in the way. It is off the board, and a dependent waiting on
+  // one nobody can find would wait for good.
+  await run(`mutation Archive($cardId: String!) { archiveCard(cardId: $cardId) { id } }`, {
+    cardId: endpoint.id,
+  });
+  expect(await waitingOn(page.id)).toEqual([]);
 });
 
 test("setCardDeps writes an ordering as a set, and refuses one that closes a loop", async () => {

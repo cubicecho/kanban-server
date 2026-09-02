@@ -17,31 +17,16 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import type { BoardQuery } from "@/gql/graphql";
+import { CARD_STATUS_CLASS, CARD_STATUS_VARIANT, needsAttention } from "@/lib/cards";
 
 type Lane = BoardQuery["lanes"][number];
 type BoardCard = BoardQuery["cards"][number];
 
-const STATUS_VARIANT = {
-  error: "destructive",
-  running: "outline",
-  blocked: "outline",
-  done: "secondary",
-  idle: "secondary",
-} as const;
-
-/**
- * The one status worth spotting from across a board, in the colour the run stream already uses
- * for a live one. Every other status is grey by design — a board where everything is coloured
- * says nothing — so this is the exception rather than the start of a palette.
- */
-const RUNNING_BADGE =
-  "border-emerald-600/30 bg-emerald-500/15 text-emerald-700 dark:border-emerald-400/30 dark:text-emerald-400";
-
 function StatusBadge({ status }: { status: BoardCard["status"] }) {
   return (
     <Badge
-      variant={STATUS_VARIANT[status] ?? "secondary"}
-      className={status === "running" ? RUNNING_BADGE : undefined}
+      variant={CARD_STATUS_VARIANT[status] ?? "secondary"}
+      className={CARD_STATUS_CLASS[status]}
     >
       {status}
     </Badge>
@@ -182,11 +167,17 @@ export function SortableCard({
         >
           <ChevronRight className="size-4" />
         </Button>
-        {card.status === "error" ? (
+        {/* A card a reviewer turned down is put back in play by the same button as one that
+            broke: both are stopped, and both are waiting on somebody to say try again. */}
+        {needsAttention(card.status) ? (
           <Button
             variant="ghost"
             size="icon"
-            title="Clear the error and put it back in play"
+            title={
+              card.status === "rejected"
+                ? "Put it back in play, keeping the reason it came back"
+                : "Clear the error and put it back in play"
+            }
             disabled={busy.retry}
             onClick={on.retry}
           >

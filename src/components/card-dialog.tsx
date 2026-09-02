@@ -1,7 +1,7 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
+import { CardHistory } from "@/components/card-history";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -17,64 +17,13 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import {
   type BoardQuery,
-  CardRunsDocument,
   CreateCardDocument,
   SetCardDepsDocument,
   UpdateCardDocument,
 } from "@/gql/graphql";
 import { request } from "@/lib/gql";
-import { duration, RUN_STATUS_VARIANT } from "@/lib/runs";
 
 type Card = BoardQuery["cards"][number];
-
-/**
- * Every time an agent was asked to work this card, newest first.
- *
- * The board says where a card is and the last thing said about it. This says how it got there:
- * the attempt that failed, the verdict that sent it back, the run a restart interrupted. It is
- * the same rows the Runs page draws, asked for the other way round — about one card rather than
- * about a whole project, which is the question somebody has open the card to ask.
- */
-function History({ cardId }: { cardId: string }) {
-  const [open, setOpen] = useState<string | null>(null);
-  const runs = useQuery({
-    queryKey: ["card-runs", cardId],
-    queryFn: () => request(CardRunsDocument, { cardId }),
-  });
-
-  const rows = runs.data?.runs ?? [];
-  if (!rows.length) return null;
-
-  return (
-    <div className="flex flex-col gap-2">
-      <Label>History</Label>
-      <div className="flex max-h-72 flex-col gap-2 overflow-y-auto rounded-md border p-3">
-        {rows.map((run) => (
-          <div key={run.id} className="flex flex-col gap-1">
-            <button
-              type="button"
-              className="flex w-full items-center gap-2 text-left"
-              onClick={() => setOpen(open === run.id ? null : run.id)}
-            >
-              <Badge variant={RUN_STATUS_VARIANT[run.status] ?? "secondary"}>{run.status}</Badge>
-              <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-                {run.agent?.name ? `${run.agent.name} · ` : ""}
-                {new Date(run.startedAt).toLocaleString()} ·{" "}
-                {duration(run.startedAt, run.finishedAt)}
-                {run.totalTokens ? ` · ${run.totalTokens} tokens` : ""}
-              </span>
-            </button>
-            {open === run.id ? (
-              <pre className="max-h-48 overflow-auto rounded-md bg-muted/30 p-2 text-xs whitespace-pre-wrap">
-                {run.error || run.output || "(no output)"}
-              </pre>
-            ) : null}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 /**
  * A card, written or edited by hand.
@@ -211,7 +160,7 @@ export function CardDialog({
 
           {/* A card that does not exist yet has no history, and asking for one would be a query
               for the id of a row nobody has written. */}
-          {card ? <History cardId={card.id} /> : null}
+          {card ? <CardHistory cardId={card.id} /> : null}
         </div>
 
         <DialogFooter>

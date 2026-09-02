@@ -238,6 +238,7 @@ enum RunDistinctColumn {
   cardId
   laneId
   status
+  verdict
   startedAt
   finishedAt
   output
@@ -1134,6 +1135,19 @@ type Card {
     distinct: [CardDepDistinctColumn!]
   ): [CardDep!]!
   depsAggregate(where: CardDepFilters): CardDepAggregate!
+  blocks(
+    where: CardDepFilters
+    orderBy: CardDepOrderBy
+    offset: Int
+    limit: Int
+
+    """
+    Keyset pagination: only return related rows strictly after this cursor (a row's `cursor` field from a previous page of this relation, under the same orderBy).
+    """
+    after: String
+    distinct: [CardDepDistinctColumn!]
+  ): [CardDep!]!
+  blocksAggregate(where: CardDepFilters): CardDepAggregate!
   runs(
     where: RunFilters
     orderBy: RunOrderBy
@@ -1147,6 +1161,19 @@ type Card {
     distinct: [RunDistinctColumn!]
   ): [Run!]!
   runsAggregate(where: RunFilters): RunAggregate!
+  events(
+    where: CardEventFilters
+    orderBy: CardEventOrderBy
+    offset: Int
+    limit: Int
+
+    """
+    Keyset pagination: only return related rows strictly after this cursor (a row's `cursor` field from a previous page of this relation, under the same orderBy).
+    """
+    after: String
+    distinct: [CardEventDistinctColumn!]
+  ): [CardEvent!]!
+  eventsAggregate(where: CardEventFilters): CardEventAggregate!
 }
 
 enum CardsStatusEnum {
@@ -1156,11 +1183,11 @@ enum CardsStatusEnum {
   """Value: running"""
   running
 
-  """Value: blocked"""
-  blocked
-
   """Value: done"""
   done
+
+  """Value: rejected"""
+  rejected
 
   """Value: error"""
   error
@@ -1171,6 +1198,18 @@ enum CardDepDistinctColumn {
   id
   cardId
   dependsOnCardId
+}
+
+"""Columns of CardEvent that a query can be made distinct on"""
+enum CardEventDistinctColumn {
+  id
+  cardId
+  runId
+  fromLaneId
+  toLaneId
+  note
+  actor
+  createdAt
 }
 
 type CardAggregate {
@@ -1307,6 +1346,7 @@ type CardDep {
   """
   cursor: String
   card(where: CardFilters): Card!
+  dependsOn(where: CardFilters): Card!
 }
 
 type CardDepAggregate {
@@ -1359,6 +1399,112 @@ type CardDepGroupKeys {
   dependsOnCardId: String
 }
 
+type CardEvent {
+  id: String!
+  cardId: String!
+  runId: String
+  fromLaneId: String
+  toLaneId: String
+  note: String!
+  actor: CardEventsActorEnum!
+  createdAt: DateTime!
+
+  """
+  Opaque cursor of this row's position in the query's ordering. Pass it as `after` to resume from here. Only set on rows returned by a list query.
+  """
+  cursor: String
+  card(where: CardFilters): Card!
+  run(where: RunFilters): Run
+  fromLane(where: LaneFilters): Lane
+  toLane(where: LaneFilters): Lane
+}
+
+enum CardEventsActorEnum {
+  """Value: agent"""
+  agent
+
+  """Value: user"""
+  user
+
+  """Value: system"""
+  system
+}
+
+type CardEventAggregate {
+  count: Int!
+  min: CardEventMinAggregate
+  max: CardEventMaxAggregate
+  countNonNull: CardEventCountNonNullAggregate
+  countDistinct: CardEventCountDistinctAggregate
+}
+
+type CardEventMinAggregate {
+  id: String
+  cardId: String
+  runId: String
+  fromLaneId: String
+  toLaneId: String
+  note: String
+  actor: CardEventsActorEnum
+  createdAt: DateTime
+}
+
+type CardEventMaxAggregate {
+  id: String
+  cardId: String
+  runId: String
+  fromLaneId: String
+  toLaneId: String
+  note: String
+  actor: CardEventsActorEnum
+  createdAt: DateTime
+}
+
+type CardEventCountNonNullAggregate {
+  id: Int!
+  cardId: Int!
+  runId: Int!
+  fromLaneId: Int!
+  toLaneId: Int!
+  note: Int!
+  actor: Int!
+  createdAt: Int!
+}
+
+type CardEventCountDistinctAggregate {
+  id: Int!
+  cardId: Int!
+  runId: Int!
+  fromLaneId: Int!
+  toLaneId: Int!
+  note: Int!
+  actor: Int!
+  createdAt: Int!
+}
+
+type CardEventGroupBy {
+  group: CardEventGroupKeys!
+  count: Int!
+  min: CardEventMinAggregate
+  max: CardEventMaxAggregate
+  countNonNull: CardEventCountNonNullAggregate
+  countDistinct: CardEventCountDistinctAggregate
+}
+
+"""
+The grouped column values of one CardEvent group. A column the query did not group by is null.
+"""
+type CardEventGroupKeys {
+  id: String
+  cardId: String
+  runId: String
+  fromLaneId: String
+  toLaneId: String
+  note: String
+  actor: CardEventsActorEnum
+  createdAt: DateTime
+}
+
 type Run {
   id: String!
   projectId: String!
@@ -1368,6 +1514,7 @@ type Run {
   cardId: String
   laneId: String
   status: RunsStatusEnum!
+  verdict: RunsVerdictEnum!
   startedAt: DateTime!
   finishedAt: DateTime
   output: String!
@@ -1385,6 +1532,7 @@ type Run {
   agent(where: AgentFilters): Agent
   task(where: TaskFilters): Task
   card(where: CardFilters): Card
+  lane(where: LaneFilters): Lane
 }
 
 enum RunsKindEnum {
@@ -1410,6 +1558,17 @@ enum RunsStatusEnum {
 
   """Value: stopped"""
   stopped
+}
+
+enum RunsVerdictEnum {
+  """Value: none"""
+  none
+
+  """Value: pass"""
+  pass
+
+  """Value: fail"""
+  fail
 }
 
 type RunAggregate {
@@ -1443,6 +1602,7 @@ type RunMinAggregate {
   cardId: String
   laneId: String
   status: RunsStatusEnum
+  verdict: RunsVerdictEnum
   startedAt: DateTime
   finishedAt: DateTime
   output: String
@@ -1461,6 +1621,7 @@ type RunMaxAggregate {
   cardId: String
   laneId: String
   status: RunsStatusEnum
+  verdict: RunsVerdictEnum
   startedAt: DateTime
   finishedAt: DateTime
   output: String
@@ -1479,6 +1640,7 @@ type RunCountNonNullAggregate {
   cardId: Int!
   laneId: Int!
   status: Int!
+  verdict: Int!
   startedAt: Int!
   finishedAt: Int!
   output: Int!
@@ -1498,6 +1660,7 @@ type RunCountDistinctAggregate {
   cardId: Int!
   laneId: Int!
   status: Int!
+  verdict: Int!
   startedAt: Int!
   finishedAt: Int!
   output: Int!
@@ -1530,6 +1693,7 @@ type RunGroupKeys {
   cardId: String
   laneId: String
   status: RunsStatusEnum
+  verdict: RunsVerdictEnum
   startedAt: DateTime
   finishedAt: DateTime
   output: String
@@ -3611,7 +3775,9 @@ input CardFilters {
   """Matches rows whose task matches these filters"""
   task: TaskFilters
   deps: CardDepListRelationFilter
+  blocks: CardDepListRelationFilter
   runs: RunListRelationFilter
+  events: CardEventListRelationFilter
 
   """At least one branch matches; ANDed with any sibling fields"""
   OR: [CardFilters!]
@@ -3706,6 +3872,17 @@ input CardDepListRelationFilter {
 
   """Every related row matches"""
   every: CardDepFilters
+}
+
+input CardEventListRelationFilter {
+  """At least one related row matches"""
+  some: CardEventFilters
+
+  """No related row matches"""
+  none: CardEventFilters
+
+  """Every related row matches"""
+  every: CardEventFilters
 }
 
 input CardOrderBy {
@@ -3832,6 +4009,9 @@ input CardDepFilters {
   """Matches rows whose card matches these filters"""
   card: CardFilters
 
+  """Matches rows whose dependsOn matches these filters"""
+  dependsOn: CardFilters
+
   """At least one branch matches; ANDed with any sibling fields"""
   OR: [CardDepFilters!]
 
@@ -3849,6 +4029,9 @@ input CardDepOrderBy {
 
   """Order by columns of the related card row"""
   card: CardOrderBy
+
+  """Order by columns of the related dependsOn row"""
+  dependsOn: CardOrderBy
 }
 
 """Filters CardDep groups by their aggregated values"""
@@ -3871,6 +4054,165 @@ input CardDepCountDistinctHaving {
   dependsOnCardId: AggregateNumberFilter
 }
 
+input CardEventFilters {
+  id: StringFilter
+  cardId: StringFilter
+  runId: StringFilter
+  fromLaneId: StringFilter
+  toLaneId: StringFilter
+  note: StringFilter
+  actor: CardEventsActorEnumFilter
+  createdAt: DateTimeFilter
+
+  """Matches rows whose card matches these filters"""
+  card: CardFilters
+
+  """Matches rows whose run matches these filters"""
+  run: RunFilters
+
+  """Matches rows whose fromLane matches these filters"""
+  fromLane: LaneFilters
+
+  """Matches rows whose toLane matches these filters"""
+  toLane: LaneFilters
+
+  """At least one branch matches; ANDed with any sibling fields"""
+  OR: [CardEventFilters!]
+
+  """Every branch matches"""
+  AND: [CardEventFilters!]
+
+  """Negates the nested filters"""
+  NOT: CardEventFilters
+}
+
+input CardEventsActorEnumFilter {
+  """Equal to"""
+  eq: CardEventsActorEnum
+
+  """Not equal to"""
+  ne: CardEventsActorEnum
+
+  """Less than"""
+  lt: CardEventsActorEnum
+
+  """Less than or equal to"""
+  lte: CardEventsActorEnum
+
+  """Greater than"""
+  gt: CardEventsActorEnum
+
+  """Greater than or equal to"""
+  gte: CardEventsActorEnum
+  like: String
+  notLike: String
+  ilike: String
+  notIlike: String
+
+  """
+  Matches values starting with the given string. `%`, `_` and `\` are matched literally.
+  """
+  startsWith: String
+
+  """
+  Matches values ending with the given string. `%`, `_` and `\` are matched literally.
+  """
+  endsWith: String
+
+  """
+  Matches values containing the given string. `%`, `_` and `\` are matched literally.
+  """
+  contains: String
+
+  """Case-insensitive `startsWith`."""
+  iStartsWith: String
+
+  """Case-insensitive `endsWith`."""
+  iEndsWith: String
+
+  """Case-insensitive `contains`."""
+  iContains: String
+
+  """
+  When true, every comparison operator in this object matches case-insensitively — `eq`, `ne`, the ordering operators, `inArray`/`notInArray` and the pattern operators all compare `lower(column)` against `lower(operand)`. Applies only to the operators beside it; a nested `AND`/`OR`/`NOT` branch sets its own.
+  """
+  insensitive: Boolean
+
+  """Matches any one of these values (SQL `IN`)"""
+  inArray: [CardEventsActorEnum!]
+
+  """Matches none of these values (SQL `NOT IN`)"""
+  notInArray: [CardEventsActorEnum!]
+
+  """When true, matches rows where the column is NULL"""
+  isNull: Boolean
+
+  """When true, matches rows where the column is not NULL"""
+  isNotNull: Boolean
+
+  """At least one branch matches; ANDed with any sibling operators"""
+  OR: [CardEventsActorEnumFilter!]
+
+  """Every branch matches"""
+  AND: [CardEventsActorEnumFilter!]
+
+  """Negates the nested operators"""
+  NOT: CardEventsActorEnumFilter
+}
+
+input CardEventOrderBy {
+  id: InnerOrder
+  cardId: InnerOrder
+  runId: InnerOrder
+  fromLaneId: InnerOrder
+  toLaneId: InnerOrder
+  note: InnerOrder
+  actor: InnerOrder
+  createdAt: InnerOrder
+
+  """Order by columns of the related card row"""
+  card: CardOrderBy
+
+  """Order by columns of the related run row"""
+  run: RunOrderBy
+
+  """Order by columns of the related fromLane row"""
+  fromLane: LaneOrderBy
+
+  """Order by columns of the related toLane row"""
+  toLane: LaneOrderBy
+}
+
+"""Filters CardEvent groups by their aggregated values"""
+input CardEventHaving {
+  """Filters groups by how many rows they contain"""
+  count: AggregateNumberFilter
+  countNonNull: CardEventCountNonNullHaving
+  countDistinct: CardEventCountDistinctHaving
+}
+
+input CardEventCountNonNullHaving {
+  id: AggregateNumberFilter
+  cardId: AggregateNumberFilter
+  runId: AggregateNumberFilter
+  fromLaneId: AggregateNumberFilter
+  toLaneId: AggregateNumberFilter
+  note: AggregateNumberFilter
+  actor: AggregateNumberFilter
+  createdAt: AggregateNumberFilter
+}
+
+input CardEventCountDistinctHaving {
+  id: AggregateNumberFilter
+  cardId: AggregateNumberFilter
+  runId: AggregateNumberFilter
+  fromLaneId: AggregateNumberFilter
+  toLaneId: AggregateNumberFilter
+  note: AggregateNumberFilter
+  actor: AggregateNumberFilter
+  createdAt: AggregateNumberFilter
+}
+
 input RunFilters {
   id: StringFilter
   projectId: StringFilter
@@ -3880,6 +4222,7 @@ input RunFilters {
   cardId: StringFilter
   laneId: StringFilter
   status: RunsStatusEnumFilter
+  verdict: RunsVerdictEnumFilter
   startedAt: DateTimeFilter
   finishedAt: DateTimeFilter
   output: StringFilter
@@ -3900,6 +4243,9 @@ input RunFilters {
 
   """Matches rows whose card matches these filters"""
   card: CardFilters
+
+  """Matches rows whose lane matches these filters"""
+  lane: LaneFilters
 
   """At least one branch matches; ANDed with any sibling fields"""
   OR: [RunFilters!]
@@ -4059,6 +4405,80 @@ input RunsStatusEnumFilter {
   NOT: RunsStatusEnumFilter
 }
 
+input RunsVerdictEnumFilter {
+  """Equal to"""
+  eq: RunsVerdictEnum
+
+  """Not equal to"""
+  ne: RunsVerdictEnum
+
+  """Less than"""
+  lt: RunsVerdictEnum
+
+  """Less than or equal to"""
+  lte: RunsVerdictEnum
+
+  """Greater than"""
+  gt: RunsVerdictEnum
+
+  """Greater than or equal to"""
+  gte: RunsVerdictEnum
+  like: String
+  notLike: String
+  ilike: String
+  notIlike: String
+
+  """
+  Matches values starting with the given string. `%`, `_` and `\` are matched literally.
+  """
+  startsWith: String
+
+  """
+  Matches values ending with the given string. `%`, `_` and `\` are matched literally.
+  """
+  endsWith: String
+
+  """
+  Matches values containing the given string. `%`, `_` and `\` are matched literally.
+  """
+  contains: String
+
+  """Case-insensitive `startsWith`."""
+  iStartsWith: String
+
+  """Case-insensitive `endsWith`."""
+  iEndsWith: String
+
+  """Case-insensitive `contains`."""
+  iContains: String
+
+  """
+  When true, every comparison operator in this object matches case-insensitively — `eq`, `ne`, the ordering operators, `inArray`/`notInArray` and the pattern operators all compare `lower(column)` against `lower(operand)`. Applies only to the operators beside it; a nested `AND`/`OR`/`NOT` branch sets its own.
+  """
+  insensitive: Boolean
+
+  """Matches any one of these values (SQL `IN`)"""
+  inArray: [RunsVerdictEnum!]
+
+  """Matches none of these values (SQL `NOT IN`)"""
+  notInArray: [RunsVerdictEnum!]
+
+  """When true, matches rows where the column is NULL"""
+  isNull: Boolean
+
+  """When true, matches rows where the column is not NULL"""
+  isNotNull: Boolean
+
+  """At least one branch matches; ANDed with any sibling operators"""
+  OR: [RunsVerdictEnumFilter!]
+
+  """Every branch matches"""
+  AND: [RunsVerdictEnumFilter!]
+
+  """Negates the nested operators"""
+  NOT: RunsVerdictEnumFilter
+}
+
 input RunOrderBy {
   id: InnerOrder
   projectId: InnerOrder
@@ -4068,6 +4488,7 @@ input RunOrderBy {
   cardId: InnerOrder
   laneId: InnerOrder
   status: InnerOrder
+  verdict: InnerOrder
   startedAt: InnerOrder
   finishedAt: InnerOrder
   output: InnerOrder
@@ -4088,6 +4509,9 @@ input RunOrderBy {
 
   """Order by columns of the related card row"""
   card: CardOrderBy
+
+  """Order by columns of the related lane row"""
+  lane: LaneOrderBy
 }
 
 """Filters Run groups by their aggregated values"""
@@ -4135,6 +4559,7 @@ input RunCountNonNullHaving {
   cardId: AggregateNumberFilter
   laneId: AggregateNumberFilter
   status: AggregateNumberFilter
+  verdict: AggregateNumberFilter
   startedAt: AggregateNumberFilter
   finishedAt: AggregateNumberFilter
   output: AggregateNumberFilter
@@ -4154,6 +4579,7 @@ input RunCountDistinctHaving {
   cardId: AggregateNumberFilter
   laneId: AggregateNumberFilter
   status: AggregateNumberFilter
+  verdict: AggregateNumberFilter
   startedAt: AggregateNumberFilter
   finishedAt: AggregateNumberFilter
   output: AggregateNumberFilter
@@ -4691,6 +5117,32 @@ type Query {
     """Filters the groups after they are aggregated."""
     having: CardDepHaving
   ): [CardDepGroupBy!]!
+  cardEvents(
+    offset: Int
+    limit: Int
+    orderBy: CardEventOrderBy
+    where: CardEventFilters
+
+    """
+    Keyset pagination: only return rows strictly after this cursor (a row's `cursor` field from a previous page, under the same orderBy).
+    """
+    after: String
+    distinct: [CardEventDistinctColumn!]
+  ): [CardEvent!]!
+  cardEvent(offset: Int, orderBy: CardEventOrderBy, where: CardEventFilters): CardEvent
+  cardEventsAggregate(where: CardEventFilters): CardEventAggregate!
+  cardEventsGroupBy(
+    """
+    Columns to group by. One result row per distinct combination of their values.
+    """
+    groupBy: [CardEventGroupByColumn!]!
+
+    """Filters the rows before they are grouped."""
+    where: CardEventFilters
+
+    """Filters the groups after they are aggregated."""
+    having: CardEventHaving
+  ): [CardEventGroupBy!]!
   runs(
     offset: Int
     limit: Int
@@ -4774,6 +5226,11 @@ type Query {
   Model ids an OpenAI-compatible server reports. With no `agentId` this asks the endpoint in Settings; with one it asks that agent's own endpoint, which is the list that agent can actually choose from.
   """
   models(agentId: String): [String!]!
+
+  """
+  The cards this one is waiting on that are not finished yet — the reason a card sits in a lane its agent never picks it up from. Empty means nothing is in its way. Worked out from the cards as they stand every time it is asked, rather than read off the card, because the answer changes when some other card finishes and nothing would go back to rewrite it. An archived dependency is not in the way: taking one off the board is a decision that it does not have to happen.
+  """
+  blockers(cardId: String!): [Card!]!
 
   """
   Which of the configured MCP servers this one actually reached, and the tools it found on each. A server that is enabled but absent here failed to connect, and its tools are not offered to any agent linked to it.
@@ -4971,6 +5428,18 @@ enum CardDepGroupByColumn {
   dependsOnCardId
 }
 
+"""Columns of CardEvent that a query can group by"""
+enum CardEventGroupByColumn {
+  id
+  cardId
+  runId
+  fromLaneId
+  toLaneId
+  note
+  actor
+  createdAt
+}
+
 """Columns of Run that a query can group by"""
 enum RunGroupByColumn {
   id
@@ -4981,6 +5450,7 @@ enum RunGroupByColumn {
   cardId
   laneId
   status
+  verdict
   startedAt
   finishedAt
   output
@@ -5266,9 +5736,9 @@ type Mutation {
   stopTask(taskId: String!): Boolean!
 
   """
-  Puts a card in a lane, at a position, and renumbers the cards around it so the board stays in the order it looks like. Omit `position` to drop it at the end. A card that had failed comes back to `idle` with its attempts forgiven, which is what makes dragging one back a retry; a card an agent is working cannot be moved out from under it, and nor can an archived one — `restoreCard` is what puts that back on the board.
+  Puts a card in a lane, at a position, and renumbers the cards around it so the board stays in the order it looks like. Omit `position` to drop it at the end. A card that had failed comes back to `idle` with its attempts forgiven, which is what makes dragging one back a retry; a card an agent is working cannot be moved out from under it, and nor can an archived one — `restoreCard` is what puts that back on the board. Say why in `note` and the agent that picks the card up is told it, the same way a reviewer's rejection reaches one: moving a card back without saying what was wrong with it buys a second attempt identical to the first.
   """
-  moveCard(cardId: String!, laneId: String!, position: Int): Card!
+  moveCard(cardId: String!, laneId: String!, position: Int, note: String): Card!
 
   """
   Puts a card back in play where it stands: clears its error, empties the count of failed attempts against it, and returns it to `idle`, which is the status a lane's agent will pick up. This is the way back for a card that stopped at `error` — one a reviewer rejected once its lane had no attempts left to spend, or one whose lane spends none. It does not run anything itself; `runCard` does that, and `autoRun` does it unasked. Refused while an agent is working the card, and on an archived one — `restoreCard` puts that back on the board first.

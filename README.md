@@ -55,13 +55,19 @@ key from the environment instead of the UI.
 - **card** — one piece of work, on the board. `acceptance` is kept apart from `body` because it
   is what a review agent is asked to check against, and a criterion buried in a paragraph is a
   criterion that gets skipped. `dependsOn` links say which cards must finish first. `result` is
-  the last account of the work and `error` the reason it last came back; `attempts` counts the
-  failures since a person last put it in play, which is what a lane's `maxAttempts` is spent
-  against.
+  the last account of the work and `error` is what broke — a crash, a timeout, an interrupted
+  run, and never a verdict. `status` is `idle`, `running`, `done`, `rejected` or `error`;
+  `attempts` counts the failures since a person last put it in play, which is what a lane's
+  `maxAttempts` is spent against.
+- **card event** — one move of a card: from a lane, to a lane, why, and who. This is where a
+  reviewer's reasons live, and where a person's do — it is the only record that knows a card was
+  dragged. "Why is this card here?" is a question about the move that brought it, so the answer
+  is kept on the move rather than on the card, where each new reason would erase the last.
 - **run** — one execution of one agent: `kind` is `refine`, `decompose` or `card`, and the row
   keeps the status, timings, output or error, the tools called and the tokens spent. A run in
   flight can be called off (`stopCard`, `stopTask`), which aborts the request and finishes the
-  run as `stopped` — neither a success nor a failure. Nothing whose run is going can be deleted;
+  run as `stopped` — neither a success nor a failure, so the card goes back to `idle` where it
+  is, costs no attempt and follows neither arrow. Nothing whose run is going can be deleted;
   the delete is refused server-side until it has stopped.
 - **mcp server** — a stdio or http MCP server whose tools an agent can reach, exposed to the
   model as `slug__tool-name`. Which agents see which servers is a separate choice — see
@@ -118,12 +124,18 @@ Two rules are worth knowing because they are what keeps a board from running awa
 it is waiting for that lane's turn. `done` means nothing further will happen to it — it stayed
 put, or it landed where no agent runs.
 
-**A card a reviewer rejected stays `error`, unless the reviewer was given a budget.** `error` is
-a status the worker will not pick up, so by default a rejected card waits for a person rather
-than looping between two agents at whatever a token costs. `retryCard` — the **Retry** button on
-the card — clears the error and returns it to `idle` where it stands, and that is how a failed
+**A card a reviewer rejected stays `rejected`, unless the reviewer was given a budget.**
+`rejected` is a status the worker will not pick up, so by default a rejected card waits for a
+person rather than looping between two agents at whatever a token costs. `retryCard` — the
+**Retry** button on the card — returns it to `idle` where it stands, and that is how a stopped
 card is put back in play. Moving it does the same thing, since a moved card comes back to `idle`
 too.
+
+`rejected` is its own status, in its own colour, and not `error`, because the two want different
+things from you. A reviewer saying no is the board working: there is a decision to make. A crash
+is a fault: there is something to look at. Folding them together meant the board could not say
+which of the two a card was, and meant a connection reset reached the next agent as though it
+were review feedback.
 
 **A station can be given attempts to spend, and then the board corrects itself.** `maxAttempts`
 on a lane — **Attempts before a person**, in the lane dialog — is how many times that station
@@ -146,9 +158,14 @@ has still run fine, so the run is `ok` and it is the card that failed. An answer
 counts as a pass. A mumbling reviewer must not be able to wedge a board.
 
 A verdict is also not an account of the work, so a judging station does not overwrite one: the
-executor's report stays in `result` and the rejection goes to `error`, where the next agent round
-the loop is handed it as "Why this came back". A second attempt without the reason for the first
-is the first attempt again.
+executor's report stays in `result` and the ruling goes on the move it caused, where the next
+agent round the loop is handed it as "Why this came back". A second attempt without the reason
+for the first is the first attempt again. A pass is recorded the same way — why a card was let
+through is worth keeping too, and it used to be thrown away.
+
+What a card's prompt never contains is `error`. A crash is not feedback: an endpoint that reset
+the connection has said nothing about the work, and an agent handed a stack trace under that
+heading is being told the last attempt was wrong when nobody said so.
 
 Reading an answer as a verdict is the **lane's** setting (`readVerdict`), not the agent's. A new
 board has it on Review and nowhere else, and the lane dialog is where it moves — which is what
@@ -156,7 +173,11 @@ lets the same agent judge cards at one station and work them at another, and let
 two reviewing stations, or none.
 
 A card whose dependencies have not finished is skipped by the worker rather than run out of
-order. Asking for it by hand marks it `blocked` and says on the card what it is waiting on.
+order, and asking for it by hand is refused with the count. Nothing is written to the card about
+waiting: what it waits on is worked out from the cards around it whenever the question is asked —
+by the board, which names them under the card, and by the `blockers` query. A stored answer was
+written once and never revisited, so a card sat saying it was waiting long after the thing it
+waited on had finished.
 
 ## Moving a card
 
@@ -164,6 +185,11 @@ Cards drag, by the grip on their left, and they also move with the arrows on the
 on the same `moveCard`, which puts the card in a lane at a position and renumbers that lane so
 the board stays in the order it looks like — and brings the card back to `idle` with its error
 cleared, which is why dragging a failed card is a retry.
+
+Every move is written down, whoever made it: which lane it came from, which it went to, and why
+if anybody said. `moveCard` takes a `note`, and an agent that picks the card up afterwards is
+told it exactly the way it would be told a reviewer's rejection — moving a card back without
+saying what was wrong with it buys a second attempt identical to the first.
 
 The grip is a handle rather than the whole card being draggable, and that is about the keyboard
 as much as the mouse: a card carries eight buttons, and a drag listener on the card itself would
@@ -328,10 +354,16 @@ card and a task each know they are being worked but not by which run, so the pag
 It is debugging output, not the record: nothing is persisted, nothing survives a restart, and a
 finished run is forgotten a minute later. The row remains the lasting account of what happened.
 
-The rows are also where a card's own history is. Opening a card shows every run against it,
-newest first — the agent, when, how long, how many tokens — and any of them expands to what it
-said or the error it died of. The Runs page asks the same question of a whole project; this asks
-it of the one card, which is the question somebody has the card open to ask.
+The rows are half of where a card's own history is. Opening a card shows every run against it
+merged with every move it made — the station and the agent, when, how long, how many tokens, and
+between them the verdicts and the drags that put the card where it is. A run expands to what it
+said or the error it died of; a verdict shows its first line without being asked, because a
+one-line reason is the whole value of a review.
+
+It reads oldest first, and says so, with a button to turn it round. A history is a story and a
+story only reads forwards: a rejection makes sense after the attempt it was about and nonsense
+before it. The Runs page is newest-first on purpose — it is a firehose across a whole board,
+where the last thing to happen is the thing being looked for.
 
 ## What it has cost
 

@@ -33,6 +33,8 @@ const TOOLS = [
   "Query.tasks",
   "Query.runs",
   "Query.runEvents",
+  "Query.cardEvents",
+  "Query.blockers",
   "Query.agents",
   "Query.roles",
   "Query.spend",
@@ -79,14 +81,31 @@ const HINTS: Record<string, string> = {
     "`onFailureLaneId` afterwards. A lane with no agent is a resting place, which is what a " +
     "backlog and a done pile are. `wipLimit` caps how many cards it works at once, and a lane " +
     "with `readVerdict` judges cards rather than working them: its agent answers PASS or FAIL " +
-    "and that word picks the arm. Filter by `projectId`.",
+    "and that word picks the arm, and the rest of what it said is kept as the reason for the " +
+    "move. Filter by `projectId`.",
   cards:
-    "The units of work. `status` is `idle`, `running`, `blocked`, `done` or `error`; a finished " +
-    "card carries the agent's `result`. `acceptance` is what it will be judged on and `taskId` " +
-    "is the task it was decomposed out of. Filter by `projectId`, or by `laneId` for one " +
-    "column. A card with an `archivedAt` has been put away and is not on the board any more, " +
-    "so add `archivedAt: { isNull: true }` to see what the board sees — this query does not " +
-    "filter them out for you.",
+    "The units of work. `status` is `idle`, `running`, `done`, `rejected` or `error` — " +
+    "`rejected` is a reviewer having turned the card down, `error` is something having broken, " +
+    "and they are apart because they want different things from you. A card carries the last " +
+    "`result` an agent working it reported; `error` is what broke and never a verdict, so read " +
+    "`card_events` for why a card is where it is. `acceptance` is what it will be judged on " +
+    "and `taskId` is the task it was decomposed out of. A card waiting on a dependency is " +
+    "`idle` like any other — ask `blockers` what is in its way. Filter by `projectId`, or by " +
+    "`laneId` for one column. A card with an `archivedAt` has been put away and is not on the " +
+    "board any more, so add `archivedAt: { isNull: true }` to see what the board sees — this " +
+    "query does not filter them out for you.",
+  card_events:
+    "A card's ledger: every move it has made, in `createdAt` order, with the reason given at " +
+    "the time. `note` is why — a reviewer's verdict in its own words, or what a person said " +
+    "when they moved it. `fromLaneId` null is the card being created and `toLaneId` null is it " +
+    "being archived; the two being the same lane is a ruling that left the card where it was. " +
+    '`actor` says who decided. This is the answer to "why is this card here", which nothing ' +
+    "on the card itself can tell you. Filter by `cardId`.",
+  blockers:
+    "The unfinished cards a card is waiting on — why a lane's agent keeps passing it over. " +
+    "Empty means nothing is in its way. Worked out from the board as it stands each time you " +
+    "ask, so it is never stale; an archived dependency does not count, since taking one off " +
+    "the board is a decision that it need not happen.",
   tasks:
     "What people ask for, before it is work. A task is a title and a `brief`, and it becomes " +
     "cards only by being decomposed — `status` walks `draft` → `ready` → `decomposing` → " +
@@ -94,7 +113,10 @@ const HINTS: Record<string, string> = {
   runs:
     "What happened when an agent ran — `kind` is `refine`, `decompose` or `card`, `status` is " +
     "`running`, `ok`, `error` or `stopped`, and a finished run carries its output, its error, " +
-    "the tools it called and what it cost. Order by `startedAt` descending for the latest.",
+    "the tools it called and what it cost. `verdict` is what it ruled, and only a run at a " +
+    "judging station rules anything: `pass`, `fail`, or `none` for every other run — including " +
+    "a judging one that never finished, because a reviewer whose connection dropped ruled on " +
+    "nothing. Order by `startedAt` descending for the latest.",
   agents:
     "Who does the work: which model on which endpoint, filling which role. Read-only here — an " +
     "agent's endpoint and key are the operator's to set.",
@@ -166,21 +188,25 @@ const HINTS: Record<string, string> = {
   move_card:
     "Puts a card in a lane, at a position. This is how work is redirected by hand — and how a " +
     "failed card is retried, since a moved card comes back to `idle` and a lane with an agent " +
-    "will pick it up again.",
+    "will pick it up again. Say why in `note`: it is recorded against the move, and the agent " +
+    "that picks the card up is shown it, exactly as it is shown a reviewer's rejection. " +
+    "Sending a card back without saying what was wrong buys a second attempt at the first.",
   retry_card:
-    "Puts a failed card back in play where it stands, without running it. A card a reviewer " +
-    "rejected keeps its `error` status so the board waits for a person, and this is what " +
-    "clears it — after which its lane's agent will pick it up again. Refused on an archived " +
-    "card: `restore_card` puts it back on the board first.",
+    "Puts a card that stopped back in play where it stands, without running it — `rejected` " +
+    "or `error` alike. Both wait for a person on purpose, and this is the person: it clears " +
+    "the card and empties the failed attempts counted against it, after which its lane's " +
+    "agent picks it up again. The reason it stopped is left standing in its ledger, so the " +
+    "next agent is still told what was wrong. Refused on an archived card: `restore_card` " +
+    "puts it back on the board first.",
   archive_card:
     "Takes a card off the board without deleting it — the Done pile once it is long enough to " +
-    "be in the way, or the card nobody is going to do. It keeps its lane, its status and its " +
-    "result, stops being picked up, and stops counting as something other cards wait on. " +
-    "Refused while an agent is working it.",
+    "be in the way, or the card nobody is going to do. It keeps its lane, its status, its " +
+    "result and its ledger, stops being picked up, and stops counting as something other " +
+    "cards wait on. Refused while an agent is working it.",
   restore_card:
     "Puts an archived card back, at the end of the lane it was archived from. Its status is " +
-    "left as it was — a card archived in `error` comes back in `error`, and `retry_card` is " +
-    "still what puts that back in play.",
+    "left as it was — a card archived in `error` comes back in `error`, one archived as " +
+    "`rejected` comes back rejected, and `retry_card` is still what puts either back in play.",
   run_card:
     "Works one card now with its lane's agent, answering when the run finishes. The card moves " +
     "on by itself afterwards, to whichever lane its own said to send it.",

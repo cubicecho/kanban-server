@@ -135,8 +135,19 @@ export const projectContext = (project: Project): string =>
 export const decomposePrompt = (project: Project, task: Task): string =>
   `${projectContext(project)}\n\nTask: ${task.title || "(untitled)"}\n\n${task.brief}`.trim();
 
-/** What an agent working a card is given: the project, the card, and its criteria. */
-export const cardPrompt = (project: Project, card: Card): string =>
+/**
+ * What an agent working a card is given: the project, the card, and its criteria.
+ *
+ * `note` is the reason the card is in this lane, off the ledger — a reviewer's FAIL in its own
+ * words, or what a person said when they dragged it back. An agent picking up a card that came
+ * back needs that, or a second attempt is the first one again.
+ *
+ * What it is deliberately *not* given is `card.error`. That is where a crash goes, and a crash
+ * is not feedback: an endpoint that reset the connection has said nothing about the work, and
+ * handing an agent a stack trace under the heading "why this came back" was how a broken
+ * network read as a review.
+ */
+export const cardPrompt = (project: Project, card: Card, note = ""): string =>
   [
     projectContext(project),
     `\n\nCard: ${card.title}`,
@@ -145,9 +156,7 @@ export const cardPrompt = (project: Project, card: Card): string =>
     // An agent judging a card is reading the same card another just worked, so it needs what
     // came out of that as well as what went in.
     card.result ? `\n\nWhat the last agent reported:\n${card.result}` : "",
-    // And an agent picking up a card that came back needs the reason it came back — a reviewer's
-    // FAIL, or the error a run died of. Without it a second attempt is the first one again.
-    card.error ? `\n\nWhy this came back:\n${card.error}` : "",
+    note ? `\n\nWhy this came back:\n${note}` : "",
   ]
     .join("")
     .trim();

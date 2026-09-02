@@ -127,6 +127,23 @@ test("an archived card leaves the board with everything it had, and comes back a
   expect(back.map((card) => card.title)).toEqual(["B", "C", "A"]);
   // And still failed. What a card was is usually why it was put away.
   expect(back.find((card) => card.id === ids.A)?.status).toBe("error");
+
+  // The whole of it is in the ledger, in order: made, put away, brought back. Going off the
+  // board is a move like any other, and the only one with nowhere to move to.
+  const { cardEvents } = await run(
+    `query History($cardId: String!) {
+       cardEvents(
+         where: { cardId: { eq: $cardId } }
+         orderBy: { createdAt: { direction: asc, priority: 1 } }
+       ) { fromLaneId toLaneId actor }
+     }`,
+    { cardId: ids.A },
+  );
+  expect(cardEvents).toEqual([
+    { fromLaneId: null, toLaneId: laneIds[0], actor: "user" },
+    { fromLaneId: laneIds[0], toLaneId: null, actor: "user" },
+    { fromLaneId: null, toLaneId: laneIds[0], actor: "user" },
+  ]);
 });
 
 test("an archived card is not run, not moved, and not waited on", async () => {

@@ -76,7 +76,9 @@ test("offers the board tools, and only those", async () => {
     "agents",
     "apply_board_template",
     "archive_card",
+    "blockers",
     "board_templates",
+    "card_events",
     "cards",
     "create_card",
     "create_project",
@@ -375,7 +377,9 @@ test("marks only the tools that actually destroy something", async () => {
   // And every read is marked as one, which is what lets a client re-ask without asking anyone.
   expect(flagged("idempotentHint").filter((name) => !writes.has(name))).toEqual([
     "agents",
+    "blockers",
     "board_templates",
+    "card_events",
     "cards",
     "lanes",
     "projects",

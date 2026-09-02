@@ -60,8 +60,12 @@ subscription RunEvents($runId: String!) {
 }
 
 # One card's own history, for the dialog that opens on it. The Runs page has the whole board's;
-# this is the account of why this card is where it is — the attempt that failed, and what the
-# reviewer said about the one before.
+# this is the account of why this card is where it is — the attempt that failed, what the
+# reviewer said about the one before, and the afternoon somebody dragged it back by hand.
+#
+# Two lists rather than one, because they answer different halves of the question: the runs are
+# what agents did, the events are what became of the card. Only the second knows about a person.
+# They are merged by time where they are drawn.
 query CardRuns($cardId: String!) {
   runs(
     limit: 20
@@ -70,12 +74,33 @@ query CardRuns($cardId: String!) {
   ) {
     id
     status
+    verdict
     startedAt
     finishedAt
     output
     error
     totalTokens
     agent {
+      name
+    }
+    lane {
+      name
+    }
+  }
+  cardEvents(
+    limit: 50
+    where: { cardId: { eq: $cardId } }
+    orderBy: { createdAt: { direction: desc, priority: 1 } }
+  ) {
+    id
+    runId
+    note
+    actor
+    createdAt
+    fromLane {
+      name
+    }
+    toLane {
       name
     }
   }

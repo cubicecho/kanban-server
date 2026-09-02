@@ -12,18 +12,11 @@ import {
   DeleteCardDocument,
   RestoreCardDocument,
 } from "@/gql/graphql";
+import { CARD_STATUS_CLASS, CARD_STATUS_VARIANT } from "@/lib/cards";
 import { request } from "@/lib/gql";
 import { useProjectId } from "@/lib/project";
 
 type Archived = ArchiveQuery["cards"][number];
-
-const STATUS_VARIANT = {
-  error: "destructive",
-  running: "outline",
-  blocked: "outline",
-  done: "secondary",
-  idle: "secondary",
-} as const;
 
 /**
  * The cards that have been put out of the way.
@@ -109,7 +102,12 @@ export function ArchiveRoute() {
                 onClick={() => setOpen(expanded ? null : card.id)}
               >
                 <div className="flex items-center gap-2">
-                  <Badge variant={STATUS_VARIANT[card.status] ?? "secondary"}>{card.status}</Badge>
+                  <Badge
+                    variant={CARD_STATUS_VARIANT[card.status] ?? "secondary"}
+                    className={CARD_STATUS_CLASS[card.status]}
+                  >
+                    {card.status}
+                  </Badge>
                   <span className="truncate font-medium">{card.title}</span>
                   <span className="shrink-0 text-xs text-muted-foreground">
                     {card.lane?.name ?? "(lane gone)"} ·{" "}
