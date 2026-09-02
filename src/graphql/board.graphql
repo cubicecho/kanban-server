@@ -1,4 +1,4 @@
-query Board($projectId: String!) {
+query Board($projectId: String!, $limit: Int!) {
   lanes(
     where: { projectId: { eq: $projectId } }
     orderBy: { position: { direction: asc, priority: 1 } }
@@ -17,7 +17,7 @@ query Board($projectId: String!) {
   }
   # Archived cards are off the board by definition — see archive.graphql for the other half.
   cards(
-    limit: 500
+    limit: $limit
     where: { projectId: { eq: $projectId }, archivedAt: { isNull: true } }
     orderBy: { position: { direction: asc, priority: 1 } }
   ) {

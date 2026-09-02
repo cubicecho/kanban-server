@@ -1,5 +1,5 @@
-import { Link } from "@tanstack/react-router";
 import { FolderOpen, type LucideIcon, Plus } from "lucide-react";
+import { useProjectActions } from "@/components/project-actions";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
@@ -38,17 +38,16 @@ export function EmptyState({
  * *disabled* picker reading "No projects yet", which is a instruction you cannot follow.
  */
 export function NoProject({ what }: { what: string }) {
+  const { newProject } = useProjectActions();
   return (
     <EmptyState
       icon={FolderOpen}
       title="No project selected"
       description={`${what} belongs to a project. Make one — it arrives with a board already wired up.`}
       action={
-        <Button asChild>
-          <Link to="/">
-            <Plus className="size-4" aria-hidden />
-            New project
-          </Link>
+        <Button onClick={newProject}>
+          <Plus className="size-4" aria-hidden />
+          New project
         </Button>
       }
     />

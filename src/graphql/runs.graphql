@@ -1,6 +1,6 @@
-query Runs($projectId: String) {
+query Runs($projectId: String, $limit: Int!) {
   runs(
-    limit: 100
+    limit: $limit
     where: { projectId: { eq: $projectId } }
     orderBy: { startedAt: { direction: desc, priority: 1 } }
   ) {

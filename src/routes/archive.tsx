@@ -24,6 +24,9 @@ import { cn } from "@/lib/utils";
 
 type Archived = ArchiveQuery["cards"][number];
 
+/** As on Runs: one more is asked for than is drawn, so the end of the page is not the end. */
+const PAGE = 100;
+
 /**
  * The cards that have been put out of the way.
  *
@@ -40,10 +43,12 @@ export function ArchiveRoute() {
   const project = useCurrentProject();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState<string | null>(null);
+  const [limit, setLimit] = useState(PAGE);
 
   const archive = useQuery({
-    queryKey: ["archive", projectId],
-    queryFn: () => request(ArchiveDocument, { projectId }),
+    // A prefix of the key everything else invalidates, so a longer page still refreshes.
+    queryKey: ["archive", projectId, limit],
+    queryFn: () => request(ArchiveDocument, { projectId, limit: limit + 1 }),
     enabled: Boolean(projectId),
   });
 
@@ -78,7 +83,9 @@ export function ArchiveRoute() {
     );
   }
 
-  const cards = archive.data?.cards ?? [];
+  const rows = archive.data?.cards ?? [];
+  const more = rows.length > limit;
+  const cards = more ? rows.slice(0, limit) : rows;
 
   return (
     <Page
@@ -182,6 +189,12 @@ export function ArchiveRoute() {
           </Card>
         );
       })}
+
+      {more ? (
+        <Button variant="outline" className="self-center" onClick={() => setLimit(limit + PAGE)}>
+          Show {PAGE} more
+        </Button>
+      ) : null}
     </Page>
   );
 }
