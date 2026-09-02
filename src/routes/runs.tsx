@@ -16,18 +16,9 @@ import {
 } from "@/gql/graphql";
 import { request } from "@/lib/gql";
 import { useProjectId } from "@/lib/project";
+import { duration, RUN_STATUS_VARIANT } from "@/lib/runs";
 
 type Run = RunsQuery["runs"][number];
-
-const duration = (from: string, to?: string | null) =>
-  to ? `${((new Date(to).getTime() - new Date(from).getTime()) / 1000).toFixed(1)}s` : "running…";
-
-const STATUS_VARIANT = {
-  error: "destructive",
-  running: "outline",
-  stopped: "outline",
-  ok: "secondary",
-} as const;
 
 /** What the run was about: a card by title, or the task it was refining or breaking up. */
 const subject = (run: Run) => run.card?.title || run.task?.title || "(gone)";
@@ -134,7 +125,9 @@ export function RunsRoute() {
                 onClick={() => setOpen(expanded ? null : run.id)}
               >
                 <div className="flex items-center gap-2">
-                  <Badge variant={STATUS_VARIANT[run.status] ?? "secondary"}>{run.status}</Badge>
+                  <Badge variant={RUN_STATUS_VARIANT[run.status] ?? "secondary"}>
+                    {run.status}
+                  </Badge>
                   <Badge variant="outline">{run.kind}</Badge>
                   <span className="truncate font-medium">{subject(run)}</span>
                   <span className="shrink-0 text-xs text-muted-foreground">
