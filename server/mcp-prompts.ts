@@ -194,7 +194,7 @@ Finish by reporting the ids of what you created and which lanes they are sitting
     title: "Find out what is stuck on a board",
     description:
       "Reads a board's lanes, cards and runs, explains why each failed or blocked card is where " +
-      "it is, and proposes one move per stuck card — retry, edit, move or delete.",
+      "it is, and proposes one move per stuck card — retry, edit, move, archive or delete.",
     args: { project },
     render: (args: Record<string, string | undefined>) =>
       `Work out what is stuck on this board and what should be done about it.
@@ -216,6 +216,8 @@ Finish by reporting the ids of what you created and which lanes they are sitting
    - \`update_card_single\` and then \`retry_card\` — the card itself was wrong: too big, or vague
      about what done means.
    - \`move_card\` — the card belongs at a different station.
+   - \`archive_card\` — nobody is going to do it, but it happened and is worth keeping. This is
+     also what to reach for on a Done pile long enough to be in the way.
    - \`delete_card_single\` — it should never have been written. \`stop_card\` first if something
      is running on it.
 6. Look at \`spend\` for the project while you are here, and mention it if the board has cost more

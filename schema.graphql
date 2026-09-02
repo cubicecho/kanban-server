@@ -1,7 +1,140 @@
+type Role {
+  id: String!
+  name: String!
+  description: String!
+  stage: RolesStageEnum!
+  systemPrompt: String!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+
+  """
+  Opaque cursor of this row's position in the query's ordering. Pass it as `after` to resume from here. Only set on rows returned by a list query.
+  """
+  cursor: String
+  agents(
+    where: AgentFilters
+    orderBy: AgentOrderBy
+    offset: Int
+    limit: Int
+
+    """
+    Keyset pagination: only return related rows strictly after this cursor (a row's `cursor` field from a previous page of this relation, under the same orderBy).
+    """
+    after: String
+    distinct: [AgentDistinctColumn!]
+  ): [Agent!]!
+  agentsAggregate(where: AgentFilters): AgentAggregate!
+}
+
+enum RolesStageEnum {
+  """Value: card"""
+  card
+
+  """Value: refine"""
+  refine
+
+  """Value: decompose"""
+  decompose
+}
+
+"""
+A date-time string at UTC, such as 2007-12-03T10:15:30Z, compliant with the `date-time` format outlined in section 5.6 of the RFC 3339 profile of the ISO 8601 standard for representation of dates and times using the Gregorian calendar.
+"""
+scalar DateTime
+
+"""Columns of Agent that a query can be made distinct on"""
+enum AgentDistinctColumn {
+  id
+  name
+  roleId
+  enabled
+  baseUrl
+  model
+  systemPrompt
+  maxTokens
+  temperature
+  maxToolIterations
+  toolDiscovery
+  requestTimeoutSeconds
+  maxRetries
+  createdAt
+  updatedAt
+}
+
+type RoleAggregate {
+  count: Int!
+  min: RoleMinAggregate
+  max: RoleMaxAggregate
+  countNonNull: RoleCountNonNullAggregate
+  countDistinct: RoleCountDistinctAggregate
+}
+
+type RoleMinAggregate {
+  id: String
+  name: String
+  description: String
+  stage: RolesStageEnum
+  systemPrompt: String
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
+type RoleMaxAggregate {
+  id: String
+  name: String
+  description: String
+  stage: RolesStageEnum
+  systemPrompt: String
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
+type RoleCountNonNullAggregate {
+  id: Int!
+  name: Int!
+  description: Int!
+  stage: Int!
+  systemPrompt: Int!
+  createdAt: Int!
+  updatedAt: Int!
+}
+
+type RoleCountDistinctAggregate {
+  id: Int!
+  name: Int!
+  description: Int!
+  stage: Int!
+  systemPrompt: Int!
+  createdAt: Int!
+  updatedAt: Int!
+}
+
+type RoleGroupBy {
+  group: RoleGroupKeys!
+  count: Int!
+  min: RoleMinAggregate
+  max: RoleMaxAggregate
+  countNonNull: RoleCountNonNullAggregate
+  countDistinct: RoleCountDistinctAggregate
+}
+
+"""
+The grouped column values of one Role group. A column the query did not group by is null.
+"""
+type RoleGroupKeys {
+  id: String
+  name: String
+  description: String
+  stage: RolesStageEnum
+  systemPrompt: String
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
 type Agent {
   id: String!
   name: String!
-  role: AgentsRoleEnum!
+  roleId: String!
   enabled: Boolean!
   baseUrl: String!
   model: String!
@@ -19,6 +152,7 @@ type Agent {
   Opaque cursor of this row's position in the query's ordering. Pass it as `after` to resume from here. Only set on rows returned by a list query.
   """
   cursor: String
+  role(where: RoleFilters): Role!
   servers(
     where: AgentServerFilters
     orderBy: AgentServerOrderBy
@@ -60,20 +194,6 @@ type Agent {
   runsAggregate(where: RunFilters): RunAggregate!
 }
 
-enum AgentsRoleEnum {
-  """Value: refine"""
-  refine
-
-  """Value: decompose"""
-  decompose
-
-  """Value: review"""
-  review
-
-  """Value: execute"""
-  execute
-}
-
 enum AgentsToolDiscoveryEnum {
   """Value: inherit"""
   inherit
@@ -84,11 +204,6 @@ enum AgentsToolDiscoveryEnum {
   """Value: ondemand"""
   ondemand
 }
-
-"""
-A date-time string at UTC, such as 2007-12-03T10:15:30Z, compliant with the `date-time` format outlined in section 5.6 of the RFC 3339 profile of the ISO 8601 standard for representation of dates and times using the Gregorian calendar.
-"""
-scalar DateTime
 
 """Columns of AgentServer that a query can be made distinct on"""
 enum AgentServerDistinctColumn {
@@ -108,6 +223,7 @@ enum LaneDistinctColumn {
   onSuccessLaneId
   onFailureLaneId
   wipLimit
+  readVerdict
   createdAt
 }
 
@@ -160,7 +276,7 @@ type AgentSumAggregate {
 type AgentMinAggregate {
   id: String
   name: String
-  role: AgentsRoleEnum
+  roleId: String
   baseUrl: String
   model: String
   systemPrompt: String
@@ -177,7 +293,7 @@ type AgentMinAggregate {
 type AgentMaxAggregate {
   id: String
   name: String
-  role: AgentsRoleEnum
+  roleId: String
   baseUrl: String
   model: String
   systemPrompt: String
@@ -194,7 +310,7 @@ type AgentMaxAggregate {
 type AgentCountNonNullAggregate {
   id: Int!
   name: Int!
-  role: Int!
+  roleId: Int!
   enabled: Int!
   baseUrl: Int!
   model: Int!
@@ -212,7 +328,7 @@ type AgentCountNonNullAggregate {
 type AgentCountDistinctAggregate {
   id: Int!
   name: Int!
-  role: Int!
+  roleId: Int!
   baseUrl: Int!
   model: Int!
   systemPrompt: Int!
@@ -243,7 +359,7 @@ The grouped column values of one Agent group. A column the query did not group b
 type AgentGroupKeys {
   id: String
   name: String
-  role: AgentsRoleEnum
+  roleId: String
   baseUrl: String
   model: String
   systemPrompt: String
@@ -531,6 +647,7 @@ enum CardDistinctColumn {
   status
   result
   error
+  archivedAt
   createdAt
   updatedAt
 }
@@ -622,6 +739,7 @@ type Lane {
   onSuccessLaneId: String
   onFailureLaneId: String
   wipLimit: Int!
+  readVerdict: Boolean!
   createdAt: DateTime!
 
   """
@@ -699,6 +817,7 @@ type LaneCountNonNullAggregate {
   onSuccessLaneId: Int!
   onFailureLaneId: Int!
   wipLimit: Int!
+  readVerdict: Int!
   createdAt: Int!
 }
 
@@ -739,6 +858,7 @@ type LaneGroupKeys {
   wipLimit: Int
   createdAt: DateTime
   intake: Boolean
+  readVerdict: Boolean
 }
 
 type Task {
@@ -979,6 +1099,7 @@ type Card {
   status: CardsStatusEnum!
   result: String!
   error: String!
+  archivedAt: DateTime
   createdAt: DateTime!
   updatedAt: DateTime!
 
@@ -1071,6 +1192,7 @@ type CardMinAggregate {
   status: CardsStatusEnum
   result: String
   error: String
+  archivedAt: DateTime
   createdAt: DateTime
   updatedAt: DateTime
 }
@@ -1087,6 +1209,7 @@ type CardMaxAggregate {
   status: CardsStatusEnum
   result: String
   error: String
+  archivedAt: DateTime
   createdAt: DateTime
   updatedAt: DateTime
 }
@@ -1103,6 +1226,7 @@ type CardCountNonNullAggregate {
   status: Int!
   result: Int!
   error: Int!
+  archivedAt: Int!
   createdAt: Int!
   updatedAt: Int!
 }
@@ -1119,6 +1243,7 @@ type CardCountDistinctAggregate {
   status: Int!
   result: Int!
   error: Int!
+  archivedAt: Int!
   createdAt: Int!
   updatedAt: Int!
 }
@@ -1149,6 +1274,7 @@ type CardGroupKeys {
   status: CardsStatusEnum
   result: String
   error: String
+  archivedAt: DateTime
   createdAt: DateTime
   updatedAt: DateTime
 }
@@ -1611,79 +1737,53 @@ type SettingGroupKeys {
   workerIntervalSeconds: Int
 }
 
-input CreateAgentInput {
+input CreateRoleInput {
   id: String
   name: String!
-  role: AgentsRoleEnum
-  enabled: Boolean
-  baseUrl: String
-  model: String
+  description: String
+  stage: RolesStageEnum
   systemPrompt: String
-  maxTokens: Int
-  temperature: Float
-  maxToolIterations: Int
-  toolDiscovery: AgentsToolDiscoveryEnum
-  requestTimeoutSeconds: Int
-  maxRetries: Int
   createdAt: DateTime
   updatedAt: DateTime
 }
 
-input UpdateAgentInput {
+input UpdateRoleInput {
   id: String
   name: String
-  role: AgentsRoleEnum
-  enabled: Boolean
-  baseUrl: String
-  model: String
+  description: String
+  stage: RolesStageEnum
   systemPrompt: String
-  maxTokens: Int
-  temperature: Float
-  maxToolIterations: Int
-  toolDiscovery: AgentsToolDiscoveryEnum
-  requestTimeoutSeconds: Int
-  maxRetries: Int
   createdAt: DateTime
   updatedAt: DateTime
 }
 
 """
-One entry of a batch update of Agent: the rows `where` matches get this entry's `set` applied.
+One entry of a batch update of Role: the rows `where` matches get this entry's `set` applied.
 """
-input UpdateAgentManyInput {
+input UpdateRoleManyInput {
   """Rows this entry updates. An omitted filter updates every row."""
-  where: AgentFilters
-  set: UpdateAgentInput!
+  where: RoleFilters
+  set: UpdateRoleInput!
 }
 
-input AgentFilters {
+input RoleFilters {
   id: StringFilter
   name: StringFilter
-  role: AgentsRoleEnumFilter
-  enabled: BooleanFilter
-  baseUrl: StringFilter
-  model: StringFilter
+  description: StringFilter
+  stage: RolesStageEnumFilter
   systemPrompt: StringFilter
-  maxTokens: IntFilter
-  temperature: FloatFilter
-  maxToolIterations: IntFilter
-  toolDiscovery: AgentsToolDiscoveryEnumFilter
-  requestTimeoutSeconds: IntFilter
-  maxRetries: IntFilter
   createdAt: DateTimeFilter
   updatedAt: DateTimeFilter
-  servers: AgentServerListRelationFilter
-  lanes: LaneListRelationFilter
-  runs: RunListRelationFilter
+  agents: AgentListRelationFilter
 
   """At least one branch matches; ANDed with any sibling fields"""
-  OR: [AgentFilters!]
+  OR: [RoleFilters!]
 
   """Every branch matches"""
-  AND: [AgentFilters!]
+  AND: [RoleFilters!]
 
   """Negates the nested filters"""
-  NOT: AgentFilters
+  NOT: RoleFilters
 }
 
 input StringFilter {
@@ -1760,24 +1860,24 @@ input StringFilter {
   NOT: StringFilter
 }
 
-input AgentsRoleEnumFilter {
+input RolesStageEnumFilter {
   """Equal to"""
-  eq: AgentsRoleEnum
+  eq: RolesStageEnum
 
   """Not equal to"""
-  ne: AgentsRoleEnum
+  ne: RolesStageEnum
 
   """Less than"""
-  lt: AgentsRoleEnum
+  lt: RolesStageEnum
 
   """Less than or equal to"""
-  lte: AgentsRoleEnum
+  lte: RolesStageEnum
 
   """Greater than"""
-  gt: AgentsRoleEnum
+  gt: RolesStageEnum
 
   """Greater than or equal to"""
-  gte: AgentsRoleEnum
+  gte: RolesStageEnum
   like: String
   notLike: String
   ilike: String
@@ -1813,10 +1913,10 @@ input AgentsRoleEnumFilter {
   insensitive: Boolean
 
   """Matches any one of these values (SQL `IN`)"""
-  inArray: [AgentsRoleEnum!]
+  inArray: [RolesStageEnum!]
 
   """Matches none of these values (SQL `NOT IN`)"""
-  notInArray: [AgentsRoleEnum!]
+  notInArray: [RolesStageEnum!]
 
   """When true, matches rows where the column is NULL"""
   isNull: Boolean
@@ -1825,13 +1925,261 @@ input AgentsRoleEnumFilter {
   isNotNull: Boolean
 
   """At least one branch matches; ANDed with any sibling operators"""
-  OR: [AgentsRoleEnumFilter!]
+  OR: [RolesStageEnumFilter!]
 
   """Every branch matches"""
-  AND: [AgentsRoleEnumFilter!]
+  AND: [RolesStageEnumFilter!]
 
   """Negates the nested operators"""
-  NOT: AgentsRoleEnumFilter
+  NOT: RolesStageEnumFilter
+}
+
+input DateTimeFilter {
+  """Equal to"""
+  eq: DateTime
+
+  """Not equal to"""
+  ne: DateTime
+
+  """Less than"""
+  lt: DateTime
+
+  """Less than or equal to"""
+  lte: DateTime
+
+  """Greater than"""
+  gt: DateTime
+
+  """Greater than or equal to"""
+  gte: DateTime
+  like: String
+  notLike: String
+  ilike: String
+  notIlike: String
+
+  """
+  Matches values starting with the given string. `%`, `_` and `\` are matched literally.
+  """
+  startsWith: String
+
+  """
+  Matches values ending with the given string. `%`, `_` and `\` are matched literally.
+  """
+  endsWith: String
+
+  """
+  Matches values containing the given string. `%`, `_` and `\` are matched literally.
+  """
+  contains: String
+
+  """Case-insensitive `startsWith`."""
+  iStartsWith: String
+
+  """Case-insensitive `endsWith`."""
+  iEndsWith: String
+
+  """Case-insensitive `contains`."""
+  iContains: String
+
+  """
+  When true, every comparison operator in this object matches case-insensitively — `eq`, `ne`, the ordering operators, `inArray`/`notInArray` and the pattern operators all compare `lower(column)` against `lower(operand)`. Applies only to the operators beside it; a nested `AND`/`OR`/`NOT` branch sets its own.
+  """
+  insensitive: Boolean
+
+  """Matches any one of these values (SQL `IN`)"""
+  inArray: [DateTime!]
+
+  """Matches none of these values (SQL `NOT IN`)"""
+  notInArray: [DateTime!]
+
+  """When true, matches rows where the column is NULL"""
+  isNull: Boolean
+
+  """When true, matches rows where the column is not NULL"""
+  isNotNull: Boolean
+
+  """At least one branch matches; ANDed with any sibling operators"""
+  OR: [DateTimeFilter!]
+
+  """Every branch matches"""
+  AND: [DateTimeFilter!]
+
+  """Negates the nested operators"""
+  NOT: DateTimeFilter
+}
+
+input AgentListRelationFilter {
+  """At least one related row matches"""
+  some: AgentFilters
+
+  """No related row matches"""
+  none: AgentFilters
+
+  """Every related row matches"""
+  every: AgentFilters
+}
+
+input RoleOrderBy {
+  id: InnerOrder
+  name: InnerOrder
+  description: InnerOrder
+  stage: InnerOrder
+  systemPrompt: InnerOrder
+  createdAt: InnerOrder
+  updatedAt: InnerOrder
+}
+
+input InnerOrder {
+  direction: OrderDirection!
+
+  """Priority of current field"""
+  priority: Int!
+
+  """
+  Where NULL values sort. Defaults to the database's own rule (PostgreSQL: last on asc, first on desc; MySQL/SQLite: first on asc, last on desc)
+  """
+  nulls: OrderNulls
+
+  """
+  Sort by this column's position in the `inArray` list the same request's `where` gives it, rather than by the column's own value — `direction: asc` keeps the list's order, `desc` reverses it. Requires an `inArray` filter on the same column at the top level of `where`, and cannot be combined with `after` or `distinct`.
+  """
+  matchFilterOrder: Boolean
+}
+
+"""Order by direction"""
+enum OrderDirection {
+  """Ascending order"""
+  asc
+
+  """Descending order"""
+  desc
+}
+
+"""Where NULL values sort relative to non-NULL values"""
+enum OrderNulls {
+  """NULL values sort before all non-NULL values"""
+  first
+
+  """NULL values sort after all non-NULL values"""
+  last
+}
+
+"""Filters Role groups by their aggregated values"""
+input RoleHaving {
+  """Filters groups by how many rows they contain"""
+  count: AggregateNumberFilter
+  countNonNull: RoleCountNonNullHaving
+  countDistinct: RoleCountDistinctHaving
+}
+
+"""
+Compares an aggregated value. Several operators in one filter are ANDed together.
+"""
+input AggregateNumberFilter {
+  eq: Float
+  ne: Float
+  gt: Float
+  gte: Float
+  lt: Float
+  lte: Float
+}
+
+input RoleCountNonNullHaving {
+  id: AggregateNumberFilter
+  name: AggregateNumberFilter
+  description: AggregateNumberFilter
+  stage: AggregateNumberFilter
+  systemPrompt: AggregateNumberFilter
+  createdAt: AggregateNumberFilter
+  updatedAt: AggregateNumberFilter
+}
+
+input RoleCountDistinctHaving {
+  id: AggregateNumberFilter
+  name: AggregateNumberFilter
+  description: AggregateNumberFilter
+  stage: AggregateNumberFilter
+  systemPrompt: AggregateNumberFilter
+  createdAt: AggregateNumberFilter
+  updatedAt: AggregateNumberFilter
+}
+
+input CreateAgentInput {
+  id: String
+  name: String!
+  roleId: String!
+  enabled: Boolean
+  baseUrl: String
+  model: String
+  systemPrompt: String
+  maxTokens: Int
+  temperature: Float
+  maxToolIterations: Int
+  toolDiscovery: AgentsToolDiscoveryEnum
+  requestTimeoutSeconds: Int
+  maxRetries: Int
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
+input UpdateAgentInput {
+  id: String
+  name: String
+  roleId: String
+  enabled: Boolean
+  baseUrl: String
+  model: String
+  systemPrompt: String
+  maxTokens: Int
+  temperature: Float
+  maxToolIterations: Int
+  toolDiscovery: AgentsToolDiscoveryEnum
+  requestTimeoutSeconds: Int
+  maxRetries: Int
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
+"""
+One entry of a batch update of Agent: the rows `where` matches get this entry's `set` applied.
+"""
+input UpdateAgentManyInput {
+  """Rows this entry updates. An omitted filter updates every row."""
+  where: AgentFilters
+  set: UpdateAgentInput!
+}
+
+input AgentFilters {
+  id: StringFilter
+  name: StringFilter
+  roleId: StringFilter
+  enabled: BooleanFilter
+  baseUrl: StringFilter
+  model: StringFilter
+  systemPrompt: StringFilter
+  maxTokens: IntFilter
+  temperature: FloatFilter
+  maxToolIterations: IntFilter
+  toolDiscovery: AgentsToolDiscoveryEnumFilter
+  requestTimeoutSeconds: IntFilter
+  maxRetries: IntFilter
+  createdAt: DateTimeFilter
+  updatedAt: DateTimeFilter
+
+  """Matches rows whose role matches these filters"""
+  role: RoleFilters
+  servers: AgentServerListRelationFilter
+  lanes: LaneListRelationFilter
+  runs: RunListRelationFilter
+
+  """At least one branch matches; ANDed with any sibling fields"""
+  OR: [AgentFilters!]
+
+  """Every branch matches"""
+  AND: [AgentFilters!]
+
+  """Negates the nested filters"""
+  NOT: AgentFilters
 }
 
 input BooleanFilter {
@@ -2064,80 +2412,6 @@ input AgentsToolDiscoveryEnumFilter {
   NOT: AgentsToolDiscoveryEnumFilter
 }
 
-input DateTimeFilter {
-  """Equal to"""
-  eq: DateTime
-
-  """Not equal to"""
-  ne: DateTime
-
-  """Less than"""
-  lt: DateTime
-
-  """Less than or equal to"""
-  lte: DateTime
-
-  """Greater than"""
-  gt: DateTime
-
-  """Greater than or equal to"""
-  gte: DateTime
-  like: String
-  notLike: String
-  ilike: String
-  notIlike: String
-
-  """
-  Matches values starting with the given string. `%`, `_` and `\` are matched literally.
-  """
-  startsWith: String
-
-  """
-  Matches values ending with the given string. `%`, `_` and `\` are matched literally.
-  """
-  endsWith: String
-
-  """
-  Matches values containing the given string. `%`, `_` and `\` are matched literally.
-  """
-  contains: String
-
-  """Case-insensitive `startsWith`."""
-  iStartsWith: String
-
-  """Case-insensitive `endsWith`."""
-  iEndsWith: String
-
-  """Case-insensitive `contains`."""
-  iContains: String
-
-  """
-  When true, every comparison operator in this object matches case-insensitively — `eq`, `ne`, the ordering operators, `inArray`/`notInArray` and the pattern operators all compare `lower(column)` against `lower(operand)`. Applies only to the operators beside it; a nested `AND`/`OR`/`NOT` branch sets its own.
-  """
-  insensitive: Boolean
-
-  """Matches any one of these values (SQL `IN`)"""
-  inArray: [DateTime!]
-
-  """Matches none of these values (SQL `NOT IN`)"""
-  notInArray: [DateTime!]
-
-  """When true, matches rows where the column is NULL"""
-  isNull: Boolean
-
-  """When true, matches rows where the column is not NULL"""
-  isNotNull: Boolean
-
-  """At least one branch matches; ANDed with any sibling operators"""
-  OR: [DateTimeFilter!]
-
-  """Every branch matches"""
-  AND: [DateTimeFilter!]
-
-  """Negates the nested operators"""
-  NOT: DateTimeFilter
-}
-
 input AgentServerListRelationFilter {
   """At least one related row matches"""
   some: AgentServerFilters
@@ -2174,7 +2448,7 @@ input RunListRelationFilter {
 input AgentOrderBy {
   id: InnerOrder
   name: InnerOrder
-  role: InnerOrder
+  roleId: InnerOrder
   enabled: InnerOrder
   baseUrl: InnerOrder
   model: InnerOrder
@@ -2187,41 +2461,9 @@ input AgentOrderBy {
   maxRetries: InnerOrder
   createdAt: InnerOrder
   updatedAt: InnerOrder
-}
 
-input InnerOrder {
-  direction: OrderDirection!
-
-  """Priority of current field"""
-  priority: Int!
-
-  """
-  Where NULL values sort. Defaults to the database's own rule (PostgreSQL: last on asc, first on desc; MySQL/SQLite: first on asc, last on desc)
-  """
-  nulls: OrderNulls
-
-  """
-  Sort by this column's position in the `inArray` list the same request's `where` gives it, rather than by the column's own value — `direction: asc` keeps the list's order, `desc` reverses it. Requires an `inArray` filter on the same column at the top level of `where`, and cannot be combined with `after` or `distinct`.
-  """
-  matchFilterOrder: Boolean
-}
-
-"""Order by direction"""
-enum OrderDirection {
-  """Ascending order"""
-  asc
-
-  """Descending order"""
-  desc
-}
-
-"""Where NULL values sort relative to non-NULL values"""
-enum OrderNulls {
-  """NULL values sort before all non-NULL values"""
-  first
-
-  """NULL values sort after all non-NULL values"""
-  last
+  """Order by columns of the related role row"""
+  role: RoleOrderBy
 }
 
 """Filters Agent groups by their aggregated values"""
@@ -2234,18 +2476,6 @@ input AgentHaving {
   max: AgentMaxHaving
   countNonNull: AgentCountNonNullHaving
   countDistinct: AgentCountDistinctHaving
-}
-
-"""
-Compares an aggregated value. Several operators in one filter are ANDed together.
-"""
-input AggregateNumberFilter {
-  eq: Float
-  ne: Float
-  gt: Float
-  gte: Float
-  lt: Float
-  lte: Float
 }
 
 input AgentAvgHaving {
@@ -2283,7 +2513,7 @@ input AgentMaxHaving {
 input AgentCountNonNullHaving {
   id: AggregateNumberFilter
   name: AggregateNumberFilter
-  role: AggregateNumberFilter
+  roleId: AggregateNumberFilter
   enabled: AggregateNumberFilter
   baseUrl: AggregateNumberFilter
   model: AggregateNumberFilter
@@ -2301,7 +2531,7 @@ input AgentCountNonNullHaving {
 input AgentCountDistinctHaving {
   id: AggregateNumberFilter
   name: AggregateNumberFilter
-  role: AggregateNumberFilter
+  roleId: AggregateNumberFilter
   baseUrl: AggregateNumberFilter
   model: AggregateNumberFilter
   systemPrompt: AggregateNumberFilter
@@ -2808,6 +3038,7 @@ input CreateLaneInput {
   onSuccessLaneId: String
   onFailureLaneId: String
   wipLimit: Int
+  readVerdict: Boolean
   createdAt: DateTime
 }
 
@@ -2821,6 +3052,7 @@ input UpdateLaneInput {
   onSuccessLaneId: String
   onFailureLaneId: String
   wipLimit: Int
+  readVerdict: Boolean
   createdAt: DateTime
 }
 
@@ -2843,6 +3075,7 @@ input LaneFilters {
   onSuccessLaneId: StringFilter
   onFailureLaneId: StringFilter
   wipLimit: IntFilter
+  readVerdict: BooleanFilter
   createdAt: DateTimeFilter
 
   """Matches rows whose project matches these filters"""
@@ -2872,6 +3105,7 @@ input LaneOrderBy {
   onSuccessLaneId: InnerOrder
   onFailureLaneId: InnerOrder
   wipLimit: InnerOrder
+  readVerdict: InnerOrder
   createdAt: InnerOrder
 
   """Order by columns of the related project row"""
@@ -2923,6 +3157,7 @@ input LaneCountNonNullHaving {
   onSuccessLaneId: AggregateNumberFilter
   onFailureLaneId: AggregateNumberFilter
   wipLimit: AggregateNumberFilter
+  readVerdict: AggregateNumberFilter
   createdAt: AggregateNumberFilter
 }
 
@@ -3289,6 +3524,7 @@ input CreateCardInput {
   status: CardsStatusEnum
   result: String
   error: String
+  archivedAt: DateTime
   createdAt: DateTime
   updatedAt: DateTime
 }
@@ -3305,6 +3541,7 @@ input UpdateCardInput {
   status: CardsStatusEnum
   result: String
   error: String
+  archivedAt: DateTime
   createdAt: DateTime
   updatedAt: DateTime
 }
@@ -3330,6 +3567,7 @@ input CardFilters {
   status: CardsStatusEnumFilter
   result: StringFilter
   error: StringFilter
+  archivedAt: DateTimeFilter
   createdAt: DateTimeFilter
   updatedAt: DateTimeFilter
 
@@ -3451,6 +3689,7 @@ input CardOrderBy {
   status: InnerOrder
   result: InnerOrder
   error: InnerOrder
+  archivedAt: InnerOrder
   createdAt: InnerOrder
   updatedAt: InnerOrder
 
@@ -3504,6 +3743,7 @@ input CardCountNonNullHaving {
   status: AggregateNumberFilter
   result: AggregateNumberFilter
   error: AggregateNumberFilter
+  archivedAt: AggregateNumberFilter
   createdAt: AggregateNumberFilter
   updatedAt: AggregateNumberFilter
 }
@@ -3520,6 +3760,7 @@ input CardCountDistinctHaving {
   status: AggregateNumberFilter
   result: AggregateNumberFilter
   error: AggregateNumberFilter
+  archivedAt: AggregateNumberFilter
   createdAt: AggregateNumberFilter
   updatedAt: AggregateNumberFilter
 }
@@ -4152,6 +4393,32 @@ input SettingCountDistinctHaving {
 }
 
 type Query {
+  roles(
+    offset: Int
+    limit: Int
+    orderBy: RoleOrderBy
+    where: RoleFilters
+
+    """
+    Keyset pagination: only return rows strictly after this cursor (a row's `cursor` field from a previous page, under the same orderBy).
+    """
+    after: String
+    distinct: [RoleDistinctColumn!]
+  ): [Role!]!
+  role(offset: Int, orderBy: RoleOrderBy, where: RoleFilters): Role
+  rolesAggregate(where: RoleFilters): RoleAggregate!
+  rolesGroupBy(
+    """
+    Columns to group by. One result row per distinct combination of their values.
+    """
+    groupBy: [RoleGroupByColumn!]!
+
+    """Filters the rows before they are grouped."""
+    where: RoleFilters
+
+    """Filters the groups after they are aggregated."""
+    having: RoleHaving
+  ): [RoleGroupBy!]!
   agents(
     offset: Int
     limit: Int
@@ -4504,21 +4771,24 @@ type Query {
   ): Spend!
 }
 
-"""Columns of Agent that a query can be made distinct on"""
-enum AgentDistinctColumn {
+"""Columns of Role that a query can be made distinct on"""
+enum RoleDistinctColumn {
   id
   name
-  role
-  enabled
-  baseUrl
-  model
+  description
+  stage
   systemPrompt
-  maxTokens
-  temperature
-  maxToolIterations
-  toolDiscovery
-  requestTimeoutSeconds
-  maxRetries
+  createdAt
+  updatedAt
+}
+
+"""Columns of Role that a query can group by"""
+enum RoleGroupByColumn {
+  id
+  name
+  description
+  stage
+  systemPrompt
   createdAt
   updatedAt
 }
@@ -4527,7 +4797,7 @@ enum AgentDistinctColumn {
 enum AgentGroupByColumn {
   id
   name
-  role
+  roleId
   enabled
   baseUrl
   model
@@ -4611,6 +4881,7 @@ enum LaneGroupByColumn {
   onSuccessLaneId
   onFailureLaneId
   wipLimit
+  readVerdict
   createdAt
 }
 
@@ -4648,6 +4919,7 @@ enum CardGroupByColumn {
   status
   result
   error
+  archivedAt
   createdAt
   updatedAt
 }
@@ -4788,6 +5060,17 @@ type Spend {
 }
 
 type Mutation {
+  createRoles(values: [CreateRoleInput!]!): [Role!]!
+  createRole(values: CreateRoleInput!): Role!
+  updateRole(set: UpdateRoleInput!, where: RoleFilters): [Role!]!
+
+  """
+  Each entry's updated rows, in entry order. An entry whose `where` matched no rows contributes `null` in its slot; an entry that matched several contributes each of its rows.
+  """
+  updateRolesMany(updates: [UpdateRoleManyInput!]!): [Role]!
+  updateRoleSingle(set: UpdateRoleInput!, where: RoleFilters!): Role
+  deleteRole(where: RoleFilters): [Role!]!
+  deleteRoleSingle(where: RoleFilters!): Role
   createAgents(values: [CreateAgentInput!]!): [Agent!]!
   createAgent(values: CreateAgentInput!): Agent!
   updateAgent(set: UpdateAgentInput!, where: AgentFilters): [Agent!]!
@@ -4943,14 +5226,24 @@ type Mutation {
   stopTask(taskId: String!): Boolean!
 
   """
-  Puts a card in a lane, at a position, and renumbers the cards around it so the board stays in the order it looks like. Omit `position` to drop it at the end. A card that had failed comes back to `idle`, which is what makes dragging one back a retry; a card an agent is working cannot be moved out from under it.
+  Puts a card in a lane, at a position, and renumbers the cards around it so the board stays in the order it looks like. Omit `position` to drop it at the end. A card that had failed comes back to `idle`, which is what makes dragging one back a retry; a card an agent is working cannot be moved out from under it, and nor can an archived one — `restoreCard` is what puts that back on the board.
   """
   moveCard(cardId: String!, laneId: String!, position: Int): Card!
 
   """
-  Puts a card back in play where it stands: clears its error and returns it to `idle`, which is the status a lane's agent will pick up. This is the way back for a card a reviewer rejected — those stay `error` on purpose, so the board waits for a person rather than looping — and for one interrupted by a restart. It does not run anything itself; `runCard` does that, and `autoRun` does it unasked. Refused while an agent is working the card.
+  Puts a card back in play where it stands: clears its error and returns it to `idle`, which is the status a lane's agent will pick up. This is the way back for a card a reviewer rejected — those stay `error` on purpose, so the board waits for a person rather than looping — and for one interrupted by a restart. It does not run anything itself; `runCard` does that, and `autoRun` does it unasked. Refused while an agent is working the card, and on an archived one — `restoreCard` puts that back on the board first.
   """
   retryCard(cardId: String!): Card!
+
+  """
+  Takes a card off the board without deleting it. It stops being drawn in its lane, stops being picked up by that lane's agent, and stops counting as something other cards are waiting on — but it keeps its lane, its status and its result, and `restoreCard` puts it back. This is what a Done pile is for once it is long enough to be in the way. Read the archive with `cards(where: { archivedAt: { isNotNull: true } })`. Refused while an agent is working the card; archiving one already archived leaves the time it was archived alone.
+  """
+  archiveCard(cardId: String!): Card!
+
+  """
+  Puts an archived card back on the board, at the end of the lane it was archived from. Its status is left as it was found — a card archived as `error` comes back as one, and `retryCard` is still the way to put that back in play — because what the card was is the reason someone archived it. The end of the lane rather than its old position, which the cards added since have long taken.
+  """
+  restoreCard(cardId: String!): Card!
 
   """
   Replaces what a card waits on, and answers with it. A card with unfinished dependencies is skipped rather than run out of order, so this is how a decomposition that got the order wrong is corrected. Written as a set rather than a row at a time, because half an ordering is not an ordering. Every id has to be a card on the same board, and a cycle is refused — cards that wait on each other would never run, and nothing downstream would say why.
@@ -4963,7 +5256,7 @@ type Mutation {
   saveBoardTemplate(projectId: String!, name: String!, description: String): BoardTemplate!
 
   """
-  Redraws a project's board from a saved template, and answers with the lanes it wrote. Refused once the board has cards on it: replacing lanes takes their cards with them, so this is for a project that has not started rather than a way to rearrange one that has.
+  Redraws a project's board from a saved template, and answers with the lanes it wrote. Refused once the board has cards on it, archived ones included: replacing lanes takes their cards with them, so this is for a project that has not started rather than a way to rearrange one that has.
   """
   applyBoardTemplate(projectId: String!, templateId: String!): [Lane!]!
 

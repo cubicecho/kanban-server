@@ -29,6 +29,7 @@ import { Button } from "@/components/ui/button";
 import {
   ActiveRunsDocument,
   AgentsDocument,
+  ArchiveCardDocument,
   BoardDocument,
   type BoardQuery,
   CardsStatusEnum,
@@ -40,7 +41,7 @@ import {
   RunCardDocument,
   StopCardDocument,
 } from "@/gql/graphql";
-import { landing, placement } from "@/lib/board-order";
+import { landing, laneOrder, placement } from "@/lib/board-order";
 import { request } from "@/lib/gql";
 import { useProjectId } from "@/lib/project";
 
@@ -100,6 +101,10 @@ function placed(
  * since most cards here move because an agent finished with them rather than because someone
  * pushed them. A drop lands on `moveCard` with an explicit position and is applied to the cache
  * first, so the card stays where it was dropped instead of flicking back until the refetch.
+ *
+ * A card being worked is drawn at the top of its lane — see `laneOrder`. It is the one thing on
+ * a board that is happening rather than waiting, and hunting for it down a column of twenty is
+ * the wrong way to find out what a project is doing.
  */
 export function BoardRoute() {
   const projectId = useProjectId();
@@ -192,6 +197,17 @@ export function BoardRoute() {
     onError,
   });
 
+  // Off the board rather than gone: the Done pile that has served its purpose, and the card
+  // nobody is going to do. The archive page is where they are read and where they come back.
+  const archive = useMutation({
+    mutationFn: (cardId: string) => request(ArchiveCardDocument, { cardId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["archive", projectId] });
+      refresh();
+    },
+    onError,
+  });
+
   const removeCard = useMutation({
     mutationFn: (id: string) => request(DeleteCardDocument, { id }),
     onSuccess: refresh,
@@ -270,7 +286,7 @@ export function BoardRoute() {
       >
         <div className="flex gap-4 overflow-x-auto pb-4">
           {lanes.map((lane, index) => {
-            const here = cards.filter((card) => card.laneId === lane.id);
+            const here = laneOrder(cards, lane.id);
             const previous = lanes[index - 1];
             const next = lanes[index + 1];
             return (
@@ -341,6 +357,7 @@ export function BoardRoute() {
                         on={{
                           edit: () => setEditingCard({ card, laneId: lane.id }),
                           move: (laneId) => move.mutate({ cardId: card.id, laneId }),
+                          archive: () => archive.mutate(card.id),
                           retry: () => retry.mutate(card.id),
                           run: () => run.mutate(card.id),
                           stop: () => stop.mutate(card.id),

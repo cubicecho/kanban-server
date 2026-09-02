@@ -1,0 +1,38 @@
+# Everything that has been put out of the way, most recently archived first — which is the
+# order someone looking for what they just archived wants, and the only order an archive has:
+# `position` means a place in a lane, and these are not in one.
+query Archive($projectId: String!) {
+  cards(
+    limit: 500
+    where: { projectId: { eq: $projectId }, archivedAt: { isNotNull: true } }
+    orderBy: { archivedAt: { direction: desc, priority: 1 } }
+  ) {
+    id
+    laneId
+    title
+    body
+    status
+    result
+    error
+    archivedAt
+    lane {
+      name
+    }
+  }
+}
+
+mutation ArchiveCard($cardId: String!) {
+  archiveCard(cardId: $cardId) {
+    id
+    archivedAt
+  }
+}
+
+mutation RestoreCard($cardId: String!) {
+  restoreCard(cardId: $cardId) {
+    id
+    laneId
+    position
+    archivedAt
+  }
+}

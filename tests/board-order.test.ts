@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { type GraphQLSchema, graphql } from "graphql";
 import { afterAll, beforeAll, expect, test } from "vitest";
-import { landing, placement } from "../src/lib/board-order.ts";
+import { landing, laneOrder, placement } from "../src/lib/board-order.ts";
 
 // The schema is built from the live Drizzle tables at import time, so the database has to be
 // pointed somewhere disposable before anything under server/ is loaded.
@@ -173,4 +173,31 @@ test("a moved card comes back to idle, and the client's guess says so too", asyn
 
   const moved = (await cardsOf(projectId)).find((card) => card.id === failed.id);
   expect(moved).toMatchObject({ laneId: laneIds[1], position: 0, status: "idle", error: "" });
+});
+
+test("a running card is drawn at the top of its lane, and the drag arithmetic is unmoved", () => {
+  // Running in the middle by position, which is the case the display order has to survive.
+  const cards = [
+    { id: "a", laneId: "one", position: 0, status: "idle" },
+    { id: "r", laneId: "one", position: 1, status: "running" },
+    { id: "b", laneId: "one", position: 2, status: "idle" },
+    { id: "elsewhere", laneId: "two", position: 0, status: "running" },
+  ];
+
+  expect(laneOrder(cards, "one").map((card) => card.id)).toEqual(["r", "a", "b"]);
+  // A view and not a move: nothing was renumbered to put it there.
+  expect(cards.map((card) => card.position)).toEqual([0, 1, 2, 0]);
+
+  // Dropping A onto B is dropping it below B on the board, and it has to still be below B once
+  // the running card has been pulled back to the top. `landing` reads `position`, which is why
+  // a running card is not a drop target: nothing is ever dropped onto the card that moved.
+  const to = landing(cards, ["one", "two"], "a", "b");
+  expect(to).toEqual({ laneId: "one", position: 2 });
+  if (!to) return;
+
+  const order = placement(cards, { cardId: "a", ...to });
+  const moved = cards.map((card) =>
+    order.includes(card.id) ? { ...card, position: order.indexOf(card.id) } : card,
+  );
+  expect(laneOrder(moved, "one").map((card) => card.id)).toEqual(["r", "b", "a"]);
 });

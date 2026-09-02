@@ -13,6 +13,29 @@
 type Sortable = { id: string; laneId: string; position: number };
 
 /**
+ * A lane's cards in the order the board draws them: whatever is running first, then the rest
+ * in `position` order.
+ *
+ * This is a view and not a move — `position` is untouched. A run that renumbered its lane
+ * would shuffle every other card under whoever was looking at it, and would do it again on the
+ * way out, which is a lot of movement to say one thing.
+ *
+ * It stays honest with the drag arithmetic because a running card is not a drop target:
+ * `useSortable` disables both halves for one, so `landing` is never asked about a card that is
+ * drawn somewhere other than where its `position` puts it. Everything else keeps its relative
+ * order, which is the order `landing` and `placement` are both reasoning about.
+ */
+export function laneOrder<T extends Sortable & { status: string }>(
+  cards: readonly T[],
+  laneId: string,
+): T[] {
+  const running = (card: T) => (card.status === "running" ? 0 : 1);
+  return cards
+    .filter((row) => row.laneId === laneId)
+    .sort((a, b) => running(a) - running(b) || a.position - b.position);
+}
+
+/**
  * The lane and position a drop means, or nothing if it means nothing.
  *
  * `over` is either another card — land where that card is — or a lane's own space, which is the

@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
 import {
+  Archive,
   Bot,
   History,
   KanbanSquare,
@@ -27,6 +28,7 @@ const NAV = [
   { to: "/tasks", label: "Tasks", icon: ListChecks },
   { to: "/agents", label: "Agents", icon: Bot },
   { to: "/runs", label: "Runs", icon: History },
+  { to: "/archive", label: "Archive", icon: Archive },
   { to: "/servers", label: "MCP servers", icon: Plug },
   { to: "/settings", label: "Settings", icon: SlidersHorizontal },
 ] as const;

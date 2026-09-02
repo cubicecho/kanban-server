@@ -1,6 +1,7 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
+  Archive,
   ChevronLeft,
   ChevronRight,
   GripVertical,
@@ -28,13 +29,32 @@ const STATUS_VARIANT = {
   idle: "secondary",
 } as const;
 
+/**
+ * The one status worth spotting from across a board, in the colour the run stream already uses
+ * for a live one. Every other status is grey by design — a board where everything is coloured
+ * says nothing — so this is the exception rather than the start of a palette.
+ */
+const RUNNING_BADGE =
+  "border-emerald-600/30 bg-emerald-500/15 text-emerald-700 dark:border-emerald-400/30 dark:text-emerald-400";
+
+function StatusBadge({ status }: { status: BoardCard["status"] }) {
+  return (
+    <Badge
+      variant={STATUS_VARIANT[status] ?? "secondary"}
+      className={status === "running" ? RUNNING_BADGE : undefined}
+    >
+      {status}
+    </Badge>
+  );
+}
+
 /** What a card looks like while it is under the cursor, and nothing it can be clicked with. */
 export function CardGhost({ card }: { card: BoardCard }) {
   return (
     <Card className="w-72 gap-2 p-3 shadow-lg">
       <div className="flex items-start justify-between gap-2">
         <span className="min-w-0 flex-1 text-sm font-medium">{card.title}</span>
-        <Badge variant={STATUS_VARIANT[card.status] ?? "secondary"}>{card.status}</Badge>
+        <StatusBadge status={card.status} />
       </div>
     </Card>
   );
@@ -44,7 +64,7 @@ export function CardGhost({ card }: { card: BoardCard }) {
  * One card on the board, draggable by its grip.
  *
  * The grip is a handle rather than the whole card being one, and that is about the keyboard as
- * much as the mouse: a card carries seven buttons, and a drag listener on the card would take
+ * much as the mouse: a card carries eight buttons, and a drag listener on the card would take
  * the space bar off every one of them. On the handle, the keyboard sensor gets a focusable
  * element of its own — tab to it, space to lift, arrows to move, space to drop — and the
  * buttons inside stay buttons.
@@ -76,6 +96,7 @@ export function SortableCard({
   on: {
     edit: () => void;
     move: (laneId: string) => void;
+    archive: () => void;
     retry: () => void;
     run: () => void;
     stop: () => void;
@@ -118,7 +139,7 @@ export function SortableCard({
         >
           {card.title}
         </button>
-        <Badge variant={STATUS_VARIANT[card.status] ?? "secondary"}>{card.status}</Badge>
+        <StatusBadge status={card.status} />
       </div>
 
       {card.error ? (
@@ -194,10 +215,13 @@ export function SortableCard({
         <Button
           variant="ghost"
           size="icon"
-          title="Delete"
-          disabled={card.status === "running"}
-          onClick={on.remove}
+          title={pinned ? "Stop the agent before archiving" : "Archive — off the board, not gone"}
+          disabled={pinned}
+          onClick={on.archive}
         >
+          <Archive className="size-4" />
+        </Button>
+        <Button variant="ghost" size="icon" title="Delete" disabled={pinned} onClick={on.remove}>
           <Trash2 className="size-4" />
         </Button>
       </div>

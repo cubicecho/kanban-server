@@ -1,0 +1,1 @@
+ALTER TABLE "cards" ADD COLUMN "archivedAt" timestamp with time zone;

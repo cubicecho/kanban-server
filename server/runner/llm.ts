@@ -1,7 +1,15 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import OpenAI from "openai";
 import { db } from "../db/client.ts";
-import { type Agent, agentServers, agents, type Settings, settings } from "../db/schema.ts";
+import {
+  type Agent,
+  agentServers,
+  agents,
+  type Role,
+  roles,
+  type Settings,
+  settings,
+} from "../db/schema.ts";
 
 export async function loadSettings(): Promise<Settings> {
   const [row] = await db.select().from(settings).where(eq(settings.id, "default")).limit(1);
@@ -20,8 +28,15 @@ export async function loadSettings(): Promise<Settings> {
 export interface Resolved {
   agentId: string;
   name: string;
-  /** What this agent is for. The only thing above here that reads it is the review verdict. */
-  role: Agent["role"];
+  /** The role this agent fills, by id and by name — the name is what a person reads. */
+  roleId: string;
+  roleName: string;
+  /**
+   * Which of the three jobs its role is for. Nothing about running an agent branches on this;
+   * it is how `resolveStage` finds the refiner and the decomposer, and how the board only ever
+   * offers a lane an agent that works cards.
+   */
+  stage: Role["stage"];
   baseUrl: string;
   apiKey: string;
   model: string;
@@ -50,18 +65,27 @@ export async function resolveAgent(agent: Agent, config?: Settings): Promise<Res
     .select({ serverId: agentServers.serverId })
     .from(agentServers)
     .where(eq(agentServers.agentId, agent.id));
+  const [role] = await db.select().from(roles).where(eq(roles.id, agent.roleId)).limit(1);
+  // The column is `notNull` against a `restrict` foreign key, so this cannot happen without
+  // somebody having gone in with SQL — but running an agent with no instructions at all is a
+  // worse way to find that out than a sentence saying so.
+  if (!role) throw new Error(`agent "${agent.name}" points at a role that is gone`);
 
   return {
     agentId: agent.id,
     name: agent.name,
-    role: agent.role,
+    roleId: role.id,
+    roleName: role.name,
+    stage: role.stage,
     baseUrl: agent.baseUrl || base.baseUrl,
     // Deliberately not `agent.apiKey || base.apiKey || env`: an agent pointed at a local model
     // has no key and should not silently borrow the one meant for the paid endpoint. It only
     // falls through when the agent is also using the shared `baseUrl`.
     apiKey: agent.apiKey || (agent.baseUrl ? "" : base.apiKey || process.env.OPENAI_API_KEY || ""),
     model: agent.model || base.model,
-    systemPrompt: agent.systemPrompt,
+    // The one setting that inherits from the role rather than from settings: a prompt is what
+    // a role *is*, and an agent that writes its own is overriding the job, not the endpoint.
+    systemPrompt: agent.systemPrompt || role.systemPrompt,
     maxTokens: num(agent.maxTokens, base.maxTokens),
     temperature: num(agent.temperature, base.temperature, -1),
     maxToolIterations: num(agent.maxToolIterations, base.maxToolIterations),
@@ -82,19 +106,22 @@ export async function resolveAgentId(agentId: string): Promise<Resolved> {
 }
 
 /**
- * The first enabled agent with this role, resolved — what a project falls back to when it has
- * not named one of its own. Deterministic by name so two servers with the same rows agree.
+ * The first enabled agent whose role is for this stage, resolved — what a project falls back to
+ * when it has not named one of its own. Deterministic by name so two servers with the same rows
+ * agree on which one that is.
  */
-export async function resolveRole(
-  role: Agent["role"],
+export async function resolveStage(
+  stage: Role["stage"],
   preferredId?: string | null,
 ): Promise<Resolved> {
   if (preferredId) return resolveAgentId(preferredId);
-  const candidates = await db.select().from(agents).where(eq(agents.role, role));
-  const [agent] = candidates
-    .filter((row) => row.enabled)
-    .sort((a, b) => a.name.localeCompare(b.name));
-  if (!agent) throw new Error(`no enabled agent with the "${role}" role — define one first`);
+  const candidates = await db
+    .select({ agent: agents })
+    .from(agents)
+    .innerJoin(roles, eq(agents.roleId, roles.id))
+    .where(and(eq(roles.stage, stage), eq(agents.enabled, true)));
+  const [agent] = candidates.map((row) => row.agent).sort((a, b) => a.name.localeCompare(b.name));
+  if (!agent) throw new Error(`no enabled agent that can ${stage} — define one first`);
   return resolveAgent(agent);
 }
 

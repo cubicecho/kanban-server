@@ -24,7 +24,6 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import {
   type AgentsQuery,
-  type AgentsRoleEnum,
   type AgentsToolDiscoveryEnum,
   CreateAgentDocument,
   SetAgentApiKeyDocument,
@@ -34,18 +33,12 @@ import {
 import { request } from "@/lib/gql";
 
 type Agent = AgentsQuery["agents"][number];
+type Role = AgentsQuery["roles"][number];
 type McpServer = AgentsQuery["mcpServers"][number];
-
-const ROLES: { value: AgentsRoleEnum; label: string }[] = [
-  { value: "refine" as AgentsRoleEnum, label: "Refine — talks a task into shape" },
-  { value: "decompose" as AgentsRoleEnum, label: "Decompose — turns a task into cards" },
-  { value: "execute" as AgentsRoleEnum, label: "Execute — works a card" },
-  { value: "review" as AgentsRoleEnum, label: "Review — checks the work" },
-];
 
 interface Draft {
   name: string;
-  role: AgentsRoleEnum;
+  roleId: string;
   enabled: boolean;
   baseUrl: string;
   model: string;
@@ -60,7 +53,7 @@ interface Draft {
 
 const toDraft = (agent?: Agent): Draft => ({
   name: agent?.name ?? "",
-  role: agent?.role ?? ("execute" as AgentsRoleEnum),
+  roleId: agent?.roleId ?? "",
   enabled: agent?.enabled ?? true,
   baseUrl: agent?.baseUrl ?? "",
   model: agent?.model ?? "",
@@ -83,10 +76,12 @@ const toDraft = (agent?: Agent): Draft => ({
  */
 export function AgentDialog({
   agent,
+  roles,
   servers,
   onClose,
 }: {
   agent?: Agent;
+  roles: readonly Role[];
   servers: readonly McpServer[];
   onClose: () => void;
 }) {
@@ -97,11 +92,13 @@ export function AgentDialog({
     () => agent?.servers.map((link) => link.serverId) ?? [],
   );
   const set = (patch: Partial<Draft>) => setDraft((current) => ({ ...current, ...patch }));
+  const role = roles.find((row) => row.id === draft.roleId);
 
   const save = useMutation({
     mutationFn: async () => {
       const values = { ...draft, name: draft.name.trim() };
       if (!values.name) throw new Error("An agent needs a name.");
+      if (!values.roleId) throw new Error("An agent needs a role — that is what it is told.");
       for (const key of [
         "maxTokens",
         "temperature",
@@ -157,21 +154,28 @@ export function AgentDialog({
             </div>
             <div className="flex flex-col gap-2">
               <Label>Role</Label>
-              <Select
-                value={draft.role}
-                onValueChange={(role) => set({ role: role as AgentsRoleEnum })}
-              >
+              <Select value={draft.roleId} onValueChange={(roleId) => set({ roleId })}>
                 <SelectTrigger className="w-full">
-                  <SelectValue />
+                  <SelectValue placeholder="Pick a role" />
                 </SelectTrigger>
                 <SelectContent>
-                  {ROLES.map((role) => (
-                    <SelectItem key={role.value} value={role.value}>
-                      {role.label}
+                  {roles.map((row) => (
+                    <SelectItem key={row.id} value={row.id}>
+                      {row.name}
+                      {row.description ? ` — ${row.description}` : ""}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground">
+                {role?.stage === "card"
+                  ? "Works cards. A lane can point at this agent."
+                  : role?.stage === "refine"
+                    ? "Talks tasks into shape. Named on a project, not on a lane."
+                    : role?.stage === "decompose"
+                      ? "Turns tasks into cards. Named on a project, not on a lane."
+                      : "The job this agent is for, and the prompt it takes."}
+              </p>
             </div>
           </div>
 
@@ -226,14 +230,34 @@ export function AgentDialog({
           </div>
 
           <div className="flex flex-col gap-2">
-            <Label htmlFor="agent-prompt">System prompt</Label>
+            <div className="flex items-center justify-between gap-4">
+              <Label htmlFor="agent-prompt">System prompt</Label>
+              {role?.systemPrompt && !draft.systemPrompt ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-auto py-1 text-xs"
+                  onClick={() => set({ systemPrompt: role.systemPrompt })}
+                >
+                  Start from {role.name}
+                </Button>
+              ) : null}
+            </div>
             <Textarea
               id="agent-prompt"
               rows={6}
               value={draft.systemPrompt}
               onChange={(event) => set({ systemPrompt: event.target.value })}
-              placeholder="How this agent should work. A refiner and a decomposer need very different instructions — the defaults are a decent starting point."
+              placeholder={
+                role?.systemPrompt
+                  ? `empty — use the ${role.name} role's prompt:\n\n${role.systemPrompt}`
+                  : "How this agent should work. Empty takes its role's prompt."
+              }
             />
+            <p className="text-xs text-muted-foreground">
+              Leave this empty and the agent is told whatever its role says, so editing the role
+              changes every agent doing that job. Write here to override it for this one.
+            </p>
           </div>
 
           <div className="flex flex-col gap-2">
