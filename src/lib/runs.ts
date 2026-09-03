@@ -9,6 +9,13 @@
 export const duration = (from: string, to?: string | null) =>
   to ? `${((new Date(to).getTime() - new Date(from).getTime()) / 1000).toFixed(1)}s` : "running…";
 
+/** 1234 → "1.2k". A run's totals get long, and nobody reads the last three digits. */
+export function compactTokens(tokens: number): string {
+  if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1)}M`;
+  if (tokens >= 1_000) return `${(tokens / 1_000).toFixed(1)}k`;
+  return String(tokens);
+}
+
 /** The badge a run's status is drawn in. `stopped` is outlined rather than red: not a failure. */
 export const RUN_STATUS_VARIANT = {
   error: "destructive",

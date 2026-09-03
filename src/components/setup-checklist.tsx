@@ -4,7 +4,7 @@ import { Check, Circle } from "lucide-react";
 import { useProjectActions } from "@/components/project-actions";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { AgentsDocument, ProjectsDocument, TasksDocument } from "@/gql/graphql";
+import { AgentsDocument, ProjectsDocument, RecentTasksDocument } from "@/gql/graphql";
 import { request } from "@/lib/gql";
 import { useProjectId } from "@/lib/project";
 import { cn } from "@/lib/utils";
@@ -26,9 +26,11 @@ export function SetupChecklist() {
   const { newProject } = useProjectActions();
   const agents = useQuery({ queryKey: ["agents"], queryFn: () => request(AgentsDocument) });
   const projects = useQuery({ queryKey: ["projects"], queryFn: () => request(ProjectsDocument) });
+  // The light half of the tasks query, and the same cache entry the composer below is already
+  // filling: this row only asks whether anything has been described yet.
   const tasks = useQuery({
-    queryKey: ["tasks", projectId],
-    queryFn: () => request(TasksDocument, { projectId }),
+    queryKey: ["tasks", projectId, "recent"],
+    queryFn: () => request(RecentTasksDocument, { projectId, limit: 25 }),
     enabled: Boolean(projectId),
   });
 

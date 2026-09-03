@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
-import { FolderOpen, Send, SquarePlus } from "lucide-react";
+import { useNavigate, useSearch } from "@tanstack/react-router";
+import { FolderOpen, Send, Square, SquarePlus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Page } from "@/components/app-shell";
@@ -21,15 +21,17 @@ import {
   MakeCardDocument,
   ProjectsDocument,
   type ProjectsQuery,
+  RecentTasksDocument,
   RefineTaskDocument,
+  StopTaskDocument,
   SubmitCardDocument,
-  TasksDocument,
-  type TasksQuery,
+  TaskDocument,
+  type TaskQuery,
 } from "@/gql/graphql";
 import { request } from "@/lib/gql";
 import { useProjectId } from "@/lib/project";
 
-type Task = TasksQuery["tasks"][number];
+type Task = TaskQuery["tasks"][number];
 type Project = ProjectsQuery["projects"][number];
 
 /**
@@ -75,26 +77,61 @@ export function HomeRoute() {
 function TaskComposer({ project }: { project: Project }) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const [draftId, setDraftId] = useState<string | null>(null);
+  // `?task=` is a conversation somebody asked to carry on — the way back into one, which the
+  // Tasks page had no way to offer. Without it this page could only ever guess, and its guess
+  // was the newest task with no cards: every older conversation was unreachable for good.
+  const linked = useSearch({ from: "/" }).task;
+  const [draftId, setDraftId] = useState<string | null>(linked ?? null);
   const [message, setMessage] = useState("");
   const [title, setTitle] = useState("");
   const [brief, setBrief] = useState("");
 
-  const tasks = useQuery({
-    queryKey: ["tasks", project.id],
-    queryFn: () => request(TasksDocument, { projectId: project.id }),
+  // Which conversation, and then that conversation — two queries rather than one, because the
+  // question "is anything still being talked about?" is about card counts and this page was
+  // answering it by fetching every task in the project with every message in it.
+  const recent = useQuery({
+    queryKey: ["tasks", project.id, "recent"],
+    queryFn: () => request(RecentTasksDocument, { projectId: project.id, limit: 25 }),
   });
+  // On a reload, the most recent conversation that never reached the board. A task has no status
+  // to ask; whether it produced work is the card pointing back at it.
+  // An empty string is somebody asking for a blank one, and it has to be distinguishable from
+  // `null`: the fallback below would otherwise hand back the very conversation being left.
+  const openId =
+    draftId === ""
+      ? null
+      : (draftId ?? recent.data?.tasks.find((task) => task.cards.length === 0)?.id ?? null);
+
+  const conversation = useQuery({
+    queryKey: ["task", openId],
+    queryFn: () => request(TaskDocument, { id: openId ?? "" }),
+    enabled: Boolean(openId),
+  });
+  const draft: Task | undefined = conversation.data?.tasks[0];
+
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ["tasks", project.id] });
+    queryClient.invalidateQueries({ queryKey: ["task", openId] });
     queryClient.invalidateQueries({ queryKey: ["board", project.id] });
   };
 
-  // The conversation in hand: the one this page started, or — on a reload — the most recent one
-  // that never reached the board. A task has no status to ask; whether it produced work is the
-  // card pointing back at it, so a task with no cards is one still being talked about.
-  const draft: Task | undefined = draftId
-    ? tasks.data?.tasks.find((task) => task.id === draftId)
-    : tasks.data?.tasks.find((task) => task.cards.length === 0);
+  // A refining turn can take a minute, and until now the only thing this page did about that
+  // was disable the box. `stopTask` has existed the whole time and only the Runs page called it,
+  // which is a page away from where the wait is actually being felt.
+  const stop = useMutation({
+    mutationFn: (taskId: string) => request(StopTaskDocument, { taskId }),
+    onSuccess: (data) => {
+      // False means the turn had already finished on its own, and the answer is on its way.
+      if (data.stopTask) toast.success("Stopping…");
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  // Arriving here from a Continue link while this page is already mounted changes the search
+  // rather than mounting it again, and so does the back button.
+  useEffect(() => {
+    if (linked) setDraftId(linked);
+  }, [linked]);
 
   const say = useMutation({
     mutationFn: async (text: string) => {
@@ -147,7 +184,7 @@ function TaskComposer({ project }: { project: Project }) {
   // A refining model that takes twenty seconds to answer should not spend them saying nothing.
   // The mutation only resolves at the end of the turn, so the run is found by the task it is
   // about — the one id this page has while the turn is still going.
-  const watched = draftId ?? draft?.id;
+  const watched = openId;
   const active = useQuery({
     queryKey: ["active-runs", project.id],
     queryFn: () => request(ActiveRunsDocument, { projectId: project.id }),
@@ -228,10 +265,25 @@ function TaskComposer({ project }: { project: Project }) {
             disabled={working}
             className="min-h-0 resize-y"
           />
-          <Button type="submit" disabled={working || !message.trim()}>
-            <Send className="size-4" />
-            Send
-          </Button>
+          {/* One button, and which one it is says what the page is doing — the same swap a
+              running card makes on the board. Stopping needs the task's id, which only exists
+              once there is a conversation to stop. */}
+          {talking && watched ? (
+            <Button
+              type="button"
+              variant="outline"
+              disabled={stop.isPending}
+              onClick={() => stop.mutate(watched)}
+            >
+              <Square className="size-4" />
+              Stop
+            </Button>
+          ) : (
+            <Button type="submit" disabled={working || !message.trim()}>
+              <Send className="size-4" />
+              Send
+            </Button>
+          )}
         </form>
 
         {draft ? (
@@ -245,13 +297,27 @@ function TaskComposer({ project }: { project: Project }) {
                     : "being talked about"}
                 </Badge>
               </div>
-              <Button
-                disabled={working || !draft.brief.trim()}
-                onClick={() => make.mutate(draft.id)}
-              >
-                <SquarePlus className="size-4" />
-                {make.isPending ? "Making…" : "Make a card"}
-              </Button>
+              <div className="flex shrink-0 items-center gap-2">
+                {/* Leaving a conversation open is what carrying one on means, so there has to be
+                    a way out of it that is not making a card of it. */}
+                <Button
+                  variant="ghost"
+                  disabled={working}
+                  onClick={() => {
+                    setDraftId("");
+                    navigate({ to: "/", search: {} });
+                  }}
+                >
+                  Start a new one
+                </Button>
+                <Button
+                  disabled={working || !draft.brief.trim()}
+                  onClick={() => make.mutate(draft.id)}
+                >
+                  <SquarePlus className="size-4" />
+                  {make.isPending ? "Making…" : "Make a card"}
+                </Button>
+              </div>
             </div>
             <p className="text-sm whitespace-pre-wrap text-muted-foreground">
               {draft.brief || "No brief yet — the agent writes it as you talk."}

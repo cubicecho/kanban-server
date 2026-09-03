@@ -46,6 +46,7 @@ export function CardDialog({
   lanes,
   projectId,
   laneId,
+  tab,
   onClose,
 }: {
   card?: Card;
@@ -56,6 +57,11 @@ export function CardDialog({
   projectId: string;
   /** Which lane a new card lands in. Ignored when editing. */
   laneId: string;
+  /**
+   * Which face to open on. The board's note marker opens the notes, because a person who
+   * clicked "2 notes" has said what they came to read.
+   */
+  tab?: "details" | "deps" | "notes" | "history";
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
@@ -172,7 +178,7 @@ export function CardDialog({
             and what has happened to it. They were one scroll, which meant the deps picker
             appearing when its query landed shoved the history down the page under whoever was
             reading it. */}
-        <Tabs defaultValue="details">
+        <Tabs defaultValue={tab ?? "details"}>
           <TabsList>
             <TabsTrigger value="details">Details</TabsTrigger>
             <TabsTrigger value="deps">

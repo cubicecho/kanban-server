@@ -14,7 +14,7 @@ import {
 } from "graphql";
 import { GraphQLJSON } from "graphql-scalars";
 import { db } from "../db/client.ts";
-import { addNote, recordMove } from "../db/history.ts";
+import { addNote, cardMarks, recordMove } from "../db/history.ts";
 import {
   agentServers,
   agents,
@@ -424,6 +424,18 @@ const McpProbeType = new GraphQLObjectType({
   },
 });
 
+const RunUsageType = new GraphQLObjectType({
+  name: "RunUsage",
+  description:
+    "What a run has spent so far, counted from its start rather than for the turn that carried " +
+    "it — the newest one seen is the answer, with no adding up to do.",
+  fields: {
+    promptTokens: { type: new GraphQLNonNull(GraphQLInt) },
+    completionTokens: { type: new GraphQLNonNull(GraphQLInt) },
+    totalTokens: { type: new GraphQLNonNull(GraphQLInt) },
+  },
+});
+
 const RunEventType = new GraphQLObjectType({
   name: "RunEvent",
   description:
@@ -438,7 +450,7 @@ const RunEventType = new GraphQLObjectType({
     at: { type: new GraphQLNonNull(GraphQLDateTime) },
     kind: {
       type: new GraphQLNonNull(GraphQLString),
-      description: "turn | thinking | output | tool-call | tool-result | notice | done.",
+      description: "turn | thinking | output | tool-call | tool-result | notice | usage | done.",
     },
     text: { type: new GraphQLNonNull(GraphQLString) },
     name: {
@@ -446,6 +458,37 @@ const RunEventType = new GraphQLObjectType({
       description: "Tool name, where there is one.",
     },
     ok: { type: GraphQLBoolean },
+    usage: {
+      type: RunUsageType,
+      description:
+        "On `usage` only: the running totals as the endpoint last reported them. Null on every " +
+        "other kind, and absent for a whole run whose endpoint does not report usage midstream.",
+    },
+  },
+});
+
+const CardMarkType = new GraphQLObjectType({
+  name: "CardMark",
+  description:
+    "What one card on a board carries that is not on the card itself: the notes a person has " +
+    "left on it, and the reason a reviewer turned it down. Both live in `card_notes`, and a " +
+    "board asks for the whole project's worth at once rather than a card at a time.",
+  fields: {
+    cardId: { type: new GraphQLNonNull(GraphQLString) },
+    notes: {
+      type: new GraphQLNonNull(GraphQLInt),
+      description:
+        "How many standing notes a person has left on it. Reports and verdicts are not " +
+        "counted — they are an account of what happened rather than something anybody wrote " +
+        "for the next agent to take into account.",
+    },
+    rejection: {
+      type: new GraphQLNonNull(GraphQLString),
+      description:
+        "Why the card came back, where a reviewer turned it down and nobody has sent it on " +
+        "since. Empty otherwise: a card stops being rejected the moment it moves, which is " +
+        "what stops a verdict following it around the board.",
+    },
   },
 });
 
@@ -612,6 +655,16 @@ export const schema = new GraphQLSchema({
           "off the board is a decision that it does not have to happen.",
         args: { cardId: { type: new GraphQLNonNull(GraphQLString) } },
         resolve: (_source, args: { cardId: string }) => blockers(args.cardId),
+      },
+      cardMarks: {
+        type: new GraphQLNonNull(new GraphQLList(new GraphQLNonNull(CardMarkType))),
+        description:
+          "For every card on a project's board, whether anyone has written a note on it and " +
+          "why a reviewer sent it back — one answer for the whole board rather than a query " +
+          "per card. Cards with neither are left out. Archived cards are not included: they " +
+          "are off the board, and the archive is where what was said about them is read.",
+        args: { projectId: { type: new GraphQLNonNull(GraphQLString) } },
+        resolve: (_source, args: { projectId: string }) => cardMarks(args.projectId),
       },
       mcpStatus: {
         type: new GraphQLNonNull(new GraphQLList(new GraphQLNonNull(McpServerStatusType))),

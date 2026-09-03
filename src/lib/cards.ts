@@ -85,3 +85,33 @@ export function cyclingCards(cardId: string, graph: DepGraph): Set<string> {
   // set: everything else is safe to wait on by construction.
   return new Set([...edges.keys()].filter(walk));
 }
+
+/** What a board knows about a card it might be waiting on. */
+export interface DepStatus {
+  id: string;
+  title: string;
+  status: CardsStatusEnum;
+}
+
+/**
+ * Which of a card's dependencies are actually still in its way, named.
+ *
+ * The board draws `deps` as they are stored, and a stored edge never expires — so a card whose
+ * blocker finished last week went on reading "After Schema audit" for good, which is precisely
+ * the staleness `blockers` exists on the server to avoid. This is that rule, `status !== "done"
+ * && !archivedAt`, run against the board the client already has in hand rather than asked for
+ * per card: the board is 500 rows polled every three seconds, and a query each to answer a
+ * hint would be 500 more.
+ *
+ * A dependency this list cannot find is one the `Board` query filtered out, which means it is
+ * archived — and an archived card is not in the way, so it is dropped rather than named. That
+ * is the same answer the server gives, and `tests/card-deps.test.ts` holds the two together.
+ */
+export function blockingDeps(deps: { dependsOnCardId: string }[], onBoard: DepStatus[]): string[] {
+  if (!deps.length) return [];
+  const byId = new Map(onBoard.map((card) => [card.id, card]));
+  return deps
+    .map((dep) => byId.get(dep.dependsOnCardId))
+    .filter((card): card is DepStatus => !!card && card.status !== CardsStatusEnum.Done)
+    .map((card) => card.title);
+}
