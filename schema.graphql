@@ -5506,6 +5506,11 @@ type Query {
   blockers(cardId: String!): [Card!]!
 
   """
+  For every card on a project's board, whether anyone has written a note on it and why a reviewer sent it back — one answer for the whole board rather than a query per card. Cards with neither are left out. Archived cards are not included: they are off the board, and the archive is where what was said about them is read.
+  """
+  cardMarks(projectId: String!): [CardMark!]!
+
+  """
   Which of the configured MCP servers this one actually reached, and the tools it found on each. A server that is enabled but absent here failed to connect, and its tools are not offered to any agent linked to it.
   """
   mcpStatus: [McpServerStatus!]!
@@ -5814,6 +5819,23 @@ enum SettingGroupByColumn {
 }
 
 """
+What one card on a board carries that is not on the card itself: the notes a person has left on it, and the reason a reviewer turned it down. Both live in `card_notes`, and a board asks for the whole project's worth at once rather than a card at a time.
+"""
+type CardMark {
+  cardId: String!
+
+  """
+  How many standing notes a person has left on it. Reports and verdicts are not counted — they are an account of what happened rather than something anybody wrote for the next agent to take into account.
+  """
+  notes: Int!
+
+  """
+  Why the card came back, where a reviewer turned it down and nobody has sent it on since. Empty otherwise: a card stops being rejected the moment it moves, which is what stops a verdict following it around the board.
+  """
+  rejection: String!
+}
+
+"""
 Live connection state for a configured MCP server, and the tools it offers.
 """
 type McpServerStatus {
@@ -5840,13 +5862,29 @@ type RunEvent {
   seq: Int!
   at: DateTime!
 
-  """turn | thinking | output | tool-call | tool-result | notice | done."""
+  """
+  turn | thinking | output | tool-call | tool-result | notice | usage | done.
+  """
   kind: String!
   text: String!
 
   """Tool name, where there is one."""
   name: String!
   ok: Boolean
+
+  """
+  On `usage` only: the running totals as the endpoint last reported them. Null on every other kind, and absent for a whole run whose endpoint does not report usage midstream.
+  """
+  usage: RunUsage
+}
+
+"""
+What a run has spent so far, counted from its start rather than for the turn that carried it — the newest one seen is the answer, with no adding up to do.
+"""
+type RunUsage {
+  promptTokens: Int!
+  completionTokens: Int!
+  totalTokens: Int!
 }
 
 """

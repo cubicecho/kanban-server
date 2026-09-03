@@ -4,7 +4,7 @@ import path from "node:path";
 import { type GraphQLSchema, graphql } from "graphql";
 import { afterAll, beforeAll, expect, test } from "vitest";
 import { CardsStatusEnum } from "../src/gql/graphql.ts";
-import { cardHealth } from "../src/lib/cards.ts";
+import { cardHealth, type DepStatus } from "../src/lib/cards.ts";
 
 // The schema is built from the live Drizzle tables at import time, so the database has to be
 // pointed somewhere disposable before anything under server/ is loaded.
@@ -39,7 +39,7 @@ const card = (status: CardsStatusEnum, dependsOn: string[] = []) => ({
 });
 
 test("a stopped card wants a person, whichever way it stopped", () => {
-  const alone = new Map<string, { status: CardsStatusEnum }>();
+  const alone: DepStatus[] = [];
   expect(cardHealth(card(CardsStatusEnum.Error), STATION, alone)).toBe("attention");
   expect(cardHealth(card(CardsStatusEnum.Rejected), STATION, alone)).toBe("attention");
   expect(cardHealth(card(CardsStatusEnum.Running), STATION, alone)).toBe("running");
@@ -48,7 +48,7 @@ test("a stopped card wants a person, whichever way it stopped", () => {
 });
 
 test("an idle card in a lane that is not a station is parked, not queued", () => {
-  const alone = new Map<string, { status: CardsStatusEnum }>();
+  const alone: DepStatus[] = [];
   const idle = card(CardsStatusEnum.Idle);
   expect(cardHealth(idle, { roleId: "role", agentId: null }, alone)).toBe("parked");
   expect(cardHealth(idle, { roleId: null, agentId: "agent" }, alone)).toBe("parked");
@@ -107,13 +107,11 @@ test("blocked means what the server means by it, archived dependencies and all",
   const onBoard = async () => {
     const { cards } = await run(
       `query Board($projectId: String!) {
-         cards(where: { projectId: { eq: $projectId }, archivedAt: { isNull: true } }) { id status }
+         cards(where: { projectId: { eq: $projectId }, archivedAt: { isNull: true } }) { id title status }
        }`,
       { projectId },
     );
-    return new Map(
-      (cards as { id: string; status: CardsStatusEnum }[]).map((row) => [row.id, row]),
-    );
+    return cards as DepStatus[];
   };
 
   const waiting = card(CardsStatusEnum.Idle, [id("done"), id("archived"), id("outstanding")]);

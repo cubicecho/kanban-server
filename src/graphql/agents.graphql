@@ -22,6 +22,17 @@ query Agents {
     label
     enabled
   }
+  # Every lane on the server, for the count beside each agent — as on Roles, and for the same
+  # reason: `lanes.agentId` is `set null`, so deleting an agent is not refused, it is a set of
+  # stations that quietly stop. Which ones, on which board, is the thing worth saying first.
+  lanes {
+    id
+    agentId
+    name
+    project {
+      name
+    }
+  }
   # What an agent that names neither of these will inherit. An agent inheriting from a
   # Settings that is itself empty has no endpoint at all, which is a thing to say on the page
   # rather than at the first run.

@@ -15,13 +15,14 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link, useSearch } from "@tanstack/react-router";
 import { KanbanSquare, Plus, Save, Search, Settings2, Trash2 } from "lucide-react";
 import type { ReactNode } from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ActionButton } from "@/components/action-button";
 import { Page, useCurrentProject } from "@/components/app-shell";
-import { CardGhost, SortableCard } from "@/components/board-card";
+import { CardGhost, type CardTab, SortableCard } from "@/components/board-card";
 import { CardDialog } from "@/components/card-dialog";
 import { ConfirmButton } from "@/components/confirm-button";
 import { EmptyState, NoProject } from "@/components/empty-state";
@@ -36,7 +37,9 @@ import {
   ActiveRunsDocument,
   AgentsDocument,
   ArchiveCardDocument,
+  ArchivedLanesDocument,
   type BoardQuery,
+  CardMarksDocument,
   CardsStatusEnum,
   DeleteCardDocument,
   DeleteLaneDocument,
@@ -49,6 +52,7 @@ import {
 } from "@/gql/graphql";
 import { landing, laneOrder, placement } from "@/lib/board-order";
 import { BOARD_LIMIT, boardQuery } from "@/lib/board-query";
+import { blockingDeps } from "@/lib/cards";
 import { request } from "@/lib/gql";
 import { useProjectId } from "@/lib/project";
 import { cn } from "@/lib/utils";
@@ -165,12 +169,22 @@ function placed(
 export function BoardRoute() {
   const projectId = useProjectId();
   const queryClient = useQueryClient();
-  const [editingCard, setEditingCard] = useState<{ card?: BoardCard; laneId: string } | null>(null);
+  const [editingCard, setEditingCard] = useState<{
+    card?: BoardCard;
+    laneId: string;
+    tab?: CardTab;
+  } | null>(null);
   const [editingLane, setEditingLane] = useState<{ lane?: Lane } | null>(null);
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [watching, setWatching] = useState<string | null>(null);
   const [dragging, setDragging] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+
+  // A card arrived at from somewhere else — "On the board" on the Tasks page. The board is one
+  // long horizontal scroll and a lane is a column of twenty, so a link that only *navigates*
+  // here has not actually shown anybody anything.
+  const linked = useSearch({ from: "/board" }).card;
+  const [focused, setFocused] = useState<string | null>(linked ?? null);
 
   const project = useCurrentProject();
 
@@ -196,6 +210,28 @@ export function BoardRoute() {
   const agentName = (id?: string | null) =>
     agents.data?.agents.find((agent) => agent.id === id)?.name;
 
+  // What a card carries that is not on the card: a person's notes, and a reviewer's reason for
+  // sending it back. One answer for the whole board — a relation on `Board` would be five
+  // hundred queries every three seconds — and not polled with it either, since a note is
+  // written by somebody here and a verdict arrives with a move the board is already refetching.
+  const marks = useQuery({
+    queryKey: ["card-marks", projectId],
+    queryFn: () => request(CardMarksDocument, { projectId }),
+    enabled: Boolean(projectId),
+  });
+  const markFor = (cardId: string) => marks.data?.cardMarks.find((mark) => mark.cardId === cardId);
+
+  // Deleting a lane cascades to its archived cards, which the board cannot show — so counting
+  // only the visible ones offered a Delete the server then refused, on exactly the cards nobody
+  // could see were at stake. Ids and lane ids only, and asked for once rather than every tick.
+  const archived = useQuery({
+    queryKey: ["archived-lanes", projectId],
+    queryFn: () => request(ArchivedLanesDocument, { projectId, limit: BOARD_LIMIT }),
+    enabled: Boolean(projectId),
+  });
+  const archivedIn = (laneId: string) =>
+    (archived.data?.cards ?? []).filter((card) => card.laneId === laneId).length;
+
   // A lane header said only which agent works here, which is the smaller half of what a lane
   // is: the role is the kind of station it is — whether cards get worked, ruled on or broken
   // up — and the same agent in two lanes does two different jobs.
@@ -212,10 +248,42 @@ export function BoardRoute() {
     // A cap on how many run at once is only worth saying where something runs.
     if (role && agent && lane.wipLimit) parts.push(`${lane.wipLimit} at a time`);
     if (lane.intake) parts.push("intake");
-    // Where a card goes is otherwise only in the lane dialog, and this one takes it off the
-    // board — a card that vanishes from a lane wants a reason visible on the lane.
-    if (lane.archiveOnSuccess) parts.push("archives what passes");
     return parts.join(" · ");
+  };
+
+  /**
+   * Where cards go from here — the two arrows that are the whole of the pipeline.
+   *
+   * They existed only inside the lane dialog, which is to say the board drew every station and
+   * none of the wiring between them: what makes this a pipeline rather than four columns is
+   * `onSuccessLaneId` and `onFailureLaneId`, and you had to open a dialog per lane to read it.
+   *
+   * Only for a station, because a lane with no role or no agent never rules on anything and its
+   * arrows are wiring that will not fire. The verb comes from the role's contract: an expanding
+   * lane sends the cards it wrote down its pass arrow rather than the card it read, and calling
+   * that "pass" would describe the wrong card.
+   */
+  const laneFlow = (lane: Lane): string | null => {
+    if (!lane.roleId || !lane.agentId) return null;
+    const laneName = (id?: string | null) => lanes.find((one) => one.id === id)?.name;
+    const contract = roles.data?.roles.find((role) => role.id === lane.roleId)?.contract;
+    if (contract === "expand") {
+      const to = lane.onSuccessLaneId ? laneName(lane.onSuccessLaneId) : null;
+      // An expand lane with no pass arrow is refused at run time — its children would have
+      // nowhere to land — so this is a board that cannot work, said on the board.
+      return to ? `breaks up into ${to}` : "nowhere to break up into";
+    }
+    const pass = lane.archiveOnSuccess
+      ? "pass → archive"
+      : lane.onSuccessLaneId
+        ? `pass → ${laneName(lane.onSuccessLaneId) ?? "a deleted lane"}`
+        : "pass stays here";
+    const fail = lane.onFailureLaneId
+      ? `fail → ${laneName(lane.onFailureLaneId) ?? "a deleted lane"}`
+      : "fail stays here";
+    // Only a judging station has a failure arm worth naming; anywhere else a failure is an
+    // error on the card, which the card says itself.
+    return contract === "verdict" ? `${pass} · ${fail}` : pass;
   };
 
   const refresh = () => {
@@ -225,6 +293,8 @@ export function BoardRoute() {
     // A card's dialog may be open over the board it is on, and a run or a move it did not
     // start is exactly what its history is for showing.
     queryClient.invalidateQueries({ queryKey: ["card-runs"] });
+    // A run that ruled on a card wrote the verdict the board now draws on its face.
+    queryClient.invalidateQueries({ queryKey: ["card-marks", projectId] });
   };
   const onError = (error: Error) => toast.error(error.message);
 
@@ -280,6 +350,7 @@ export function BoardRoute() {
     mutationFn: (cardId: string) => request(RestoreCardDocument, { cardId }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["archive", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["archived-lanes", projectId] });
       refresh();
     },
     onError,
@@ -299,6 +370,7 @@ export function BoardRoute() {
         action: { label: "Undo", onClick: () => restore.mutate(cardId) },
       });
       queryClient.invalidateQueries({ queryKey: ["archive", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["archived-lanes", projectId] });
       refresh();
     },
     onError,
@@ -329,11 +401,21 @@ export function BoardRoute() {
   const matches = (card: BoardCard) =>
     card.title.toLowerCase().includes(filter) || card.body.toLowerCase().includes(filter);
   const matched = filter ? cards.filter(matches).length : cards.length;
-  // The board draws only the cards on it, so a dependency that has been archived is not in
-  // this list — and dropping it silently told a card it was waiting on nothing when it was
-  // waiting on something nobody can see. Named rather than omitted.
-  const title = (cardId: string) =>
-    cards.find((card) => card.id === cardId)?.title ?? "an archived card";
+  // `deps` are edges and edges do not expire: a card whose blocker finished last week went on
+  // saying "After Schema audit" for good. `blockingDeps` is the server's rule — not done, not
+  // archived — run over the board already in hand, and it reads `all` rather than the drawn
+  // `cards` so that a dependency past the limit is still recognised as one.
+  const waitingOn = (card: BoardCard) => blockingDeps(card.deps, all);
+
+  // A ring that never leaves is a card that looks selected for the rest of the session, so it
+  // goes once it has been seen. Gated on a boolean rather than on `cards`, which is a new array
+  // every three seconds and would restart the timer for good.
+  const drawn = focused ? cards.some((card) => card.id === focused) : false;
+  useEffect(() => {
+    if (!drawn) return;
+    const timer = setTimeout(() => setFocused(null), 6000);
+    return () => clearTimeout(timer);
+  }, [drawn]);
 
   const dragged = cards.find((card) => card.id === dragging);
   // A few pixels of slop before a drag begins, so that pressing a button on a card is still
@@ -453,6 +535,20 @@ export function BoardRoute() {
         </p>
       ) : null}
 
+      {/* Followed a link to a card that is not here. Every reason for that — archived, deleted,
+          or on another project's board — is something to say rather than a page that simply
+          does not do what the link said it would. */}
+      {linked && !board.isPending && !cards.some((card) => card.id === linked) ? (
+        <p className="rounded-md border border-dashed px-3 py-2 text-xs text-muted-foreground">
+          That card is not on this board. It may have been archived, deleted, or it belongs to
+          another project —{" "}
+          <Link to="/archive" className="font-medium text-foreground underline">
+            check the archive
+          </Link>
+          .
+        </p>
+      ) : null}
+
       {/* A board that stopped at the limit looked like a board that ended there. Said once,
           above the lanes, with the thing to do about it. */}
       {truncated ? (
@@ -507,6 +603,12 @@ export function BoardRoute() {
                       </span>
                     </h2>
                     <p className="truncate text-xs text-muted-foreground">{laneSummary(lane)}</p>
+                    {/* Its own line rather than more of the summary above: the arrows are what
+                        make the board a pipeline, and appended to a truncated line they would
+                        be the half that gets cut off. */}
+                    {laneFlow(lane) ? (
+                      <p className="truncate text-xs text-muted-foreground/70">{laneFlow(lane)}</p>
+                    ) : null}
                   </div>
                   <div className="flex shrink-0">
                     <ActionButton
@@ -532,9 +634,15 @@ export function BoardRoute() {
                       size="icon"
                       label={`Delete ${lane.name}`}
                       hint={
-                        inLane.length ? "Move its cards somewhere else first" : "Delete this lane"
+                        inLane.length
+                          ? "Move its cards somewhere else first"
+                          : archivedIn(lane.id)
+                            ? `Restore or delete the ${archivedIn(lane.id)} archived card${
+                                archivedIn(lane.id) === 1 ? "" : "s"
+                              } it still holds`
+                            : "Delete this lane"
                       }
-                      disabled={inLane.length > 0}
+                      disabled={inLane.length > 0 || archivedIn(lane.id) > 0}
                       title={`Delete the lane "${lane.name}"?`}
                       description="Any other lane whose success or failure arrow pointed here stops pointing anywhere, and cards that land in it will sit still."
                       onConfirm={() => removeLane.mutate(lane.id)}
@@ -558,7 +666,9 @@ export function BoardRoute() {
                         next={next}
                         agentLabel={agentName(lane.agentId)}
                         dragDisabled={Boolean(filter)}
-                        waitingOn={card.deps.map((dep) => title(dep.dependsOnCardId))}
+                        waitingOn={waitingOn(card)}
+                        mark={markFor(card.id)}
+                        focused={focused === card.id}
                         watching={watching === card.id}
                         runId={runFor(card.id)}
                         // Per card, not per mutation: these are one mutation object shared by
@@ -572,7 +682,7 @@ export function BoardRoute() {
                           remove: removeCard.isPending && removeCard.variables === card.id,
                         }}
                         on={{
-                          edit: () => setEditingCard({ card, laneId: lane.id }),
+                          edit: (tab) => setEditingCard({ card, laneId: lane.id, tab }),
                           move: (laneId) => move.mutate({ cardId: card.id, laneId }),
                           archive: () => archive.mutate(card.id),
                           retry: () => retry.mutate(card.id),
@@ -618,6 +728,7 @@ export function BoardRoute() {
           lanes={lanes}
           projectId={projectId}
           laneId={editingCard.laneId}
+          tab={editingCard.tab}
           onClose={() => setEditingCard(null)}
         />
       ) : null}

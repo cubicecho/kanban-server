@@ -394,6 +394,20 @@ export async function runAgent({
     result.completionTokens += step.usage.completion;
     result.totalTokens += step.usage.total;
 
+    // What the run has cost, at the only moment anybody can know it: usage arrives in the last
+    // chunk of a turn. A turn the endpoint reported nothing for says nothing rather than
+    // repeating the total, so a watcher can tell "no usage yet" from "no usage reported".
+    if (step.usage.total > 0 || step.usage.prompt > 0 || step.usage.completion > 0) {
+      onEvent?.({
+        kind: "usage",
+        usage: {
+          promptTokens: result.promptTokens,
+          completionTokens: result.completionTokens,
+          totalTokens: result.totalTokens,
+        },
+      });
+    }
+
     messages.push({
       role: "assistant",
       content: step.content || null,

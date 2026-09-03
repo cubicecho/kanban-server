@@ -12,6 +12,8 @@ query Runs($projectId: String, $limit: Int!) {
     output
     error
     toolCalls
+    promptTokens
+    completionTokens
     totalTokens
     cardId
     taskId
@@ -56,6 +58,11 @@ subscription RunEvents($runId: String!) {
     text
     name
     ok
+    usage {
+      promptTokens
+      completionTokens
+      totalTokens
+    }
   }
 }
 

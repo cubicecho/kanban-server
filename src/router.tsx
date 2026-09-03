@@ -23,15 +23,30 @@ import { RouteError, RouteNotFound } from "@/components/route-error";
  */
 const rootRoute = createRootRoute({ component: AppShell });
 
+/**
+ * Which conversation this page is continuing.
+ *
+ * The one thing about a task that is a *location* rather than app state: the board is one of
+ * several and the app remembers which, but a conversation is one of many and the way back to a
+ * particular one has to be a link somebody can follow from the Tasks page. Without it, Home
+ * guessed — the newest task with no cards — and every older conversation was unreachable.
+ */
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
+  validateSearch: (search: Record<string, unknown>): { task?: string } => ({
+    task: typeof search.task === "string" && search.task ? search.task : undefined,
+  }),
   component: lazyRouteComponent(() => import("@/routes/home"), "HomeRoute"),
 });
 
+/** `?card=` is a card to go and look at — what "On the board" on the Tasks page now means. */
 const boardRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/board",
+  validateSearch: (search: Record<string, unknown>): { card?: string } => ({
+    card: typeof search.card === "string" && search.card ? search.card : undefined,
+  }),
   component: lazyRouteComponent(() => import("@/routes/board"), "BoardRoute"),
 });
 

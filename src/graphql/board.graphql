@@ -39,6 +39,31 @@ query Board($projectId: String!, $limit: Int!) {
   }
 }
 
+# What the cards on a board carry that is not on the card: a person's notes, and a reviewer's
+# reason for sending it back. Its own query rather than a relation on `Board`, which draws up to
+# five hundred cards every three seconds — a relation there is five hundred queries a tick, and
+# this is one for the whole board. Cards with neither are simply absent from the answer.
+query CardMarks($projectId: String!) {
+  cardMarks(projectId: $projectId) {
+    cardId
+    notes
+    rejection
+  }
+}
+
+# The archived cards, by lane, and nothing else about them.
+#
+# `Board` filters them out — correctly, they are off the board — but deleting a lane cascades to
+# them, and the guard that matters is the one for what you cannot see: a lane holding nothing but
+# archived cards looked empty and offered a Delete the server then refused. Not polled: this
+# changes when somebody archives or restores, which is when it is invalidated.
+query ArchivedLanes($projectId: String!, $limit: Int!) {
+  cards(limit: $limit, where: { projectId: { eq: $projectId }, archivedAt: { isNotNull: true } }) {
+    id
+    laneId
+  }
+}
+
 mutation MoveCard($cardId: String!, $laneId: String!, $position: Int) {
   moveCard(cardId: $cardId, laneId: $laneId, position: $position) {
     id

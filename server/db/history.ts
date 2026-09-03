@@ -1,6 +1,6 @@
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, count, desc, eq, isNull } from "drizzle-orm";
 import { db } from "./client.ts";
-import { type CardEvent, type CardNote, cardEvents, cardNotes } from "./schema.ts";
+import { type CardEvent, type CardNote, cardEvents, cardNotes, cards } from "./schema.ts";
 
 /**
  * Writing and reading a card's ledger — the record of what became of it, and why.
@@ -148,4 +148,62 @@ export async function saidAbout(cardId: string): Promise<{ report: string; notes
     .where(and(eq(cardNotes.cardId, cardId), eq(cardNotes.kind, "note")))
     .orderBy(asc(cardNotes.createdAt));
   return { report: newest?.body ?? "", notes: notes.map((note) => note.body) };
+}
+
+/** What a board can say about one card without opening it. */
+export interface CardMark {
+  cardId: string;
+  /** Standing notes a person left on it. Reports and verdicts are not anybody's to leave. */
+  notes: number;
+  /** Why a reviewer turned it down, where one did and it has not been sent on since. */
+  rejection: string;
+}
+
+/**
+ * The marks a whole board's cards carry, in two queries rather than one per card.
+ *
+ * A card knew everything about itself except the two things worth seeing from across the board:
+ * that somebody has written on it, and why it came back. Both live in `card_notes`, which the
+ * `Board` query cannot reach for — it draws as many as five hundred cards and polls every three
+ * seconds, and a relation on that is five hundred more queries a tick.
+ *
+ * The rejection is the newest `verdict` on a card that is *currently* rejected, which is the
+ * same reason `lastMoveNote` would give and arrived at without walking the ledger: a card stops
+ * being rejected the moment it is sent on, so a stale verdict cannot be drawn. Only those cards
+ * are read at all, which is what keeps the bodies fetched here to the handful being asked about.
+ */
+export async function cardMarks(projectId: string): Promise<CardMark[]> {
+  const counts = await db
+    .select({ cardId: cardNotes.cardId, notes: count() })
+    .from(cardNotes)
+    .innerJoin(cards, eq(cardNotes.cardId, cards.id))
+    .where(
+      and(eq(cards.projectId, projectId), isNull(cards.archivedAt), eq(cardNotes.kind, "note")),
+    )
+    .groupBy(cardNotes.cardId);
+
+  const verdicts = await db
+    .select({ cardId: cardNotes.cardId, body: cardNotes.body })
+    .from(cardNotes)
+    .innerJoin(cards, eq(cardNotes.cardId, cards.id))
+    .where(
+      and(
+        eq(cards.projectId, projectId),
+        isNull(cards.archivedAt),
+        eq(cards.status, "rejected"),
+        eq(cardNotes.kind, "verdict"),
+      ),
+    )
+    .orderBy(asc(cardNotes.createdAt));
+
+  // Oldest first, so the last write per card wins and the newest verdict is what is left.
+  const marks = new Map<string, CardMark>();
+  const mark = (cardId: string) => {
+    const found = marks.get(cardId) ?? { cardId, notes: 0, rejection: "" };
+    marks.set(cardId, found);
+    return found;
+  };
+  for (const row of counts) mark(row.cardId).notes = row.notes;
+  for (const row of verdicts) mark(row.cardId).rejection = row.body;
+  return [...marks.values()];
 }

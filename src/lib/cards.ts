@@ -72,27 +72,22 @@ export const CARD_HEALTH: readonly CardHealth[] = [
 /**
  * Where one card stands, given the lane it is in and the board around it.
  *
- * The dependency half is `blockers` as the server works it out, against the cards this board
- * already has: a dependency that is not among them has been archived, and an archived
- * dependency is not in the way — taking a card off the board is a decision that it does not
- * have to happen. The one case the two can differ on is a board truncated at `BOARD_LIMIT`,
- * where the missing rows are the tail of the longest lanes; the page says when it is drawing
- * a board that big.
+ * The dependency half is `blockingDeps` rather than a second reading of the same edges — the
+ * board's hint and this page's heap have to agree about what is in a card's way, or the two
+ * say different things about one card on two pages. The one case either can differ from the
+ * server on is a board truncated at `BOARD_LIMIT`, where the missing rows are the tail of the
+ * longest lanes; the page says when it is drawing a board that big.
  */
 export function cardHealth(
   card: { status: CardsStatusEnum; deps: readonly { dependsOnCardId: string }[] },
   lane: { roleId?: string | null; agentId?: string | null } | undefined,
-  onBoard: ReadonlyMap<string, { status: CardsStatusEnum }>,
+  onBoard: DepStatus[],
 ): CardHealth {
   if (needsAttention(card.status)) return "attention";
   if (card.status === CardsStatusEnum.Running) return "running";
   if (card.status === CardsStatusEnum.Done) return "done";
   if (!lane || !isStation(lane)) return "parked";
-  const waiting = card.deps.some((dep) => {
-    const on = onBoard.get(dep.dependsOnCardId);
-    return Boolean(on) && on?.status !== CardsStatusEnum.Done;
-  });
-  return waiting ? "blocked" : "waiting";
+  return blockingDeps([...card.deps], onBoard).length ? "blocked" : "waiting";
 }
 
 /** The board's dependency edges: each row is one card waiting on one other. */
@@ -138,4 +133,34 @@ export function cyclingCards(cardId: string, graph: DepGraph): Set<string> {
   // Only a card with an outgoing edge can reach anything, so the keys are the whole candidate
   // set: everything else is safe to wait on by construction.
   return new Set([...edges.keys()].filter(walk));
+}
+
+/** What a board knows about a card it might be waiting on. */
+export interface DepStatus {
+  id: string;
+  title: string;
+  status: CardsStatusEnum;
+}
+
+/**
+ * Which of a card's dependencies are actually still in its way, named.
+ *
+ * The board draws `deps` as they are stored, and a stored edge never expires — so a card whose
+ * blocker finished last week went on reading "After Schema audit" for good, which is precisely
+ * the staleness `blockers` exists on the server to avoid. This is that rule, `status !== "done"
+ * && !archivedAt`, run against the board the client already has in hand rather than asked for
+ * per card: the board is 500 rows polled every three seconds, and a query each to answer a
+ * hint would be 500 more.
+ *
+ * A dependency this list cannot find is one the `Board` query filtered out, which means it is
+ * archived — and an archived card is not in the way, so it is dropped rather than named. That
+ * is the same answer the server gives, and `tests/card-deps.test.ts` holds the two together.
+ */
+export function blockingDeps(deps: { dependsOnCardId: string }[], onBoard: DepStatus[]): string[] {
+  if (!deps.length) return [];
+  const byId = new Map(onBoard.map((card) => [card.id, card]));
+  return deps
+    .map((dep) => byId.get(dep.dependsOnCardId))
+    .filter((card): card is DepStatus => !!card && card.status !== CardsStatusEnum.Done)
+    .map((card) => card.title);
 }

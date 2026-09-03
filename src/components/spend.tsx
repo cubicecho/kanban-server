@@ -2,13 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { SpendDocument } from "@/gql/graphql";
 import { request } from "@/lib/gql";
-
-/** 1234 → "1.2k". A board's totals get long, and nobody reads the last three digits. */
-function compact(tokens: number): string {
-  if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1)}M`;
-  if (tokens >= 1_000) return `${(tokens / 1_000).toFixed(1)}k`;
-  return String(tokens);
-}
+import { compactTokens } from "@/lib/runs";
 
 const date = (value: string) =>
   new Date(value).toLocaleDateString(undefined, { day: "numeric", month: "short" });
@@ -49,7 +43,7 @@ export function Spend({
   return (
     <Tooltip>
       <TooltipTrigger className="text-muted-foreground text-xs">
-        {compact(total.totalTokens)} tokens · {total.runs} run{total.runs === 1 ? "" : "s"}
+        {compactTokens(total.totalTokens)} tokens · {total.runs} run{total.runs === 1 ? "" : "s"}
         {total.from ? ` · since ${date(total.from)}` : ""}
       </TooltipTrigger>
       <TooltipContent>

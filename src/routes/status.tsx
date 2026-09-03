@@ -25,6 +25,7 @@ import {
 } from "@/gql/graphql";
 import { BOARD_LIMIT, boardQuery } from "@/lib/board-query";
 import {
+  blockingDeps,
   CARD_HEALTH,
   CARD_STATUS_CLASS,
   CARD_STATUS_VARIANT,
@@ -234,15 +235,14 @@ export function StatusRoute() {
   const truncated = all.length > BOARD_LIMIT;
   const cards = useMemo(() => (truncated ? all.slice(0, BOARD_LIMIT) : all), [all, truncated]);
 
-  const byId = useMemo(() => new Map(cards.map((card) => [card.id, card])), [cards]);
   const laneById = useMemo(() => new Map(lanes.map((lane) => [lane.id, lane])), [lanes]);
 
   const health = useMemo(
     () =>
       new Map(
-        cards.map((card) => [card.id, cardHealth(card, laneById.get(card.laneId), byId)] as const),
+        cards.map((card) => [card.id, cardHealth(card, laneById.get(card.laneId), cards)] as const),
       ),
-    [cards, laneById, byId],
+    [cards, laneById],
   );
 
   const counts = useMemo(() => {
@@ -270,15 +270,6 @@ export function StatusRoute() {
     return newest;
   }, [issues.data]);
 
-  const blockedBy = (card: BoardCard) => {
-    const names: string[] = [];
-    for (const dep of card.deps) {
-      const on = byId.get(dep.dependsOnCardId);
-      if (on && on.status !== CardsStatusEnum.Done) names.push(on.title || "Untitled");
-    }
-    return names;
-  };
-
   /** The sentence under a card: why it is where it is, in the words that apply to it. */
   const why = (card: BoardCard): string | null => {
     switch (health.get(card.id)) {
@@ -287,7 +278,7 @@ export function StatusRoute() {
           ? card.error || "It broke without saying why — its history has the run that did it."
           : verdicts.get(card.id) || "A reviewer turned it down without saying why.";
       case "blocked":
-        return `Waiting on ${blockedBy(card).join(", ")}.`;
+        return `Waiting on ${blockingDeps([...card.deps], cards).join(", ")}.`;
       case "parked": {
         const lane = laneById.get(card.laneId);
         if (!lane) return "This card's lane is gone.";

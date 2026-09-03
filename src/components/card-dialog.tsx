@@ -58,10 +58,10 @@ export function CardDialog({
   /** Which lane a new card lands in. Ignored when editing. */
   laneId: string;
   /**
-   * Which tab to open on. The board opens a card to edit it, so `details` is right there; the
-   * status page opens one because of something said about it, and landing on the form puts a
-   * click in front of the answer somebody came for. A card that does not exist yet has no
-   * notes and no history, so it opens on `details` whatever is asked for.
+   * Which face to open on. The board's note marker opens the notes, because a person who
+   * clicked "2 notes" has said what they came to read; so does every row on the status page,
+   * each of which is a card opened because of something said about it. A card that does not
+   * exist yet has neither notes nor a history, so it opens on `details` whatever is asked for.
    */
   tab?: "details" | "deps" | "notes" | "history";
   onClose: () => void;
