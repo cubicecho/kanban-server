@@ -1,29 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  CheckCircle2,
-  Pencil,
-  Plug,
-  PlugZap,
-  Plus,
-  RefreshCw,
-  Trash2,
-  XCircle,
-} from "lucide-react";
+import { Pencil, Plug, PlugZap, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { ActionButton } from "@/components/action-button";
 import { Page } from "@/components/app-shell";
 import { ConfirmButton } from "@/components/confirm-button";
 import { EmptyState } from "@/components/empty-state";
+import { EnableSwitch } from "@/components/enable-switch";
 import { McpDialog } from "@/components/mcp-dialog";
-import { QueryError } from "@/components/query-error";
-import { RowSkeleton } from "@/components/row-skeleton";
-import { ToolList, toolCount } from "@/components/tool-list";
+import { ProbeResult } from "@/components/probe-result";
+import { QueryState } from "@/components/query-state";
+import { RowCard } from "@/components/row-card";
+import { toolCount } from "@/components/tool-list";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   DeleteMcpServerDocument,
   type McpProbe,
@@ -35,6 +25,7 @@ import {
 } from "@/gql/graphql";
 import { request } from "@/lib/gql";
 import { toConnection } from "@/lib/mcp-config";
+import { toastError } from "@/lib/toast";
 
 type McpServer = McpServersQuery["mcpServers"][number];
 
@@ -59,7 +50,7 @@ export function McpRoute() {
       toast.success("Reconnecting");
       refresh();
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: toastError,
   });
 
   const toggle = useMutation({
@@ -67,7 +58,7 @@ export function McpRoute() {
       request(UpdateMcpServerDocument, { id, set: { enabled } }),
     // The write reconnects the pool, so the status this row shows is a beat behind the switch.
     onSuccess: refresh,
-    onError: (error: Error) => toast.error(error.message),
+    onError: toastError,
   });
 
   const test = useMutation({
@@ -78,13 +69,13 @@ export function McpRoute() {
       return { id: server.id, probe: testMcpServer };
     },
     onSuccess: ({ id, probe }) => setProbes((current) => ({ ...current, [id]: probe })),
-    onError: (error: Error) => toast.error(error.message),
+    onError: toastError,
   });
 
   const remove = useMutation({
     mutationFn: (id: string) => request(DeleteMcpServerDocument, { id }),
     onSuccess: refresh,
-    onError: (error: Error) => toast.error(error.message),
+    onError: toastError,
   });
 
   const statusOf = (id: string) => servers.data?.mcpStatus.find((entry) => entry.id === id);
@@ -106,113 +97,96 @@ export function McpRoute() {
         </div>
       }
     >
-      {servers.isError ? (
-        <QueryError error={servers.error} onRetry={() => servers.refetch()} what="your servers" />
-      ) : null}
-      {servers.isPending ? <RowSkeleton rows={2} /> : null}
-      {servers.data?.mcpServers.length === 0 ? (
-        <EmptyState
-          icon={Plug}
-          title="No servers yet"
-          description="An MCP server is where an agent's tools come from. Without one an agent can think, but not act."
-          action={<Button onClick={() => setCreating(true)}>New server</Button>}
-        />
-      ) : null}
+      <QueryState
+        query={servers}
+        what="your servers"
+        rows={2}
+        count={(servers.data?.mcpServers ?? []).length}
+        empty={
+          <EmptyState
+            icon={Plug}
+            title="No servers yet"
+            description="An MCP server is where an agent's tools come from. Without one an agent can think, but not act."
+            action={<Button onClick={() => setCreating(true)}>New server</Button>}
+          />
+        }
+      />
 
       {servers.data?.mcpServers.map((server) => {
         const status = statusOf(server.id);
         const tools = status?.tools ?? [];
         const probe = probes[server.id];
         return (
-          <Card key={server.id} className="gap-3 p-4">
-            <div className="flex items-center gap-3">
-              <div className={`min-w-0 flex-1 ${server.enabled ? "" : "opacity-50"}`}>
-                <div className="flex items-center gap-2">
-                  <span className="truncate font-mono text-sm font-medium">{server.slug}</span>
-                  <Badge variant="outline">{server.transport}</Badge>
-                  <Badge variant={status?.status === "ready" ? "secondary" : "outline"}>
-                    {status?.status ?? "unknown"}
-                  </Badge>
-                  {tools.length ? (
-                    <span className="text-xs text-muted-foreground">{toolCount(tools.length)}</span>
-                  ) : null}
-                </div>
-                <p className="truncate font-mono text-xs text-muted-foreground">
-                  {server.transport === "stdio"
-                    ? [server.command, ...(toConnection(server).args ?? [])].join(" ")
-                    : server.url}
-                </p>
-              </div>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Switch
-                    checked={server.enabled}
-                    onCheckedChange={(enabled) => toggle.mutate({ id: server.id, enabled })}
-                    // A switch that says "Enable" while it is on names the state rather than
-                    // the action, which is the one thing a toggle must not do.
-                    aria-label={`${server.enabled ? "Disable" : "Enable"} ${server.slug}`}
-                  />
-                </TooltipTrigger>
-                <TooltipContent>{server.enabled ? "Disable" : "Enable"}</TooltipContent>
-              </Tooltip>
-              <ActionButton
-                variant="ghost"
-                size="icon"
-                label={`Test the connection to ${server.slug}`}
-                hint="Test connection"
-                onClick={() => test.mutate(server)}
-                disabled={test.isPending && test.variables?.id === server.id}
-              >
-                <PlugZap className="size-4" aria-hidden />
-              </ActionButton>
-              <ActionButton
-                variant="ghost"
-                size="icon"
-                label={`Edit ${server.slug}`}
-                hint="Edit"
-                onClick={() => setEditing(server)}
-              >
-                <Pencil className="size-4" aria-hidden />
-              </ActionButton>
-              <ConfirmButton
-                variant="ghost"
-                size="icon"
-                label={`Delete ${server.slug}`}
-                hint="Delete"
-                title={`Delete the server "${server.slug}"?`}
-                description="Every agent given these tools loses them, on every board on this server. The tools themselves are wherever they were — this is only the connection to them."
-                onConfirm={() => remove.mutate(server.id)}
-              >
-                <Trash2 className="size-4" aria-hidden />
-              </ConfirmButton>
-            </div>
-
+          <RowCard
+            key={server.id}
+            dim={!server.enabled}
+            title={<span className="font-mono text-sm">{server.slug}</span>}
+            badges={
+              <>
+                <Badge variant="outline">{server.transport}</Badge>
+                <Badge variant={status?.status === "ready" ? "secondary" : "outline"}>
+                  {status?.status ?? "unknown"}
+                </Badge>
+                {tools.length ? (
+                  <span className="text-xs text-muted-foreground">{toolCount(tools.length)}</span>
+                ) : null}
+              </>
+            }
+            meta={
+              <p className="truncate font-mono text-xs text-muted-foreground">
+                {server.transport === "stdio"
+                  ? [server.command, ...(toConnection(server).args ?? [])].join(" ")
+                  : server.url}
+              </p>
+            }
+            actions={
+              <>
+                <EnableSwitch
+                  enabled={server.enabled}
+                  onChange={(enabled) => toggle.mutate({ id: server.id, enabled })}
+                  name={server.slug}
+                />
+                <ActionButton
+                  variant="ghost"
+                  size="icon"
+                  label={`Test the connection to ${server.slug}`}
+                  hint="Test connection"
+                  onClick={() => test.mutate(server)}
+                  disabled={test.isPending && test.variables?.id === server.id}
+                >
+                  <PlugZap className="size-4" aria-hidden />
+                </ActionButton>
+                <ActionButton
+                  variant="ghost"
+                  size="icon"
+                  label={`Edit ${server.slug}`}
+                  hint="Edit"
+                  onClick={() => setEditing(server)}
+                >
+                  <Pencil className="size-4" aria-hidden />
+                </ActionButton>
+                <ConfirmButton
+                  variant="ghost"
+                  size="icon"
+                  label={`Delete ${server.slug}`}
+                  hint="Delete"
+                  title={`Delete the server "${server.slug}"?`}
+                  description="Every agent given these tools loses them, on every board on this server. The tools themselves are wherever they were — this is only the connection to them."
+                  onConfirm={() => remove.mutate(server.id)}
+                >
+                  <Trash2 className="size-4" aria-hidden />
+                </ConfirmButton>
+              </>
+            }
+          >
             {status?.error ? (
               <p className="whitespace-pre-wrap font-mono text-xs text-destructive">
                 {status.error}
               </p>
             ) : null}
 
-            {probe ? (
-              <div className="flex flex-col gap-2 border-t pt-3 text-sm">
-                <div className="flex items-center gap-2">
-                  {probe.ok ? (
-                    <CheckCircle2 className="size-4 text-status-running" />
-                  ) : (
-                    <XCircle className="size-4 text-destructive" />
-                  )}
-                  {probe.ok ? `Connected — ${toolCount(probe.tools.length)}` : "Could not connect"}
-                </div>
-                {probe.ok ? (
-                  <ToolList tools={probe.tools} />
-                ) : (
-                  <p className="whitespace-pre-wrap font-mono text-xs text-destructive">
-                    {probe.error}
-                  </p>
-                )}
-              </div>
-            ) : null}
-          </Card>
+            {probe ? <ProbeResult probe={probe} className="border-t pt-3" /> : null}
+          </RowCard>
         );
       })}
 

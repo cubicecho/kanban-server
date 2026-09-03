@@ -7,6 +7,7 @@ import { afterAll, beforeAll, expect, test } from "vitest";
 import type { McpServerRow } from "../server/db/schema.ts";
 import type { Resolved } from "../server/runner/llm.ts";
 import { replyWith } from "./fixtures/sse.ts";
+import { stop } from "./fixtures/teardown.ts";
 
 // Loading the runner pulls in the database module, so give it somewhere disposable first.
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "kanban-server-ondemand-"));
@@ -85,7 +86,7 @@ beforeAll(async () => {
 afterAll(async () => {
   const { mcp } = await import("../server/runner/mcp.ts");
   await mcp.shutdown();
-  await new Promise((resolve) => server.close(resolve));
+  await stop(server);
   fs.rmSync(dir, { recursive: true, force: true });
 });
 

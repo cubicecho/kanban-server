@@ -19,6 +19,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { ActionButton } from "@/components/action-button";
 import { RunStream } from "@/components/run-stream";
+import { CardStatusBadge } from "@/components/status-badge";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,7 +30,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -48,7 +48,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { BoardQuery } from "@/gql/graphql";
-import { CARD_STATUS_CLASS, CARD_STATUS_VARIANT, needsAttention } from "@/lib/cards";
+import { needsAttention } from "@/lib/cards";
+import { plural } from "@/lib/text";
 import { cn } from "@/lib/utils";
 
 type Lane = BoardQuery["lanes"][number];
@@ -57,24 +58,13 @@ type BoardCard = BoardQuery["cards"][number];
 /** Which face of the card dialog to open on. */
 export type CardTab = "details" | "deps" | "notes" | "history";
 
-function StatusBadge({ status }: { status: BoardCard["status"] }) {
-  return (
-    <Badge
-      variant={CARD_STATUS_VARIANT[status] ?? "secondary"}
-      className={CARD_STATUS_CLASS[status]}
-    >
-      {status}
-    </Badge>
-  );
-}
-
 /** What a card looks like while it is under the cursor, and nothing it can be clicked with. */
 export function CardGhost({ card }: { card: BoardCard }) {
   return (
     <Card className="w-72 gap-2 p-3 shadow-lg">
       <div className="flex items-start justify-between gap-2">
         <span className="min-w-0 flex-1 text-sm font-medium">{card.title}</span>
-        <StatusBadge status={card.status} />
+        <CardStatusBadge status={card.status} />
       </div>
     </Card>
   );
@@ -211,7 +201,7 @@ export function SortableCard({
         >
           {card.title}
         </button>
-        <StatusBadge status={card.status} />
+        <CardStatusBadge status={card.status} />
       </div>
 
       {card.error ? (
@@ -242,7 +232,7 @@ export function SortableCard({
           onClick={() => on.edit("notes")}
         >
           <MessageSquare className="size-3 shrink-0" aria-hidden />
-          {mark.notes} note{mark.notes === 1 ? "" : "s"}
+          {plural(mark.notes, "note")}
         </button>
       ) : null}
 
@@ -259,9 +249,7 @@ export function SortableCard({
           matters: it is why an idle card is idle for the second time. Not counted against the
           lane's budget here — the attempts were spent by whichever station failed it. */}
       {card.attempts ? (
-        <p className="text-xs text-muted-foreground">
-          {card.attempts} failed {card.attempts === 1 ? "attempt" : "attempts"}
-        </p>
+        <p className="text-xs text-muted-foreground">{plural(card.attempts, "failed attempt")}</p>
       ) : null}
 
       <div className="flex items-center gap-1">

@@ -5,6 +5,7 @@ import path from "node:path";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, expect, test } from "vitest";
 import { replyWith } from "./fixtures/sse.ts";
+import { stop } from "./fixtures/teardown.ts";
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "kanban-server-worker-"));
 process.env.KANBAN_SERVER_DATA_DIR = dir;
@@ -50,9 +51,9 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  worker.stop();
+  worker?.stop();
   for (const answer of waiting.splice(0)) answer();
-  await new Promise((resolve) => server.close(resolve));
+  await stop(server);
   fs.rmSync(dir, { recursive: true, force: true });
 });
 

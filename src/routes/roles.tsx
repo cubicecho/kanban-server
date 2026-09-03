@@ -6,14 +6,14 @@ import { ActionButton } from "@/components/action-button";
 import { Page } from "@/components/app-shell";
 import { ConfirmButton } from "@/components/confirm-button";
 import { EmptyState } from "@/components/empty-state";
-import { QueryError } from "@/components/query-error";
+import { QueryState } from "@/components/query-state";
 import { RoleDialog } from "@/components/role-dialog";
-import { RowSkeleton } from "@/components/row-skeleton";
+import { RowCard } from "@/components/row-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { DeleteRoleDocument, RolesDocument, type RolesQuery } from "@/gql/graphql";
 import { request } from "@/lib/gql";
+import { nameList, plural } from "@/lib/text";
 
 type Role = RolesQuery["roles"][number];
 
@@ -57,44 +57,44 @@ export function RolesRoute() {
         </Button>
       }
     >
-      {roles.isError ? (
-        <QueryError error={roles.error} onRetry={() => roles.refetch()} what="your roles" />
-      ) : null}
-      {roles.isPending ? <RowSkeleton rows={3} /> : null}
-      {roles.data?.roles.length === 0 ? (
-        <EmptyState
-          icon={Notebook}
-          title="No kinds of lane yet"
-          description="A role is what a station does — work a card, judge it, or break it up. Every board on this server picks its lanes from this list."
-          action={<Button onClick={() => setCreating(true)}>New role</Button>}
-        />
-      ) : null}
+      <QueryState
+        query={roles}
+        what="your roles"
+        rows={3}
+        count={(roles.data?.roles ?? []).length}
+        empty={
+          <EmptyState
+            icon={Notebook}
+            title="No kinds of lane yet"
+            description="A role is what a station does — work a card, judge it, or break it up. Every board on this server picks its lanes from this list."
+            action={<Button onClick={() => setCreating(true)}>New role</Button>}
+          />
+        }
+      />
 
       {roles.data?.roles.map((role) => {
         const of = lanes.filter((lane) => lane.roleId === role.id);
         const count = of.length;
         // The foreign key is `restrict`, so confirming a delete here could only ever fail.
         // Naming the lanes is the difference between a refusal and somewhere to go.
-        const where = of
-          .slice(0, 3)
-          .map((lane) => `${lane.name} on ${lane.project.name}`)
-          .join(", ");
+        const where = nameList(of.map((lane) => `${lane.name} on ${lane.project.name}`));
         return (
-          <Card key={role.id} className="gap-2 p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium">{role.name}</span>
-                  <Badge variant="outline">{CONTRACT_LABEL[role.contract] ?? role.contract}</Badge>
-                  <span className="text-xs text-muted-foreground">
-                    {count} lane{count === 1 ? "" : "s"}
-                  </span>
-                </div>
-                {role.description ? (
-                  <p className="mt-1 text-sm text-muted-foreground">{role.description}</p>
-                ) : null}
-              </div>
-              <div className="flex shrink-0 items-center gap-1">
+          <RowCard
+            key={role.id}
+            title={role.name}
+            badges={
+              <>
+                <Badge variant="outline">{CONTRACT_LABEL[role.contract] ?? role.contract}</Badge>
+                <span className="text-xs text-muted-foreground">{plural(count, "lane")}</span>
+              </>
+            }
+            meta={
+              role.description ? (
+                <p className="mt-1 text-sm text-muted-foreground">{role.description}</p>
+              ) : null
+            }
+            actions={
+              <>
                 <ActionButton
                   variant="ghost"
                   size="icon"
@@ -109,23 +109,20 @@ export function RolesRoute() {
                   size="icon"
                   label={`Delete ${role.name}`}
                   disabled={count > 0}
-                  hint={
-                    count
-                      ? `Still in use by ${where}${count > 3 ? ` and ${count - 3} more` : ""}`
-                      : "Delete"
-                  }
+                  hint={count ? `Still in use by ${where}` : "Delete"}
                   title={`Delete the role "${role.name}"?`}
                   description="This kind of lane goes for every board on the server, not just this one."
                   onConfirm={() => remove.mutate(role.id)}
                 >
                   <Trash2 className="size-4" aria-hidden />
                 </ConfirmButton>
-              </div>
-            </div>
+              </>
+            }
+          >
             <p className="line-clamp-2 font-mono text-muted-foreground text-xs">
               {role.prompt || "no prompt — a lane of this kind is told nothing"}
             </p>
-          </Card>
+          </RowCard>
         );
       })}
 

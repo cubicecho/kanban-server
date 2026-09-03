@@ -5,6 +5,7 @@ import path from "node:path";
 import { and, desc, eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, expect, test } from "vitest";
 import { replyWith } from "./fixtures/sse.ts";
+import { stop } from "./fixtures/teardown.ts";
 
 // Everything under server/ builds against the live tables, so the database needs a home first.
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "kanban-server-board-"));
@@ -55,7 +56,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await new Promise((resolve) => server.close(resolve));
+  await stop(server);
   fs.rmSync(dir, { recursive: true, force: true });
 });
 

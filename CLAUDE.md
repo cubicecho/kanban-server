@@ -409,6 +409,40 @@ runs behind it, and a total that cannot be checked against the rows is worse tha
 with a typed document — no raw `fetch` in a component — and every mutation invalidates the
 query keys it affected.
 
+**A thing the board has a word for is drawn by one component.** Between `ui/` and the routes sits
+a layer of domain components, built out of the primitives and named after what they say rather
+than how they look: `status-badge.tsx` (a card's status, a run's, a verdict), `live-dot.tsx`,
+`meta-line.tsx`, `disclosure-row.tsx` — the openable row Runs, Tasks and the archive are all
+lists of — `probe-result.tsx` and `show-more.tsx`. Every one of them replaced a copy per page,
+and every one of those copies had drifted: a `running` card was green on the board and grey on
+Runs, a card's status in Tasks was grey whatever it said, and the meta line under a title grew a
+stray `·` wherever the middle of it was empty. There is one tone vocabulary — five tones and two
+colours — in `status-badge.tsx`, and a page picks a tone rather than a Tailwind class. Anything
+drawn in two places belongs here; anything drawn once belongs where it is drawn.
+
+`row-card.tsx` is `disclosure-row.tsx` with nothing to open, which is what Agents, Roles and MCP
+are lists of, and `query-state.tsx` is the ladder every one of those pages climbs before it draws
+a row: failed, loading, empty. That last rung is why it is a component rather than three — six
+pages wrote the empty check two different ways, `data?.roles.length === 0` where the query is read
+straight and `shown.length === 0 && !isPending && !isError` where the list was already defaulted to
+`[]`, and both being correct is exactly what stops anybody fixing it. `enable-switch.tsx` is the
+on/off toggle Agents and MCP share, along with the two things about it worth remembering: a Radix
+switch needs its name said outright, and the label names the action rather than the state.
+`toastError` in `src/lib/toast.ts` is how a failed write is said — one line that was written
+twenty-five times, seven of those as the same local `const onError` — and `nameList` in
+`src/lib/text.ts` is the "and 2 more" that trails a list of what a delete is about to take.
+
+`form-dialog.tsx` is the same argument taken as far as it goes: the seven dialogs on this server
+differ in their fields and in nothing else, so the shell — the open/close wiring, the header, the
+scrolling body, a footer with a ghost Cancel and a Save that says "Saving…" — is written once and
+they pass what is theirs. `dirty` is asked for rather than worked out, because only the caller
+knows what its fields are; `aside` is whatever sits at the far end of the footer and is what
+splits it, being a second action (Test connection, Delete project) or a word about why Save is
+refusing. What the shell is really for is the guard: six of the seven closed through
+`useDiscardGuard` and the seventh, written before it existed, wired `onOpenChange` straight into
+`onClose` and quietly lost a typed template name to a stray Escape. A guard a caller cannot see is
+a guard a caller cannot forget.
+
 ## Code style
 
 - Biome-enforced: double quotes, semicolons, trailing commas, 2-space indent, 100 line width,

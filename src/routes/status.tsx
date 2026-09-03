@@ -7,10 +7,13 @@ import { ActionButton } from "@/components/action-button";
 import { Page, useCurrentProject } from "@/components/app-shell";
 import { CardDialog } from "@/components/card-dialog";
 import { EmptyState, NoProject } from "@/components/empty-state";
+import { LiveDot } from "@/components/live-dot";
+import { MetaLine } from "@/components/meta-line";
 import { useProjectActions } from "@/components/project-actions";
 import { QueryError } from "@/components/query-error";
 import { RowSkeleton } from "@/components/row-skeleton";
 import { Spend } from "@/components/spend";
+import { CardStatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -24,17 +27,11 @@ import {
   RunCardDocument,
 } from "@/gql/graphql";
 import { BOARD_LIMIT, boardQuery } from "@/lib/board-query";
-import {
-  blockingDeps,
-  CARD_HEALTH,
-  CARD_STATUS_CLASS,
-  CARD_STATUS_VARIANT,
-  type CardHealth,
-  cardHealth,
-  isStation,
-} from "@/lib/cards";
+import { blockingDeps, CARD_HEALTH, type CardHealth, cardHealth, isStation } from "@/lib/cards";
 import { request } from "@/lib/gql";
 import { useProjectId } from "@/lib/project";
+import { plural } from "@/lib/text";
+import { toastError } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 
 type BoardCard = BoardQuery["cards"][number];
@@ -63,8 +60,6 @@ const HEALTH: Record<CardHealth, { label: string; blurb: string }> = {
   },
   done: { label: "Done", blurb: "Nothing further will happen to these." },
 };
-
-const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
 
 /** A tally with every heap at nought, which is what a lane holding nothing has to say. */
 const noneYet = (): Record<CardHealth, number> =>
@@ -106,7 +101,15 @@ function Tile({
           >
             {count}
           </span>
-          <span className="block text-xs text-muted-foreground">{HEALTH[health].label}</span>
+          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            {/* The two heaps that are true *now* rather than as of the last poll say so the
+                same way, in the same dot: green that work is moving, red that it has stopped
+                and is waiting on somebody. A tile at nought pulses at nobody. */}
+            {count > 0 && (health === "attention" || health === "running") ? (
+              <LiveDot tone={health === "attention" ? "fault" : "running"} className="size-1.5" />
+            ) : null}
+            {HEALTH[health].label}
+          </span>
         </button>
       </TooltipTrigger>
       <TooltipContent>{HEALTH[health].blurb}</TooltipContent>
@@ -157,11 +160,7 @@ function FailureRow({ failure }: { failure: Failure }) {
         <span className="truncate font-medium">
           {failure.card?.title || failure.task?.title || "(gone)"}
         </span>
-        <span className="text-xs text-muted-foreground">
-          {failure.agent?.name ? `${failure.agent.name} · ` : ""}
-          {failure.lane?.name ? `${failure.lane.name} · ` : ""}
-          {when(failure.startedAt)}
-        </span>
+        <MetaLine parts={[failure.agent?.name, failure.lane?.name, when(failure.startedAt)]} />
       </div>
       <p className="line-clamp-3 text-sm text-destructive">
         {failure.error || "It broke without saying why."}
@@ -210,7 +209,6 @@ export function StatusRoute() {
     queryClient.invalidateQueries({ queryKey: ["project-issues", projectId] });
     queryClient.invalidateQueries({ queryKey: ["spend"] });
   };
-  const onError = (error: Error) => toast.error(error.message);
 
   const retry = useMutation({
     mutationFn: (cardId: string) => request(RetryCardDocument, { cardId }),
@@ -218,7 +216,7 @@ export function StatusRoute() {
       toast.success("Back in play");
       refresh();
     },
-    onError,
+    onError: toastError,
   });
 
   const run = useMutation({
@@ -227,7 +225,7 @@ export function StatusRoute() {
       if (result.runCard.status !== "ok") toast.error(result.runCard.error || "The agent failed.");
       refresh();
     },
-    onError,
+    onError: toastError,
   });
 
   const lanes = useMemo(() => board.data?.lanes ?? [], [board.data]);
@@ -428,21 +426,17 @@ export function StatusRoute() {
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <Badge
-                      variant={CARD_STATUS_VARIANT[card.status] ?? "secondary"}
-                      className={CARD_STATUS_CLASS[card.status]}
-                    >
-                      {card.status}
-                    </Badge>
+                    <CardStatusBadge status={card.status} />
                     <span className="truncate font-medium">{card.title || "Untitled"}</span>
                   </div>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {lane?.name ?? "(lane gone)"}
-                    {card.attempts
-                      ? ` · ${plural(card.attempts, "failed attempt", "failed attempts")}`
-                      : ""}{" "}
-                    · {when(card.updatedAt)}
-                  </p>
+                  <MetaLine
+                    className="mt-1 block"
+                    parts={[
+                      lane?.name ?? "(lane gone)",
+                      card.attempts ? plural(card.attempts, "failed attempt") : null,
+                      when(card.updatedAt),
+                    ]}
+                  />
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
                   {kind === "attention" ? (
@@ -504,7 +498,12 @@ export function StatusRoute() {
       {unexplained.length ? (
         <section className="flex flex-col gap-3">
           <div>
-            <h2 className="font-medium">Failures with nothing to show for them</h2>
+            <h2 className="flex items-center gap-2 font-medium">
+              {/* On the heading rather than on every row: five broken runs are one thing to
+                  look at, and five pulsing dots are five. */}
+              <LiveDot tone="fault" />
+              Failures with nothing to show for them
+            </h2>
             <p className="text-sm text-muted-foreground">
               Runs that broke and left no card standing in the way — a refinement that never reached
               the board, or a card somebody has since moved on.

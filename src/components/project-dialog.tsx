@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
-import { useDiscardGuard } from "@/components/discard-guard";
 import { useFieldError } from "@/components/field-error";
+import { FormDialog } from "@/components/form-dialog";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -13,14 +13,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -44,6 +36,7 @@ import {
 import { useDirty } from "@/lib/dirty";
 import { request } from "@/lib/gql";
 import { selectProject } from "@/lib/project";
+import { toastError } from "@/lib/toast";
 
 type Project = ProjectsQuery["projects"][number];
 
@@ -91,7 +84,7 @@ export function ProjectDialog({
   const [deleting, setDeleting] = useState(false);
   const [typed, setTyped] = useState("");
 
-  const { close, guard } = useDiscardGuard(useDirty({ ...draft, templateId }), onClose);
+  const dirty = useDirty({ ...draft, templateId });
   const nameError = useFieldError(
     "project-name",
     draft.name.trim() ? "" : "A project needs a name.",
@@ -135,7 +128,7 @@ export function ProjectDialog({
       queryClient.invalidateQueries({ queryKey: ["projects"] });
       onClose();
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: toastError,
   });
 
   // The one delete in this app that takes a whole body of work with it, and until now the only
@@ -154,179 +147,166 @@ export function ProjectDialog({
       toast.success("Project deleted");
       onClose();
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: toastError,
   });
 
   return (
-    <Dialog open onOpenChange={(open) => !open && close()}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
-        <DialogHeader>
-          <DialogTitle>{project ? "Edit project" : "New project"}</DialogTitle>
-          <DialogDescription>
-            A project is a board and the standing context every agent working it is given.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="project-name">Name</Label>
-            <Input
-              id="project-name"
-              value={draft.name}
-              onChange={(event) => set({ name: event.target.value })}
-              placeholder="Billing rewrite"
-              {...nameError.field}
-            />
-            {nameError.error}
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="description">Description</Label>
-            <Input
-              id="description"
-              value={draft.description}
-              onChange={(event) => set({ description: event.target.value })}
-              placeholder="One line, for the picker."
-            />
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="context">Context</Label>
-            <Textarea
-              id="context"
-              rows={6}
-              value={draft.context}
-              onChange={(event) => set({ context: event.target.value })}
-              placeholder="The stack, the conventions, where things live — whatever every agent working this project needs to know before its own prompt."
-            />
-          </div>
-
-          {project ? null : (
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="project-board">Board</Label>
-              <Select value={templateId} onValueChange={setTemplateId}>
-                <SelectTrigger id="project-board" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={SEEDED}>Backlog, Doing, Review, Done</SelectItem>
-                  {(templates.data?.boardTemplates ?? []).map((template) => (
-                    <SelectItem key={template.id} value={template.id}>
-                      {template.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                {templateId === SEEDED
-                  ? "The default four, wired to whichever agents this server has."
-                  : ((templates.data?.boardTemplates ?? []).find((one) => one.id === templateId)
-                      ?.description ?? "A board saved from another project.")}
-              </p>
-            </div>
-          )}
-
-          <div className="flex items-center justify-between gap-4 rounded-md border p-3">
-            <div>
-              <Label htmlFor="autoRun">Run cards automatically</Label>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Off, cards sit where they are put and run when you ask. On, a card that lands in a
-                lane with an agent is picked up, worked and moved along on its own.
-              </p>
-            </div>
-            <Switch
-              id="autoRun"
-              checked={draft.autoRun}
-              onCheckedChange={(autoRun) => set({ autoRun })}
-            />
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="project-refiner">Refining agent</Label>
-              <Select
-                value={draft.refineAgentId || ANY}
-                onValueChange={(value) => set({ refineAgentId: value === ANY ? "" : value })}
-              >
-                <SelectTrigger id="project-refiner" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ANY}>Whatever Settings says</SelectItem>
-                  {enabled.map((agent) => (
-                    <SelectItem key={agent.id} value={agent.id}>
-                      {agent.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+    <FormDialog
+      title={project ? "Edit project" : "New project"}
+      description="A project is a board and the standing context every agent working it is given."
+      width="xl"
+      dirty={dirty}
+      onClose={onClose}
+      onSave={() => save.mutate()}
+      saving={save.isPending}
+      canSave={!nameError.invalid}
+      aside={
+        project ? (
+          <Button
+            variant="ghost"
+            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+            onClick={() => {
+              setTyped("");
+              setDeleting(true);
+            }}
+          >
+            Delete project
+          </Button>
+        ) : null
+      }
+    >
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="project-name">Name</Label>
+          <Input
+            id="project-name"
+            value={draft.name}
+            onChange={(event) => set({ name: event.target.value })}
+            placeholder="Billing rewrite"
+            {...nameError.field}
+          />
+          {nameError.error}
         </div>
 
-        <DialogFooter className="sm:justify-between">
-          {project ? (
-            <Button
-              variant="ghost"
-              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-              onClick={() => {
-                setTyped("");
-                setDeleting(true);
-              }}
-            >
-              Delete project
-            </Button>
-          ) : (
-            <span />
-          )}
-          <div className="flex gap-2">
-            <Button variant="ghost" onClick={close}>
-              Cancel
-            </Button>
-            <Button onClick={() => save.mutate()} disabled={nameError.invalid || save.isPending}>
-              {save.isPending ? "Saving…" : "Save"}
-            </Button>
-          </div>
-        </DialogFooter>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="description">Description</Label>
+          <Input
+            id="description"
+            value={draft.description}
+            onChange={(event) => set({ description: event.target.value })}
+            placeholder="One line, for the picker."
+          />
+        </div>
 
-        {project ? (
-          <AlertDialog open={deleting} onOpenChange={setDeleting}>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete “{project.name}”?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Its lanes go, and its cards with them — along with the conversations they came
-                  from, their dependencies, their history of moves and every run of the lot. This is
-                  the whole project, not a board you can draw again.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="confirm-project">
-                  Type <span className="font-medium text-foreground">{project.name}</span> to
-                  confirm
-                </Label>
-                <Input
-                  id="confirm-project"
-                  value={typed}
-                  onChange={(event) => setTyped(event.target.value)}
-                  autoComplete="off"
-                />
-              </div>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <Button
-                  variant="destructive"
-                  disabled={typed.trim() !== project.name || remove.isPending}
-                  onClick={() => remove.mutate(project.id)}
-                >
-                  {remove.isPending ? "Deleting…" : "Delete project"}
-                </Button>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        ) : null}
-        {guard}
-      </DialogContent>
-    </Dialog>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="context">Context</Label>
+          <Textarea
+            id="context"
+            rows={6}
+            value={draft.context}
+            onChange={(event) => set({ context: event.target.value })}
+            placeholder="The stack, the conventions, where things live — whatever every agent working this project needs to know before its own prompt."
+          />
+        </div>
+
+        {project ? null : (
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="project-board">Board</Label>
+            <Select value={templateId} onValueChange={setTemplateId}>
+              <SelectTrigger id="project-board" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={SEEDED}>Backlog, Doing, Review, Done</SelectItem>
+                {(templates.data?.boardTemplates ?? []).map((template) => (
+                  <SelectItem key={template.id} value={template.id}>
+                    {template.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {templateId === SEEDED
+                ? "The default four, wired to whichever agents this server has."
+                : ((templates.data?.boardTemplates ?? []).find((one) => one.id === templateId)
+                    ?.description ?? "A board saved from another project.")}
+            </p>
+          </div>
+        )}
+
+        <div className="flex items-center justify-between gap-4 rounded-md border p-3">
+          <div>
+            <Label htmlFor="autoRun">Run cards automatically</Label>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Off, cards sit where they are put and run when you ask. On, a card that lands in a
+              lane with an agent is picked up, worked and moved along on its own.
+            </p>
+          </div>
+          <Switch
+            id="autoRun"
+            checked={draft.autoRun}
+            onCheckedChange={(autoRun) => set({ autoRun })}
+          />
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="project-refiner">Refining agent</Label>
+            <Select
+              value={draft.refineAgentId || ANY}
+              onValueChange={(value) => set({ refineAgentId: value === ANY ? "" : value })}
+            >
+              <SelectTrigger id="project-refiner" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ANY}>Whatever Settings says</SelectItem>
+                {enabled.map((agent) => (
+                  <SelectItem key={agent.id} value={agent.id}>
+                    {agent.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </div>
+
+      {project ? (
+        <AlertDialog open={deleting} onOpenChange={setDeleting}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete “{project.name}”?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Its lanes go, and its cards with them — along with the conversations they came from,
+                their dependencies, their history of moves and every run of the lot. This is the
+                whole project, not a board you can draw again.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="confirm-project">
+                Type <span className="font-medium text-foreground">{project.name}</span> to confirm
+              </Label>
+              <Input
+                id="confirm-project"
+                value={typed}
+                onChange={(event) => setTyped(event.target.value)}
+                autoComplete="off"
+              />
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <Button
+                variant="destructive"
+                disabled={typed.trim() !== project.name || remove.isPending}
+                onClick={() => remove.mutate(project.id)}
+              >
+                {remove.isPending ? "Deleting…" : "Delete project"}
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      ) : null}
+    </FormDialog>
   );
 }

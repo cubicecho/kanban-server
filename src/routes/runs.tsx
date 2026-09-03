@@ -1,18 +1,20 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronRight, History, RefreshCw, Square, Trash2 } from "lucide-react";
+import { History, RefreshCw, Square, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { ActionButton } from "@/components/action-button";
 import { Page, useCurrentProject } from "@/components/app-shell";
 import { ConfirmButton } from "@/components/confirm-button";
+import { DisclosureRow } from "@/components/disclosure-row";
 import { EmptyState, NoProject } from "@/components/empty-state";
-import { QueryError } from "@/components/query-error";
-import { RowSkeleton } from "@/components/row-skeleton";
+import { MetaLine } from "@/components/meta-line";
+import { QueryState } from "@/components/query-state";
 import { RunStream } from "@/components/run-stream";
+import { ShowMore } from "@/components/show-more";
+import { RunStatusBadge } from "@/components/status-badge";
 import { TokenStats } from "@/components/token-stats";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import {
   DeleteRunDocument,
   RunsDocument,
@@ -22,8 +24,8 @@ import {
 } from "@/gql/graphql";
 import { request } from "@/lib/gql";
 import { useProjectId } from "@/lib/project";
-import { compactTokens, duration, RUN_STATUS_VARIANT } from "@/lib/runs";
-import { cn } from "@/lib/utils";
+import { compactTokens, duration } from "@/lib/runs";
+import { toastError } from "@/lib/toast";
 
 type Run = RunsQuery["runs"][number];
 
@@ -90,12 +92,11 @@ export function RunsRoute() {
     queryClient.invalidateQueries({ queryKey: ["board", projectId] });
     queryClient.invalidateQueries({ queryKey: ["tasks", projectId] });
   };
-  const onError = (error: Error) => toast.error(error.message);
 
   const remove = useMutation({
     mutationFn: (id: string) => request(DeleteRunDocument, { id }),
     onSuccess: refresh,
-    onError,
+    onError: toastError,
   });
 
   const stop = useMutation({
@@ -108,7 +109,7 @@ export function RunsRoute() {
       if (stopped) toast.success("Stopping…");
       refresh();
     },
-    onError,
+    onError: toastError,
   });
 
   const rows = runs.data?.runs ?? [];
@@ -135,57 +136,48 @@ export function RunsRoute() {
         </Button>
       }
     >
-      {runs.isError ? (
-        <QueryError error={runs.error} onRetry={() => runs.refetch()} what="these runs" />
-      ) : null}
-      {runs.isPending ? <RowSkeleton rows={3} /> : null}
-      {shown.length === 0 && !runs.isPending && !runs.isError ? (
-        <EmptyState
-          icon={History}
-          title="Nothing has run yet"
-          description="Every time an agent is asked to do anything — refine a task, or work a card — it shows up here."
-        />
-      ) : null}
+      <QueryState
+        query={runs}
+        what="these runs"
+        rows={3}
+        count={shown.length}
+        empty={
+          <EmptyState
+            icon={History}
+            title="Nothing has run yet"
+            description="Every time an agent is asked to do anything — refine a task, or work a card — it shows up here."
+          />
+        }
+      />
 
       {shown.map((run) => {
-        const expanded = open === run.id;
         const running = run.status === "running";
         return (
-          <Card key={run.id} className="gap-2 p-4">
-            <div className="flex items-start justify-between gap-3">
-              <button
-                type="button"
-                className="flex min-w-0 flex-1 items-start gap-2 text-left"
-                aria-expanded={expanded}
-                onClick={() => setOpen(expanded ? null : run.id)}
-              >
-                <ChevronRight
-                  className={cn(
-                    "mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform",
-                    expanded && "rotate-90",
-                  )}
-                  aria-hidden
-                />
-                <span className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <Badge variant={RUN_STATUS_VARIANT[run.status] ?? "secondary"}>
-                      {run.status}
-                    </Badge>
-                    <Badge variant="outline">{run.kind}</Badge>
-                    <span className="truncate font-medium">{subject(run)}</span>
-                    <span className="shrink-0 text-xs text-muted-foreground">
-                      {run.agent?.name ? `${run.agent.name} · ` : ""}
-                      {new Date(run.startedAt).toLocaleString()} ·{" "}
-                      {duration(run.startedAt, run.finishedAt)}
-                      {run.totalTokens ? ` · ${compactTokens(run.totalTokens)} tokens` : ""}
-                    </span>
-                  </div>
-                  <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
-                    {run.error || run.output || "(no output)"}
-                  </p>
-                </span>
-              </button>
-              <div className="flex shrink-0 items-center gap-1">
+          <DisclosureRow
+            key={run.id}
+            open={open === run.id}
+            onOpenChange={(next) => setOpen(next ? run.id : null)}
+            badges={
+              <>
+                <RunStatusBadge status={run.status} />
+                <Badge variant="outline">{run.kind}</Badge>
+              </>
+            }
+            title={subject(run)}
+            meta={
+              <MetaLine
+                className="shrink-0"
+                parts={[
+                  run.agent?.name,
+                  new Date(run.startedAt).toLocaleString(),
+                  duration(run.startedAt, run.finishedAt),
+                  run.totalTokens ? `${compactTokens(run.totalTokens)} tokens` : null,
+                ]}
+              />
+            }
+            summary={run.error || run.output || "(no output)"}
+            actions={
+              <>
                 {running ? (
                   <ActionButton
                     variant="ghost"
@@ -209,49 +201,39 @@ export function RunsRoute() {
                 >
                   <Trash2 className="size-4" aria-hidden />
                 </ConfirmButton>
-              </div>
-            </div>
-
-            {expanded ? (
-              <div className="flex flex-col gap-2 border-t pt-3">
-                {/* A run in flight has no stored output yet — this is the run itself, live. */}
-                {running ? (
-                  <RunStream runId={run.id} />
-                ) : (
-                  <>
-                    {/* The split and the rate live here rather than in the row above, which is
-                        a button: a tooltip trigger is a button too, and one cannot sit in the
-                        other. */}
-                    {run.totalTokens ? (
-                      <TokenStats
-                        usage={run}
-                        seconds={
-                          run.finishedAt
-                            ? (new Date(run.finishedAt).getTime() -
-                                new Date(run.startedAt).getTime()) /
-                              1000
-                            : null
-                        }
-                        className="self-start"
-                      />
-                    ) : null}
-                    <ToolChips calls={run.toolCalls} />
-                    <pre className="overflow-x-auto text-sm whitespace-pre-wrap">
-                      {run.error || run.output || "(no output)"}
-                    </pre>
-                  </>
-                )}
-              </div>
-            ) : null}
-          </Card>
+              </>
+            }
+          >
+            {/* A run in flight has no stored output yet — this is the run itself, live. */}
+            {running ? (
+              <RunStream runId={run.id} />
+            ) : (
+              <>
+                {/* The split and the rate live here rather than in the row above, which is a
+                    button: a tooltip trigger is a button too, and one cannot sit in the other. */}
+                {run.totalTokens ? (
+                  <TokenStats
+                    usage={run}
+                    seconds={
+                      run.finishedAt
+                        ? (new Date(run.finishedAt).getTime() - new Date(run.startedAt).getTime()) /
+                          1000
+                        : null
+                    }
+                    className="self-start"
+                  />
+                ) : null}
+                <ToolChips calls={run.toolCalls} />
+                <pre className="overflow-x-auto text-sm whitespace-pre-wrap">
+                  {run.error || run.output || "(no output)"}
+                </pre>
+              </>
+            )}
+          </DisclosureRow>
         );
       })}
 
-      {more ? (
-        <Button variant="outline" className="self-center" onClick={() => setLimit(limit + PAGE)}>
-          Show {PAGE} more
-        </Button>
-      ) : null}
+      {more ? <ShowMore count={PAGE} onMore={() => setLimit(limit + PAGE)} /> : null}
     </Page>
   );
 }

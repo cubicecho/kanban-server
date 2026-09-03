@@ -1,19 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bot, Pencil, Plus, Trash2, TriangleAlert } from "lucide-react";
 import { useState } from "react";
-import { toast } from "sonner";
 import { ActionButton } from "@/components/action-button";
 import { AgentDialog } from "@/components/agent-dialog";
 import { Page } from "@/components/app-shell";
 import { ConfirmButton } from "@/components/confirm-button";
 import { EmptyState } from "@/components/empty-state";
-import { QueryError } from "@/components/query-error";
-import { RowSkeleton } from "@/components/row-skeleton";
+import { EnableSwitch } from "@/components/enable-switch";
+import { QueryState } from "@/components/query-state";
+import { RowCard } from "@/components/row-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   AgentsDocument,
   type AgentsQuery,
@@ -21,6 +18,8 @@ import {
   UpdateAgentDocument,
 } from "@/gql/graphql";
 import { request } from "@/lib/gql";
+import { nameList, plural } from "@/lib/text";
+import { toastError } from "@/lib/toast";
 
 type Agent = AgentsQuery["agents"][number];
 
@@ -66,19 +65,18 @@ export function AgentsRoute() {
 
   const agents = useQuery({ queryKey: ["agents"], queryFn: () => request(AgentsDocument) });
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["agents"] });
-  const onError = (error: Error) => toast.error(error.message);
 
   const toggle = useMutation({
     mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) =>
       request(UpdateAgentDocument, { id, set: { enabled } }),
     onSuccess: refresh,
-    onError,
+    onError: toastError,
   });
 
   const remove = useMutation({
     mutationFn: (id: string) => request(DeleteAgentDocument, { id }),
     onSuccess: refresh,
-    onError,
+    onError: toastError,
   });
 
   const servers = agents.data?.mcpServers ?? [];
@@ -96,18 +94,20 @@ export function AgentsRoute() {
         </Button>
       }
     >
-      {agents.isError ? (
-        <QueryError error={agents.error} onRetry={() => agents.refetch()} what="your agents" />
-      ) : null}
-      {agents.isPending ? <RowSkeleton rows={2} /> : null}
-      {agents.data?.agents.length === 0 ? (
-        <EmptyState
-          icon={Bot}
-          title="No agents yet"
-          description="An agent is an endpoint and a model. Without one, no lane on any board can run."
-          action={<Button onClick={() => setCreating(true)}>New agent</Button>}
-        />
-      ) : null}
+      <QueryState
+        query={agents}
+        what="your agents"
+        rows={2}
+        count={(agents.data?.agents ?? []).length}
+        empty={
+          <EmptyState
+            icon={Bot}
+            title="No agents yet"
+            description="An agent is an endpoint and a model. Without one, no lane on any board can run."
+            action={<Button onClick={() => setCreating(true)}>New agent</Button>}
+          />
+        }
+      />
 
       {agents.data?.agents.map((agent) => {
         const staffed = lanes.filter((lane) => lane.agentId === agent.id);
@@ -115,27 +115,22 @@ export function AgentsRoute() {
         // Unlike a role, this delete is never refused — the foreign key is `set null`, so the
         // lanes simply stop having an agent. That is the case worth naming before it happens
         // rather than after: an unstaffed station looks exactly like a resting place.
-        const where = staffed
-          .slice(0, 3)
-          .map((lane) => `${lane.name} on ${lane.project.name}`)
-          .join(", ");
+        const where = nameList(staffed.map((lane) => `${lane.name} on ${lane.project.name}`));
         return (
-          <Card key={agent.id} className="gap-2 p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className={`min-w-0 ${agent.enabled ? "" : "opacity-50"}`}>
-                <div className="flex items-center gap-2">
-                  <span className="font-medium">{agent.name}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {count} lane{count === 1 ? "" : "s"}
-                  </span>
-                  {agent.servers.length ? (
-                    <span className="text-xs text-muted-foreground">
-                      {agent.servers.length} server{agent.servers.length === 1 ? "" : "s"}
-                    </span>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">no tools</span>
-                  )}
-                </div>
+          <RowCard
+            key={agent.id}
+            dim={!agent.enabled}
+            title={agent.name}
+            badges={
+              <>
+                <span className="text-xs text-muted-foreground">{plural(count, "lane")}</span>
+                <span className="text-xs text-muted-foreground">
+                  {agent.servers.length ? plural(agent.servers.length, "server") : "no tools"}
+                </span>
+              </>
+            }
+            meta={
+              <>
                 <p className="mt-1 truncate font-mono text-xs text-muted-foreground">
                   {agent.model || "model from Settings"} ·{" "}
                   {agent.baseUrl || "endpoint from Settings"}
@@ -155,20 +150,15 @@ export function AgentsRoute() {
                     settings={settings}
                   />
                 ) : null}
-              </div>
-              <div className="flex shrink-0 items-center gap-1">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Switch
-                      checked={agent.enabled}
-                      onCheckedChange={(enabled) => toggle.mutate({ id: agent.id, enabled })}
-                      // `title` on a Radix switch is a hint the accessibility tree does not
-                      // read; the name has to be said outright.
-                      aria-label={`${agent.enabled ? "Disable" : "Enable"} ${agent.name}`}
-                    />
-                  </TooltipTrigger>
-                  <TooltipContent>{agent.enabled ? "Disable" : "Enable"}</TooltipContent>
-                </Tooltip>
+              </>
+            }
+            actions={
+              <>
+                <EnableSwitch
+                  enabled={agent.enabled}
+                  onChange={(enabled) => toggle.mutate({ id: agent.id, enabled })}
+                  name={agent.name}
+                />
                 <ActionButton
                   variant="ghost"
                   size="icon"
@@ -182,25 +172,24 @@ export function AgentsRoute() {
                   variant="ghost"
                   size="icon"
                   label={`Delete ${agent.name}`}
-                  hint={
-                    count ? `Staffs ${where}${count > 3 ? ` and ${count - 3} more` : ""}` : "Delete"
-                  }
+                  hint={count ? `Staffs ${where}` : "Delete"}
                   title={`Delete the agent "${agent.name}"?`}
                   description={
                     count
-                      ? `${count} lane${count === 1 ? "" : "s"} — ${where}${count > 3 ? ` and ${count - 3} more` : ""} — stop running until another agent is picked.`
+                      ? `${plural(count, "lane")} — ${where} — stop running until another agent is picked.`
                       : "No lane is staffed by it, so nothing on any board stops."
                   }
                   onConfirm={() => remove.mutate(agent.id)}
                 >
                   <Trash2 className="size-4" aria-hidden />
                 </ConfirmButton>
-              </div>
-            </div>
+              </>
+            }
+          >
             {agent.systemPrompt ? (
               <p className="line-clamp-2 text-sm text-muted-foreground">{agent.systemPrompt}</p>
             ) : null}
-          </Card>
+          </RowCard>
         );
       })}
 
