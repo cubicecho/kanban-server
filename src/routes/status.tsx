@@ -7,10 +7,12 @@ import { ActionButton } from "@/components/action-button";
 import { Page, useCurrentProject } from "@/components/app-shell";
 import { CardDialog } from "@/components/card-dialog";
 import { EmptyState, NoProject } from "@/components/empty-state";
+import { MetaLine } from "@/components/meta-line";
 import { useProjectActions } from "@/components/project-actions";
 import { QueryError } from "@/components/query-error";
 import { RowSkeleton } from "@/components/row-skeleton";
 import { Spend } from "@/components/spend";
+import { CardStatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -24,17 +26,10 @@ import {
   RunCardDocument,
 } from "@/gql/graphql";
 import { BOARD_LIMIT, boardQuery } from "@/lib/board-query";
-import {
-  blockingDeps,
-  CARD_HEALTH,
-  CARD_STATUS_CLASS,
-  CARD_STATUS_VARIANT,
-  type CardHealth,
-  cardHealth,
-  isStation,
-} from "@/lib/cards";
+import { blockingDeps, CARD_HEALTH, type CardHealth, cardHealth, isStation } from "@/lib/cards";
 import { request } from "@/lib/gql";
 import { useProjectId } from "@/lib/project";
+import { plural } from "@/lib/text";
 import { cn } from "@/lib/utils";
 
 type BoardCard = BoardQuery["cards"][number];
@@ -63,8 +58,6 @@ const HEALTH: Record<CardHealth, { label: string; blurb: string }> = {
   },
   done: { label: "Done", blurb: "Nothing further will happen to these." },
 };
-
-const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
 
 /** A tally with every heap at nought, which is what a lane holding nothing has to say. */
 const noneYet = (): Record<CardHealth, number> =>
@@ -157,11 +150,7 @@ function FailureRow({ failure }: { failure: Failure }) {
         <span className="truncate font-medium">
           {failure.card?.title || failure.task?.title || "(gone)"}
         </span>
-        <span className="text-xs text-muted-foreground">
-          {failure.agent?.name ? `${failure.agent.name} · ` : ""}
-          {failure.lane?.name ? `${failure.lane.name} · ` : ""}
-          {when(failure.startedAt)}
-        </span>
+        <MetaLine parts={[failure.agent?.name, failure.lane?.name, when(failure.startedAt)]} />
       </div>
       <p className="line-clamp-3 text-sm text-destructive">
         {failure.error || "It broke without saying why."}
@@ -428,21 +417,17 @@ export function StatusRoute() {
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <Badge
-                      variant={CARD_STATUS_VARIANT[card.status] ?? "secondary"}
-                      className={CARD_STATUS_CLASS[card.status]}
-                    >
-                      {card.status}
-                    </Badge>
+                    <CardStatusBadge status={card.status} />
                     <span className="truncate font-medium">{card.title || "Untitled"}</span>
                   </div>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {lane?.name ?? "(lane gone)"}
-                    {card.attempts
-                      ? ` · ${plural(card.attempts, "failed attempt", "failed attempts")}`
-                      : ""}{" "}
-                    · {when(card.updatedAt)}
-                  </p>
+                  <MetaLine
+                    className="mt-1 block"
+                    parts={[
+                      lane?.name ?? "(lane gone)",
+                      card.attempts ? plural(card.attempts, "failed attempt") : null,
+                      when(card.updatedAt),
+                    ]}
+                  />
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
                   {kind === "attention" ? (

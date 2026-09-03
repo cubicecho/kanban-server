@@ -1,22 +1,25 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ChevronRight, ListChecks, SquarePlus, Trash2 } from "lucide-react";
+import { ListChecks, SquarePlus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { ActionButton } from "@/components/action-button";
 import { Page, useCurrentProject } from "@/components/app-shell";
 import { ConfirmButton } from "@/components/confirm-button";
+import { DisclosureRow } from "@/components/disclosure-row";
 import { EmptyState, NoProject } from "@/components/empty-state";
+import { MetaLine } from "@/components/meta-line";
 import { QueryError } from "@/components/query-error";
 import { RowSkeleton } from "@/components/row-skeleton";
+import { ShowMore } from "@/components/show-more";
 import { Spend } from "@/components/spend";
+import { CardStatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { DeleteTaskDocument, MakeCardDocument, TasksDocument } from "@/gql/graphql";
 import { request } from "@/lib/gql";
 import { useProjectId } from "@/lib/project";
-import { cn } from "@/lib/utils";
+import { plural } from "@/lib/text";
 
 /**
  * How many conversations are asked for at a time — one more than is drawn, as on Runs and in the
@@ -112,46 +115,32 @@ export function TasksRoute() {
       ) : null}
 
       {shown.map((task) => {
-        const expanded = open === task.id;
         // Where "on the board" actually goes: a card that is still on it. All of them archived
         // and the link would scroll to nothing, so it says so instead.
         const onBoard = task.cards.find((card) => !card.archivedAt);
         return (
-          <Card key={task.id} className="gap-2 p-4">
-            <div className="flex items-start justify-between gap-3">
-              <button
-                type="button"
-                className="flex min-w-0 flex-1 items-start gap-2 text-left"
-                aria-expanded={expanded}
-                onClick={() => setOpen(expanded ? null : task.id)}
-              >
-                <ChevronRight
-                  className={cn(
-                    "mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform",
-                    expanded && "rotate-90",
-                  )}
-                  aria-hidden
-                />
-                <span className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <Badge variant={task.cards.length ? "secondary" : "outline"}>
-                      {task.cards.length ? "on the board" : "being talked about"}
-                    </Badge>
-                    <span className="truncate font-medium">{task.title || "Untitled task"}</span>
-                    <span className="shrink-0 text-xs text-muted-foreground">
-                      {task.cards.length} card{task.cards.length === 1 ? "" : "s"} ·{" "}
-                      {new Date(task.createdAt).toLocaleString()}
-                    </span>
-                  </div>
-                  <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
-                    {task.brief || "(no brief)"}
-                  </p>
-                </span>
-              </button>
-              <div className="flex shrink-0 items-center gap-1">
-                {/* Only while the conversation has not reached the board. Making a second card
-                    out of the same thread is a thing somebody means to do rarely and almost
-                    never means to do by pressing the button twice. */}
+          <DisclosureRow
+            key={task.id}
+            open={open === task.id}
+            onOpenChange={(next) => setOpen(next ? task.id : null)}
+            badges={
+              <Badge variant={task.cards.length ? "secondary" : "outline"}>
+                {task.cards.length ? "on the board" : "being talked about"}
+              </Badge>
+            }
+            title={task.title || "Untitled task"}
+            meta={
+              <MetaLine
+                className="shrink-0"
+                parts={[
+                  plural(task.cards.length, "card"),
+                  new Date(task.createdAt).toLocaleString(),
+                ]}
+              />
+            }
+            summary={task.brief || "(no brief)"}
+            actions={
+              <>
                 {/* A conversation is not finished when it produces a card, and until now there
                     was no way back into one: the composer opened whichever task had no cards
                     yet, and everything else was read-only history. */}
@@ -160,6 +149,8 @@ export function TasksRoute() {
                     Continue
                   </Link>
                 </Button>
+                {/* Making a second card out of the same thread is a thing somebody means to do
+                    rarely and almost never means to do by pressing the button twice. */}
                 {task.cards.length ? (
                   <Button variant="ghost" size="sm" asChild>
                     {/* At the card, not merely at the board — the board draws five lanes and up
@@ -192,61 +183,53 @@ export function TasksRoute() {
                   title="Delete this task?"
                   description={
                     task.cards.length
-                      ? `The ${task.cards.length} card${task.cards.length === 1 ? "" : "s"} it became stay on the board. The conversation behind them goes.`
+                      ? `The ${plural(task.cards.length, "card")} it became stay on the board. The conversation behind them goes.`
                       : "The conversation goes. Nothing has come of it yet."
                   }
                   onConfirm={() => remove.mutate(task.id)}
                 >
                   <Trash2 className="size-4" aria-hidden />
                 </ConfirmButton>
-              </div>
-            </div>
-
-            {expanded ? (
-              <div className="flex flex-col gap-3 border-t pt-3">
-                <pre className="overflow-x-auto text-sm whitespace-pre-wrap">
-                  {task.brief || "(no brief)"}
-                </pre>
-                {/* Beside the cards, because the cards are where the tokens went: a task's
-                    total is its refinement and every run of every card it became. */}
-                <Spend projectId={projectId} taskId={task.id} days={0} />
-                {task.cards.length ? (
-                  <ul className="flex flex-col gap-1">
-                    {task.cards.map((card) => (
-                      <li key={card.id} className="flex items-center gap-2 text-sm">
-                        <Badge variant="secondary">{card.status}</Badge>
-                        {card.title}
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
-                {task.messages.length ? (
-                  <div className="flex flex-col gap-2 border-t pt-3">
-                    {task.messages.map((message) => (
-                      <p
-                        key={message.id}
-                        className={
-                          message.role === "user"
-                            ? "self-end rounded-lg bg-accent px-3 py-2 text-sm whitespace-pre-wrap"
-                            : "text-sm whitespace-pre-wrap text-muted-foreground"
-                        }
-                      >
-                        {message.content}
-                      </p>
-                    ))}
-                  </div>
-                ) : null}
+              </>
+            }
+          >
+            <pre className="overflow-x-auto text-sm whitespace-pre-wrap">
+              {task.brief || "(no brief)"}
+            </pre>
+            {/* Beside the cards, because the cards are where the tokens went: a task's total is
+                its refinement and every run of every card it became. */}
+            <Spend projectId={projectId} taskId={task.id} days={0} />
+            {task.cards.length ? (
+              <ul className="flex flex-col gap-1">
+                {task.cards.map((card) => (
+                  <li key={card.id} className="flex items-center gap-2 text-sm">
+                    <CardStatusBadge status={card.status} />
+                    {card.title}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            {task.messages.length ? (
+              <div className="flex flex-col gap-2 border-t pt-3">
+                {task.messages.map((message) => (
+                  <p
+                    key={message.id}
+                    className={
+                      message.role === "user"
+                        ? "self-end rounded-lg bg-accent px-3 py-2 text-sm whitespace-pre-wrap"
+                        : "text-sm whitespace-pre-wrap text-muted-foreground"
+                    }
+                  >
+                    {message.content}
+                  </p>
+                ))}
               </div>
             ) : null}
-          </Card>
+          </DisclosureRow>
         );
       })}
 
-      {more ? (
-        <Button variant="outline" className="self-center" onClick={() => setLimit(limit + PAGE)}>
-          Show {PAGE} more
-        </Button>
-      ) : null}
+      {more ? <ShowMore count={PAGE} onMore={() => setLimit(limit + PAGE)} /> : null}
     </Page>
   );
 }

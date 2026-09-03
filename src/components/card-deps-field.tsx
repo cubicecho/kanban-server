@@ -1,12 +1,13 @@
 import { Check, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { ActionButton } from "@/components/action-button";
+import { CardStatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { CardsStatusEnum } from "@/gql/graphql";
-import { CARD_STATUS_CLASS, CARD_STATUS_VARIANT, cyclingCards, type DepGraph } from "@/lib/cards";
+import { cyclingCards, type DepGraph } from "@/lib/cards";
 import { cn } from "@/lib/utils";
 
 /** A card as this field needs to know it, which is the same for a live one and an archived one. */
@@ -166,12 +167,7 @@ export function CardDepsField({
                     {held ? <Check className="size-3" /> : null}
                   </span>
                   <span className="min-w-0 truncate">{card.title || "Untitled"}</span>
-                  <Badge
-                    variant={CARD_STATUS_VARIANT[card.status]}
-                    className={cn("ml-auto shrink-0", CARD_STATUS_CLASS[card.status])}
-                  >
-                    {card.status}
-                  </Badge>
+                  <CardStatusBadge status={card.status} className="ml-auto shrink-0" />
                   {card.archived ? (
                     <span className="shrink-0 text-xs text-muted-foreground italic">archived</span>
                   ) : null}

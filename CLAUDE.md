@@ -409,6 +409,17 @@ runs behind it, and a total that cannot be checked against the rows is worse tha
 with a typed document — no raw `fetch` in a component — and every mutation invalidates the
 query keys it affected.
 
+**A thing the board has a word for is drawn by one component.** Between `ui/` and the routes sits
+a layer of domain components, built out of the primitives and named after what they say rather
+than how they look: `status-badge.tsx` (a card's status, a run's, a verdict), `live-dot.tsx`,
+`meta-line.tsx`, `disclosure-row.tsx` — the openable row Runs, Tasks and the archive are all
+lists of — `probe-result.tsx` and `show-more.tsx`. Every one of them replaced a copy per page,
+and every one of those copies had drifted: a `running` card was green on the board and grey on
+Runs, a card's status in Tasks was grey whatever it said, and the meta line under a title grew a
+stray `·` wherever the middle of it was empty. There is one tone vocabulary — five tones and two
+colours — in `status-badge.tsx`, and a page picks a tone rather than a Tailwind class. Anything
+drawn in two places belongs here; anything drawn once belongs where it is drawn.
+
 ## Code style
 
 - Biome-enforced: double quotes, semicolons, trailing commas, 2-space indent, 100 line width,

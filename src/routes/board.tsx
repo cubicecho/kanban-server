@@ -55,6 +55,7 @@ import { BOARD_LIMIT, boardQuery } from "@/lib/board-query";
 import { blockingDeps } from "@/lib/cards";
 import { request } from "@/lib/gql";
 import { useProjectId } from "@/lib/project";
+import { plural } from "@/lib/text";
 import { cn } from "@/lib/utils";
 
 type Lane = BoardQuery["lanes"][number];
@@ -637,9 +638,7 @@ export function BoardRoute() {
                         inLane.length
                           ? "Move its cards somewhere else first"
                           : archivedIn(lane.id)
-                            ? `Restore or delete the ${archivedIn(lane.id)} archived card${
-                                archivedIn(lane.id) === 1 ? "" : "s"
-                              } it still holds`
+                            ? `Restore or delete the ${plural(archivedIn(lane.id), "archived card")} it still holds`
                             : "Delete this lane"
                       }
                       disabled={inLane.length > 0 || archivedIn(lane.id) > 0}

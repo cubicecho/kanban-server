@@ -1,13 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
 import { ArrowDownUp, ChevronRight } from "lucide-react";
 import { useState } from "react";
+import { MetaLine } from "@/components/meta-line";
 import { RunStream } from "@/components/run-stream";
+import { RunStatusBadge, VerdictBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { CardRunsDocument, type CardRunsQuery, RunsVerdictEnum } from "@/gql/graphql";
+import { CardRunsDocument, type CardRunsQuery } from "@/gql/graphql";
 import { request } from "@/lib/gql";
-import { duration, RUN_STATUS_VARIANT } from "@/lib/runs";
+import { duration } from "@/lib/runs";
+import { plural } from "@/lib/text";
 import { cn } from "@/lib/utils";
 
 type Run = CardRunsQuery["runs"][number];
@@ -52,30 +55,6 @@ const moved = (event: Move): string => {
   if (from && to && from !== to) return `${from} → ${to}`;
   return to ? `judged in ${to}` : "moved";
 };
-
-/**
- * A verdict is the one thing worth a colour of its own here: it is why the card moved.
- *
- * It said so and then drew both of them grey. They take the board's own two status colours —
- * a FAIL is amber like a `rejected` card, because it is the same event seen from the run's
- * side, and red stays what it has always been here, which is a fault.
- */
-function VerdictBadge({ verdict }: { verdict: RunsVerdictEnum }) {
-  if (verdict === RunsVerdictEnum.None) return null;
-  const failed = verdict === RunsVerdictEnum.Fail;
-  return (
-    <Badge
-      variant="outline"
-      className={
-        failed
-          ? "border-status-rejected/30 bg-status-rejected/15 text-status-rejected-foreground"
-          : "border-status-running/30 bg-status-running/15 text-status-running-foreground"
-      }
-    >
-      {failed ? "FAIL" : "PASS"}
-    </Badge>
-  );
-}
 
 /**
  * A card's history, oldest first.
@@ -141,21 +120,22 @@ export function CardHistory({ cardId }: { cardId: string }) {
                 {run ? (
                   <>
                     <VerdictBadge verdict={run.verdict} />
-                    <Badge variant={RUN_STATUS_VARIANT[run.status] ?? "secondary"}>
-                      {run.status}
-                    </Badge>
+                    <RunStatusBadge status={run.status} />
                   </>
                 ) : (
                   <Badge variant="secondary">{event?.actor === "user" ? "you" : "moved"}</Badge>
                 )}
-                <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-                  {run?.lane?.name ? `${run.lane.name} · ` : ""}
-                  {run?.agent?.name ? `${run.agent.name} · ` : ""}
-                  {event ? `${moved(event)} · ` : ""}
-                  {new Date(at).toLocaleString()}
-                  {run ? ` · ${duration(run.startedAt, run.finishedAt)}` : ""}
-                  {run?.totalTokens ? ` · ${run.totalTokens} tokens` : ""}
-                </span>
+                <MetaLine
+                  className="min-w-0 flex-1 truncate"
+                  parts={[
+                    run?.lane?.name,
+                    run?.agent?.name,
+                    event ? moved(event) : null,
+                    new Date(at).toLocaleString(),
+                    run ? duration(run.startedAt, run.finishedAt) : null,
+                    run?.totalTokens ? plural(run.totalTokens, "token") : null,
+                  ]}
+                />
               </button>
               {reason ? <p className="pl-1 text-xs">{reason}</p> : null}
               {open === id && run ? (

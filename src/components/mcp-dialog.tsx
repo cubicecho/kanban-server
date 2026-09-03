@@ -1,10 +1,10 @@
 import { useMutation } from "@tanstack/react-query";
-import { CheckCircle2, ClipboardPaste, PlugZap, XCircle } from "lucide-react";
+import { ClipboardPaste, PlugZap } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useDiscardGuard } from "@/components/discard-guard";
 import { useFieldError } from "@/components/field-error";
-import { ToolList, toolCount } from "@/components/tool-list";
+import { ProbeResult } from "@/components/probe-result";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -36,6 +36,7 @@ import {
 import { useDirty } from "@/lib/dirty";
 import { request } from "@/lib/gql";
 import { parseJson, parseMcpJson } from "@/lib/mcp-config";
+import { cn } from "@/lib/utils";
 
 type McpServer = McpServersQuery["mcpServers"][number];
 
@@ -305,27 +306,10 @@ export function McpDialog({
           </div>
 
           {probe ? (
-            <div
-              className={`flex flex-col gap-2 rounded-md border p-3 text-sm ${
-                probe.ok ? "" : "border-destructive"
-              }`}
-            >
-              <div className="flex items-center gap-2 font-medium">
-                {probe.ok ? (
-                  <CheckCircle2 className="size-4 text-status-running" />
-                ) : (
-                  <XCircle className="size-4 text-destructive" />
-                )}
-                {probe.ok ? `Connected — ${toolCount(probe.tools.length)}` : "Could not connect"}
-              </div>
-              {probe.ok ? (
-                <ToolList tools={probe.tools} />
-              ) : (
-                <p className="whitespace-pre-wrap font-mono text-xs text-destructive">
-                  {probe.error}
-                </p>
-              )}
-            </div>
+            <ProbeResult
+              probe={probe}
+              className={cn("rounded-md border p-3", !probe.ok && "border-destructive")}
+            />
           ) : null}
         </div>
 

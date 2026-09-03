@@ -21,6 +21,7 @@ import {
   UpdateAgentDocument,
 } from "@/gql/graphql";
 import { request } from "@/lib/gql";
+import { plural } from "@/lib/text";
 
 type Agent = AgentsQuery["agents"][number];
 
@@ -125,12 +126,10 @@ export function AgentsRoute() {
               <div className={`min-w-0 ${agent.enabled ? "" : "opacity-50"}`}>
                 <div className="flex items-center gap-2">
                   <span className="font-medium">{agent.name}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {count} lane{count === 1 ? "" : "s"}
-                  </span>
+                  <span className="text-xs text-muted-foreground">{plural(count, "lane")}</span>
                   {agent.servers.length ? (
                     <span className="text-xs text-muted-foreground">
-                      {agent.servers.length} server{agent.servers.length === 1 ? "" : "s"}
+                      {plural(agent.servers.length, "server")}
                     </span>
                   ) : (
                     <span className="text-xs text-muted-foreground">no tools</span>
@@ -188,7 +187,7 @@ export function AgentsRoute() {
                   title={`Delete the agent "${agent.name}"?`}
                   description={
                     count
-                      ? `${count} lane${count === 1 ? "" : "s"} — ${where}${count > 3 ? ` and ${count - 3} more` : ""} — stop running until another agent is picked.`
+                      ? `${plural(count, "lane")} — ${where}${count > 3 ? ` and ${count - 3} more` : ""} — stop running until another agent is picked.`
                       : "No lane is staffed by it, so nothing on any board stops."
                   }
                   onConfirm={() => remove.mutate(agent.id)}

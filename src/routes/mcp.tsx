@@ -1,14 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  CheckCircle2,
-  Pencil,
-  Plug,
-  PlugZap,
-  Plus,
-  RefreshCw,
-  Trash2,
-  XCircle,
-} from "lucide-react";
+import { Pencil, Plug, PlugZap, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { ActionButton } from "@/components/action-button";
@@ -16,9 +7,10 @@ import { Page } from "@/components/app-shell";
 import { ConfirmButton } from "@/components/confirm-button";
 import { EmptyState } from "@/components/empty-state";
 import { McpDialog } from "@/components/mcp-dialog";
+import { ProbeResult } from "@/components/probe-result";
 import { QueryError } from "@/components/query-error";
 import { RowSkeleton } from "@/components/row-skeleton";
-import { ToolList, toolCount } from "@/components/tool-list";
+import { toolCount } from "@/components/tool-list";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -193,25 +185,7 @@ export function McpRoute() {
               </p>
             ) : null}
 
-            {probe ? (
-              <div className="flex flex-col gap-2 border-t pt-3 text-sm">
-                <div className="flex items-center gap-2">
-                  {probe.ok ? (
-                    <CheckCircle2 className="size-4 text-status-running" />
-                  ) : (
-                    <XCircle className="size-4 text-destructive" />
-                  )}
-                  {probe.ok ? `Connected — ${toolCount(probe.tools.length)}` : "Could not connect"}
-                </div>
-                {probe.ok ? (
-                  <ToolList tools={probe.tools} />
-                ) : (
-                  <p className="whitespace-pre-wrap font-mono text-xs text-destructive">
-                    {probe.error}
-                  </p>
-                )}
-              </div>
-            ) : null}
+            {probe ? <ProbeResult probe={probe} className="border-t pt-3" /> : null}
           </Card>
         );
       })}

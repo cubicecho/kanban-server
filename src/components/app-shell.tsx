@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo } from "react";
 import { ActionButton } from "@/components/action-button";
+import { LiveDot } from "@/components/live-dot";
 import { ProjectActions, useProjectActions } from "@/components/project-actions";
 import { ThemeToggle } from "@/components/theme-toggle";
 import {
@@ -104,22 +105,14 @@ function NavGroup({
                   <Icon className="size-4" aria-hidden />
                   {/* On the rail the count has nowhere to go, so it becomes a dot on the icon
                       and the number is said in the tooltip and to a screen reader instead. */}
-                  {busy ? (
-                    <span
-                      className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-status-running lg:hidden"
-                      aria-hidden
-                    />
-                  ) : null}
+                  {busy ? <LiveDot className="absolute -top-0.5 -right-0.5 lg:hidden" /> : null}
                 </span>
                 <span className="hidden lg:inline">{text}</span>
                 <span className="sr-only lg:hidden">{text}</span>
                 {busy ? (
                   <>
                     <span className="ml-auto hidden items-center gap-1.5 text-xs text-status-running lg:inline-flex">
-                      <span
-                        className="size-1.5 animate-pulse rounded-full bg-current"
-                        aria-hidden
-                      />
+                      <LiveDot className="size-1.5" />
                       {busy}
                     </span>
                     <span className="sr-only">, {busy} running</span>

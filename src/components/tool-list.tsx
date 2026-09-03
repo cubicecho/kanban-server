@@ -1,4 +1,5 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { plural } from "@/lib/text";
 
 /**
  * The tools a server answered `tools/list` with.
@@ -26,4 +27,4 @@ export function ToolList({ tools }: { tools: { name: string; description?: strin
 }
 
 /** "1 tool", "3 tools" — the `tool(s)` this replaces was in three places and read as unfinished. */
-export const toolCount = (count: number): string => `${count} tool${count === 1 ? "" : "s"}`;
+export const toolCount = (count: number): string => plural(count, "tool");

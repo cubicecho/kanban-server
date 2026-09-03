@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { DeleteRoleDocument, RolesDocument, type RolesQuery } from "@/gql/graphql";
 import { request } from "@/lib/gql";
+import { plural } from "@/lib/text";
 
 type Role = RolesQuery["roles"][number];
 
@@ -86,9 +87,7 @@ export function RolesRoute() {
                 <div className="flex items-center gap-2">
                   <span className="font-medium">{role.name}</span>
                   <Badge variant="outline">{CONTRACT_LABEL[role.contract] ?? role.contract}</Badge>
-                  <span className="text-xs text-muted-foreground">
-                    {count} lane{count === 1 ? "" : "s"}
-                  </span>
+                  <span className="text-xs text-muted-foreground">{plural(count, "lane")}</span>
                 </div>
                 {role.description ? (
                   <p className="mt-1 text-sm text-muted-foreground">{role.description}</p>

@@ -30,6 +30,7 @@ import {
 } from "@/gql/graphql";
 import { request } from "@/lib/gql";
 import { useProjectId } from "@/lib/project";
+import { plural } from "@/lib/text";
 
 type Task = TaskQuery["tasks"][number];
 type Project = ProjectsQuery["projects"][number];
@@ -292,9 +293,7 @@ function TaskComposer({ project }: { project: Project }) {
               <div className="min-w-0">
                 <h2 className="truncate font-medium">{draft.title || "Untitled task"}</h2>
                 <Badge variant="outline" className="mt-1">
-                  {draft.cards.length
-                    ? `${draft.cards.length} card${draft.cards.length === 1 ? "" : "s"}`
-                    : "being talked about"}
+                  {draft.cards.length ? plural(draft.cards.length, "card") : "being talked about"}
                 </Badge>
               </div>
               <div className="flex shrink-0 items-center gap-2">

@@ -1,42 +1,5 @@
 import { CardsStatusEnum } from "@/gql/graphql";
 
-/**
- * How a card's status is drawn, wherever one is drawn — the board and the archive both.
- *
- * The two of them kept their own copy of this map until `rejected` arrived, and a status that
- * means one thing on the board and another in the archive is worse than no colour at all.
- */
-
-/** The base badge for each status. Grey unless there is a reason not to be. */
-export const CARD_STATUS_VARIANT: Record<CardsStatusEnum, "destructive" | "outline" | "secondary"> =
-  {
-    [CardsStatusEnum.Error]: "destructive",
-    [CardsStatusEnum.Rejected]: "outline",
-    [CardsStatusEnum.Running]: "outline",
-    [CardsStatusEnum.Done]: "secondary",
-    [CardsStatusEnum.Idle]: "secondary",
-  };
-
-/**
- * The two statuses worth spotting from across a board, and they are deliberately only two: a
- * board where everything is coloured says nothing.
- *
- * `running` is green, the colour the run stream already uses for a live run. `rejected` is
- * amber and not red, because that is the whole point of it being its own word — a reviewer
- * saying no is the board working and wants a decision, where red is a fault and wants looking
- * at. Telling the two apart at a glance is what a person comes to the board for.
- *
- * The hues are `--status-*` tokens rather than `emerald-*`/`amber-*` utilities, because a
- * green that reads on a near-black card is not the green that reads on a white one, and the
- * light palette is now something you can actually be looking at.
- */
-export const CARD_STATUS_CLASS: Partial<Record<CardsStatusEnum, string>> = {
-  [CardsStatusEnum.Running]:
-    "border-status-running/30 bg-status-running/15 text-status-running-foreground",
-  [CardsStatusEnum.Rejected]:
-    "border-status-rejected/30 bg-status-rejected/15 text-status-rejected-foreground",
-};
-
 /** A card waiting on a person: one that was turned down, or one that broke. */
 export const needsAttention = (status: CardsStatusEnum) =>
   status === CardsStatusEnum.Error || status === CardsStatusEnum.Rejected;
