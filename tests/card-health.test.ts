@@ -3,8 +3,8 @@ import os from "node:os";
 import path from "node:path";
 import { type GraphQLSchema, graphql } from "graphql";
 import { afterAll, beforeAll, expect, test } from "vitest";
-import { CardsStatusEnum } from "../src/gql/graphql.ts";
-import { cardHealth, type DepStatus } from "../src/lib/cards.ts";
+import { CardsStatusEnum } from "../web/__generated__/graphql/index.ts";
+import { cardHealth, type DepStatus } from "../web/lib/cards.ts";
 
 // The schema is built from the live Drizzle tables at import time, so the database has to be
 // pointed somewhere disposable before anything under server/ is loaded.

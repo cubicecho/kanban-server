@@ -26,7 +26,7 @@ if (interrupted.runs) {
 }
 
 // The GraphQL schema comes from the tables, so a column added upstairs changes the API here.
-// In dev that is regenerated into `schema.graphql` and `src/gql/graphql.ts` on boot; the
+// In dev that is regenerated into `schema.graphql` and `web/__generated__/graphql` on boot; the
 // production image has neither codegen nor sources to write. See `dev/codegen.ts`.
 if (process.env.NODE_ENV !== "production") {
   await import("./dev/codegen.ts")

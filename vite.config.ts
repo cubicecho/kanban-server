@@ -8,20 +8,20 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
-    // Regenerates `src/gql/graphql.ts` off vite's own watcher, so editing a document in
-    // `src/graphql/` updates its typed node and hot-reloads without a second watch process.
+    // Regenerates `web/__generated__/graphql` off vite's own watcher, so editing a document in
+    // `web/graphql/` updates its typed node and hot-reloads without a second watch process.
     codegen({
       // Off by default, and the half that matters here: `schema.graphql` is rewritten by the
       // dev server whenever the tables change, and that is what has to reach the types.
       matchOnSchemas: true,
-      // `npm run build` runs codegen before typecheck — it has to, or tsc reads stale types —
-      // so by the time vite starts there is nothing left to do.
+      // `npm run build` runs codegen before the typecheck — it has to, or tsc reads stale or
+      // absent types — so by the time vite starts there is nothing left to do.
       runOnBuild: false,
     }),
   ],
   resolve: {
     alias: {
-      "@": fileURLToPath(new URL("./src", import.meta.url)),
+      "@": fileURLToPath(new URL("./web", import.meta.url)),
     },
   },
   server: {

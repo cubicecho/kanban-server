@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { type GraphQLSchema, graphql } from "graphql";
 import { afterAll, beforeAll, expect, test } from "vitest";
-import { blockingDeps, cyclingCards, type DepGraph } from "../src/lib/cards.ts";
+import { blockingDeps, cyclingCards, type DepGraph } from "../web/lib/cards.ts";
 
 // The schema is built from the live Drizzle tables at import time, so the database has to be
 // pointed somewhere disposable before anything under server/ is loaded.

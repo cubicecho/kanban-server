@@ -245,7 +245,7 @@ to move, space to drop, escape to think better of it. The lane arrows stay becau
 the right" is one keystroke on an arrow and a dozen on a drag.
 
 A drop is applied to the query cache before the server has answered, using the same arithmetic
-the server does (`src/lib/board-order.ts`), because a card that jumps back for a moment reads as
+the server does (`web/lib/board-order.ts`), because a card that jumps back for a moment reads as
 broken. `tests/board-order.test.ts` drags cards against the real mutation and asserts the two
 orders are the same one. A refusal — a card an agent picked up between the drop and the request —
 puts the board back as it was. The board's own three-second poll stops while a card is in the air:
@@ -473,7 +473,7 @@ server/
   mcp-endpoint.ts  the curated /mcp tool surface
   index.ts     express + yoga + the MCP endpoint + the built SPA
 shared/        the bits both halves import
-src/           vite + react + tanstack router/query + shadcn
+web/           vite + react + tanstack router/query + shadcn
                (new task, board, tasks, agents, runs, mcp servers, settings)
 tests/         vitest
 ```
@@ -709,26 +709,28 @@ publishes the images without tagging a release.
 The schema is built at runtime from the tables, so codegen needs it written out first:
 
 ```sh
-npm run codegen    # prints schema.graphql, then generates src/gql/
+npm run codegen    # prints schema.graphql, then generates web/__generated__/graphql/
 ```
 
-That produces `src/gql/graphql.ts`: a typed document node per operation, so a query whose shape
-changes breaks compilation rather than at runtime.
+That produces `web/__generated__/graphql/index.ts`: a typed document node per operation, so a
+query whose shape changes breaks compilation rather than at runtime. It is not committed — the
+folder is in `.gitignore` — because it is a function of two things that are, and a generated file
+under review is a diff nobody reads. `npm run typecheck`, `npm test` and `npm run build` each
+regenerate it before they start, so a fresh clone needs no step before any of them.
 
 In development you rarely run it by hand, because both halves of `npm run dev` keep it current
 from the side they can see:
 
 - the **server** rewrites `schema.graphql` on boot, and regenerates the types with it — that is
   the moment after a table changes, and it only does the work when the SDL actually moved
-- **vite** watches `schema.graphql` and `src/graphql/**/*.graphql` through
+- **vite** watches `schema.graphql` and `web/graphql/**/*.graphql` through
   `vite-plugin-graphql-codegen`, so editing a document regenerates its typed node and hot-reloads
 
 Both are dev-only. The production image has no codegen in it and nothing to regenerate: it serves
 a `dist/` that was built against the types it was typechecked with.
 
-`npm run build` runs codegen before the typecheck, so a stale `src/gql/graphql.ts` cannot reach a
-build. CI additionally regenerates and diffs against what is committed — the artefacts are
-generated *and* checked in, and that step is what stops the two from drifting apart.
+`schema.graphql` *is* committed, and CI regenerates it and diffs: the SDL is the API, and a column
+added without running codegen is a change to it that a review would otherwise never see.
 
 ## Postgres
 
@@ -783,10 +785,10 @@ other is your own `pg_dump`-shaped problem.
 | | |
 | --- | --- |
 | `npm run dev` | server and web together |
-| `npm run build` | codegen, typecheck, then build the SPA into `dist/` |
+| `npm run build` | typecheck (which regenerates first), then build the SPA into `dist/` |
 | `npm start` | production: express serves `dist/` and the API on one port |
-| `npm run codegen` | print `schema.graphql` and regenerate `src/gql/` |
-| `npm test` | vitest |
+| `npm run codegen` | print `schema.graphql` and regenerate `web/__generated__/graphql/` |
+| `npm test` | codegen, then vitest |
 | `npm run lint` / `format` | biome |
 | `npm run db:generate` | write a migration into `drizzle/` after a schema change |
 | `npm run db:migrate` | apply `drizzle/` by hand; the server does it on boot anyway |

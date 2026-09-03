@@ -13,7 +13,7 @@ everything else.
 
 Read [`README.md`](README.md) first — it holds the design decisions this file only summarises.
 
-Single package, no workspaces: `server/` (Express 5 + graphql-yoga + Drizzle), `src/` (Vite +
+Single package, no workspaces: `server/` (Express 5 + graphql-yoga + Drizzle), `web/` (Vite +
 React 19 + TanStack Router/Query + shadcn), `shared/`, `tests/` (Vitest).
 
 ## Commands
@@ -32,13 +32,13 @@ npm test                 # vitest run
 
 # Schema and types
 npm run schema           # prints the runtime schema to schema.graphql
-npm run codegen          # schema, then graphql-codegen into src/gql/graphql.ts
+npm run codegen          # schema, then graphql-codegen into web/__generated__/graphql/
 npm run db:generate      # drizzle-kit, after a change to server/db/schema.ts
 npm run db:migrate       # apply drizzle/ by hand; the server does this on boot anyway
 npm run db:studio
 
 # Build / run
-npm run build            # codegen, typecheck, then vite build into dist/
+npm run build            # typecheck (regenerates first), then vite build into dist/
 npm start                # NODE_ENV=production tsx server/index.ts
 docker compose up --build
 ```
@@ -60,15 +60,23 @@ docker compose up --build
 require it, and `allowImportingTsExtensions` is on for that reason.
 
 **The schema is the contract, and it is generated.** Add a column to `server/db/schema.ts` and
-the typed documents in `src/graphql/*.graphql` see it. Never hand-write a type that codegen
-produces, and never edit `src/gql/graphql.ts` — biome ignores it because it is output.
+the typed documents in `web/graphql/*.graphql` see it. Never hand-write a type that codegen
+produces, and never edit `web/__generated__/graphql/index.ts` — biome ignores that folder, and
+git does not track it at all.
 
 `npm run codegen` does it explicitly, but under `npm run dev` you should not need to: the
 server rewrites `schema.graphql` on boot and regenerates with it when the SDL moved, and vite
 runs codegen off its own watcher for the documents. Both are dev-only — `@graphql-codegen/cli`
 is a devDependency and `server/dev/codegen.ts` is behind a `NODE_ENV !== "production"` guard,
-because the image has neither codegen nor the sources it would write. `npm run build` runs
-codegen before the typecheck, and CI regenerates and diffs it against what is committed.
+because the image has neither codegen nor the sources it would write.
+
+**The types are generated, not kept.** `web/__generated__/` is in `.gitignore`: it is a pure
+function of `schema.graphql` and the documents, both of which are tracked, and a generated file
+in a diff is a review nobody reads and a merge conflict everybody resolves the same way. So the
+three scripts that read it regenerate it first — `typecheck` runs codegen, `test` runs codegen,
+and `build` runs `typecheck` — and a fresh clone can go straight to any of them. `schema.graphql`
+stays committed, because that one *is* the API and a column added without codegen should show up
+as a change to it; CI regenerates it and diffs.
 
 **A schema change is an edit and a generate.** Change `server/db/schema.ts`, then run
 `npm run db:generate` and commit what lands in `drizzle/` — the SQL and the snapshot both.
@@ -154,7 +162,7 @@ Settings', else the first enabled agent by name. It is the only agent named anyw
 and the only one that has to be, which is the whole of what "off the board" now means.
 
 **The optimistic board and the server agree by construction.** A drop rewrites the board cache
-before the request goes out, and `src/lib/board-order.ts` holds the pure functions that decide
+before the request goes out, and `web/lib/board-order.ts` holds the pure functions that decide
 where a card lands and how its lane renumbers — the same arithmetic `moveCard` does.
 `tests/board-order.test.ts` runs the real mutation and compares, because the failure mode of a
 disagreement is a card that moves twice: once where it was dropped, once when the refetch lands.
@@ -171,7 +179,7 @@ card whose drawn place and `position` disagree.
 **A dependency you cannot see is a dependency you will lose.** The `Board` query filters archived
 cards out, so a card's `deps` as the board carries them are only the visible half — and a dialog
 seeded from that half writes the short list back on the next save, quietly forgetting whichever
-dependency got archived. `CardDeps` in `src/graphql/board.graphql` asks for one card's real edges,
+dependency got archived. `CardDeps` in `web/graphql/board.graphql` asks for one card's real edges,
 archived ones included, and `card-dialog.tsx` holds the picker empty until that answer lands rather
 than seeding from the board and correcting itself: the window between the two is a save that drops
 work. It is its own query rather than a field on `Board` because `Board` polls every three seconds
@@ -179,7 +187,7 @@ over as many as five hundred cards, and this is one card's answer, wanted once, 
 opens. The reverse direction — what waits on *this* card — comes back with it and is drawn
 read-only: editing another card's list from inside this one is a change with no visible cause.
 
-`cyclingCards` in `src/lib/cards.ts` is the same bargain `board-order.ts` strikes, in the other
+`cyclingCards` in `web/lib/cards.ts` is the same bargain `board-order.ts` strikes, in the other
 direction: it walks the board's edges to find the cards that already lead back to this one, and the
 picker draws those rows disabled with the reason on them. `setCardDeps` stays the authority — it
 reads every card in the project, archived ones included, and names the loop — so the two can only
@@ -441,8 +449,8 @@ tokens with `tokenMatches` — hashed, then `timingSafeEqual` — and never say 
 oldest run it counted. A stored counter would keep climbing after `runRetentionDays` deleted the
 runs behind it, and a total that cannot be checked against the rows is worse than none.
 
-**Frontend:** shadcn primitives in `src/components/ui/` with no app logic; routes in
-`src/routes/`; `@/` maps to `src/`. Every query goes through `request()` in `src/lib/gql.ts`
+**Frontend:** shadcn primitives in `web/components/ui/` with no app logic; routes in
+`web/routes/`; `@/` maps to `web/`. Every query goes through `request()` in `web/lib/gql.ts`
 with a typed document — no raw `fetch` in a component — and every mutation invalidates the
 query keys it affected.
 
@@ -465,9 +473,9 @@ straight and `shown.length === 0 && !isPending && !isError` where the list was a
 `[]`, and both being correct is exactly what stops anybody fixing it. `enable-switch.tsx` is the
 on/off toggle Agents and MCP share, along with the two things about it worth remembering: a Radix
 switch needs its name said outright, and the label names the action rather than the state.
-`toastError` in `src/lib/toast.ts` is how a failed write is said — one line that was written
+`toastError` in `web/lib/toast.ts` is how a failed write is said — one line that was written
 twenty-five times, seven of those as the same local `const onError` — and `nameList` in
-`src/lib/text.ts` is the "and 2 more" that trails a list of what a delete is about to take.
+`web/lib/text.ts` is the "and 2 more" that trails a list of what a delete is about to take.
 
 `form-dialog.tsx` is the same argument taken as far as it goes: the seven dialogs on this server
 differ in their fields and in nothing else, so the shell — the open/close wiring, the header, the
