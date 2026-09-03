@@ -1,4 +1,5 @@
 import { memo, useEffect, useRef, useState } from "react";
+import { LiveDot } from "@/components/live-dot";
 import { TokenStats, type Usage } from "@/components/token-stats";
 import { RunEventsDocument, type RunEventsSubscription } from "@/gql/graphql";
 import { subscribe } from "@/lib/gql";
@@ -153,12 +154,7 @@ export function RunStream({
     // minified JSON tool result was enough to push the whole run past the dialog's edge.
     <div className="flex min-w-0 flex-col gap-2">
       <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-        <span
-          className={cn(
-            "size-2 rounded-full",
-            ended ? "bg-muted-foreground" : "animate-pulse bg-status-running",
-          )}
-        />
+        <LiveDot live={!ended} />
         {ended ? "Run ended" : "Live"}
         {usage ? (
           <>

@@ -5,6 +5,7 @@ import path from "node:path";
 import { afterAll, beforeAll, beforeEach, expect, test } from "vitest";
 import type { Resolved } from "../server/runner/llm.ts";
 import { sseFrom } from "./fixtures/sse.ts";
+import { stop } from "./fixtures/teardown.ts";
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "kanban-server-resilience-"));
 process.env.KANBAN_SERVER_DATA_DIR = dir;
@@ -75,7 +76,7 @@ beforeEach(() => {
 
 afterAll(async () => {
   while (open.length) open.pop()?.destroy();
-  await new Promise((resolve) => server.close(resolve));
+  await stop(server);
   fs.rmSync(dir, { recursive: true, force: true });
 });
 

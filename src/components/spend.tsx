@@ -3,6 +3,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { SpendDocument } from "@/gql/graphql";
 import { request } from "@/lib/gql";
 import { compactTokens } from "@/lib/runs";
+import { plural } from "@/lib/text";
 
 const date = (value: string) =>
   new Date(value).toLocaleDateString(undefined, { day: "numeric", month: "short" });
@@ -43,13 +44,13 @@ export function Spend({
   return (
     <Tooltip>
       <TooltipTrigger className="text-muted-foreground text-xs">
-        {compactTokens(total.totalTokens)} tokens · {total.runs} run{total.runs === 1 ? "" : "s"}
+        {compactTokens(total.totalTokens)} tokens · {plural(total.runs, "run")}
         {total.from ? ` · since ${date(total.from)}` : ""}
       </TooltipTrigger>
       <TooltipContent>
         {total.promptTokens.toLocaleString()} prompt + {total.completionTokens.toLocaleString()}{" "}
-        completion tokens over {total.runs} run{total.runs === 1 ? "" : "s"}. Added up from the runs
-        themselves. {kept}
+        completion tokens over {plural(total.runs, "run")}. Added up from the runs themselves.{" "}
+        {kept}
       </TooltipContent>
     </Tooltip>
   );

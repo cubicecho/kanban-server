@@ -48,8 +48,8 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await mcpClose();
-  await locked.close();
+  await mcpClose?.();
+  await locked?.close();
   fs.rmSync(dir, { recursive: true, force: true });
 });
 

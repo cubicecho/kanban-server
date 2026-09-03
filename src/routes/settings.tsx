@@ -28,6 +28,7 @@ import {
   UpdateSettingsDocument,
 } from "@/gql/graphql";
 import { request } from "@/lib/gql";
+import { toastError } from "@/lib/toast";
 
 /**
  * Where an agent reaches this server.
@@ -199,7 +200,7 @@ export function SettingsRoute() {
       toast.success("Settings saved");
       refresh();
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: toastError,
   });
 
   const field = <K extends keyof Form>(key: K, value: Form[K]) =>
