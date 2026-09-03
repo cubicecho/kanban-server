@@ -377,6 +377,26 @@ is unrepeatable, so a failure after that propagates. `requestTimeoutSeconds` is 
 watchdog that rearms on every chunk, not a deadline on the request, and an aborted stream ends
 its iteration rather than throwing — hence the `throwIfAborted()` after the loop.
 
+**The context window is asked for, overridable, and read before the request goes out.** The
+OpenAI listing has no field for it, so `CONTEXT_KEYS` in `server/runner/llm.ts` takes whichever
+one a server adds — `context_length`, `max_context_window`, `max_model_len`, `context_window`,
+`n_ctx` — off `models.list()`, cached per endpoint because two endpoints are two different sets
+of models. `contextLimitFor` answers with the agent's own `contextLength` first and the listing
+second, and a listing that fails is an unknown window rather than a failed run: nothing here may
+stop a turn that would otherwise have worked.
+
+The override is the point of the field, not a convenience. A server can report the window a model
+was *built* with while serving it in a fraction of one — llama.cpp will load a 256k model at
+`-c 16384` and go on listing it as 256k — and a run held to the honest-looking number fails at
+the endpoint with somebody else's stack trace. So `agent.ts` refuses an over-large request before
+it is sent, in a message that says what the request measured, what the window is, and *where that
+figure came from*, since the whole difficulty of this failure is two numbers disagreeing.
+`requestTokens` is characters over four, there being no tokenizer here and no prospect of one;
+it runs low on tool schemas, which is the side to be wrong on — guessing high refuses a run that
+would have worked, and guessing low leaves us exactly where we were. `isOverflow` recognises the
+endpoint's own refusal and keeps its words, adding ours; either way it is a `ContextOverflow`,
+which `isTransient` will not retry, because the same request refused again is the same refusal.
+
 **Agents inherit from Settings by sentinel.** Every numeric knob treats `0` as "inherit",
 except `temperature` and `maxRetries`, which use `-1` because `0` is a value someone may
 genuinely want; empty strings inherit the same way, and `toolDiscovery` uses the word

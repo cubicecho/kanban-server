@@ -36,6 +36,7 @@ interface Draft {
   model: string;
   systemPrompt: string;
   maxTokens: number;
+  contextLength: number;
   temperature: number;
   maxToolIterations: number;
   toolDiscovery: AgentsToolDiscoveryEnum;
@@ -50,6 +51,7 @@ const toDraft = (agent?: Agent): Draft => ({
   model: agent?.model ?? "",
   systemPrompt: agent?.systemPrompt ?? "",
   maxTokens: agent?.maxTokens ?? 0,
+  contextLength: agent?.contextLength ?? 0,
   temperature: agent?.temperature ?? -1,
   maxToolIterations: agent?.maxToolIterations ?? 0,
   toolDiscovery: agent?.toolDiscovery ?? ("inherit" as AgentsToolDiscoveryEnum),
@@ -60,6 +62,7 @@ const toDraft = (agent?: Agent): Draft => ({
 /** The numeric fields, by the label above each one rather than by its column name. */
 const NUMBERS = [
   ["maxTokens", "Max tokens"],
+  ["contextLength", "Context window"],
   ["temperature", "Temperature"],
   ["maxToolIterations", "Max tool steps"],
   ["requestTimeoutSeconds", "Silence before giving up"],
@@ -263,6 +266,16 @@ export function AgentDialog({
               onChange={(event) => set({ maxTokens: Number(event.target.value) })}
             />
             <p className="text-xs text-muted-foreground">0 inherits.</p>
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="agent-context">Context window</Label>
+            <Input
+              id="agent-context"
+              type="number"
+              value={draft.contextLength}
+              onChange={(event) => set({ contextLength: Number(event.target.value) })}
+            />
+            <p className="text-xs text-muted-foreground">0 inherits, then asks the endpoint.</p>
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="agent-temp">Temperature</Label>

@@ -1,7 +1,7 @@
 import OpenAI from "openai";
 import { errorMessage } from "../../shared/errors.ts";
 import type { RunEventInput } from "./events.ts";
-import { getClient, type Resolved, timeoutMs } from "./llm.ts";
+import { contextLimitFor, getClient, type Resolved, timeoutMs } from "./llm.ts";
 import { type CatalogServer, mcp } from "./mcp.ts";
 import { isGrammarError, relaxTools, sanitizeTools } from "./schema-compat.ts";
 import { ask, parseJson, tryAsk } from "./side-task.ts";
@@ -56,6 +56,61 @@ export interface AgentOptions {
 class EndpointSilent extends Error {
   override readonly name = "EndpointSilent";
 }
+
+/**
+ * The request was bigger than the model will read. Its own class so nothing retries it: sending
+ * the same too-large request again is the same refusal, one round trip later.
+ */
+export class ContextOverflow extends Error {
+  override readonly name = "ContextOverflow";
+}
+
+/** Rough token count — good enough to decide whether a request has any hope of fitting. */
+const estimateTokens = (text: string) => Math.ceil(text.length / 4);
+
+/** 1234 → "1.2k". The numbers in an overflow message are large and nobody reads the units digit. */
+const compact = (tokens: number) =>
+  tokens >= 1000 ? `${(tokens / 1000).toFixed(1)}k` : String(tokens);
+
+/**
+ * What this request will cost the window, in tokens, near enough.
+ *
+ * Characters over four, because there is no tokenizer here and there is not going to be one:
+ * a server that will not say how big its window is will not lend us its vocabulary either.
+ * The estimate runs low on tool schemas — JSON packs more tokens into a character than prose
+ * does — and that is the side to be wrong on, since the cost of guessing high is a run refused
+ * that would have worked, and the cost of guessing low is the endpoint's own refusal, which is
+ * where we were before this existed.
+ */
+const requestTokens = (body: OpenAI.ChatCompletionCreateParamsStreaming) =>
+  estimateTokens(JSON.stringify(body.messages)) +
+  (body.tools?.length ? estimateTokens(JSON.stringify(body.tools)) : 0);
+
+/**
+ * Servers refuse an over-long request in their own words; these are the ones worth reading as
+ * that rather than as a broken request. Matched loosely — every one of them is some
+ * arrangement of "context" and "too long", and the arrangement is the part that varies.
+ */
+const OVERFLOW = [
+  /context (size|length|window)/i,
+  /exceeds? the (available|maximum)/i,
+  /too (long|large) for/i,
+  /reduce the length/i,
+];
+
+const isOverflow = (detail: string) =>
+  OVERFLOW.some((pattern) => pattern.test(detail)) && /token|context/i.test(detail);
+
+/**
+ * Below this, the window is nobody's business and is not asked for.
+ *
+ * Finding out what a model reads costs a listing against its endpoint, and a run whose whole
+ * request is a few thousand tokens fits anything anyone serves — spending a round trip to
+ * confirm that, on every run of every card, would be the cost of the guard falling on the
+ * runs that never needed it. A model in a window smaller than this exists, and a request that
+ * overruns one is left to the endpoint's own complaint, which reads properly now either way.
+ */
+const SMALLEST_LIKELY_WINDOW = 8192;
 
 /**
  * Whether a failed request is worth trying again.
@@ -269,6 +324,18 @@ export async function runAgent({
 
   const client = getClient(config);
   const idleMs = timeoutMs(config);
+  // The window, once anything wants to know it. An agent that names its own is answered from
+  // the row; anything else costs a listing, so it is not asked for until a request is big
+  // enough for the answer to change what happens — see `SMALLEST_LIKELY_WINDOW`.
+  let contextLimit = config.contextLength;
+  let windowKnown = config.contextLength > 0;
+  const stated =
+    config.contextLength > 0 ? "as this agent is set to read" : "as the endpoint reports it";
+  const advice =
+    config.contextLength > 0
+      ? "Raise the context window on the agent, or give the lane less to read."
+      : "Raise the window the model is served in, or set the agent's context window by hand " +
+        "if the endpoint is reporting one it is not honouring.";
   // Both columns are `notNull` with a default, so this is belt and braces — but an unbounded
   // retry loop is a bad way to find out about a row that predates them.
   const maxRetries = Math.max(0, Number(config.maxRetries) || 0);
@@ -351,6 +418,25 @@ export async function runAgent({
     // Both are bounded by the same rule: nothing is retried once the server has started
     // answering. The tokens are already out and on their way to whoever is watching, and a
     // second attempt would say everything twice.
+    // Before the request rather than after its refusal, because the refusal is a stack trace
+    // from somebody else's server and this is the one place that knows what was in the request,
+    // what the window is, and where that figure came from. Only the plainly-over case is
+    // stopped: the estimate is rough, and a run refused here that the endpoint would have taken
+    // is worse than the endpoint's own complaint, which still arrives with everything below.
+    const needed = requestTokens(request());
+    if (!windowKnown && needed > SMALLEST_LIKELY_WINDOW) {
+      contextLimit = await contextLimitFor(config);
+      windowKnown = true;
+    }
+    const room = contextLimit - config.maxTokens;
+    if (contextLimit > 0 && room > 0 && needed > room) {
+      throw new ContextOverflow(
+        `This request is about ${compact(needed)} tokens and the model reads ` +
+          `${compact(contextLimit)} (${stated}), of which ${compact(config.maxTokens)} is held ` +
+          `back for the reply. ${advice}`,
+      );
+    }
+
     let step: Step | undefined;
     for (let attempt = 0; ; attempt++) {
       const produced = { any: false };
@@ -375,6 +461,16 @@ export async function runAgent({
       } catch (error) {
         const detail = errorMessage(error);
         if (produced.any) throw error;
+        // The endpoint got there first — its window is smaller than anything we could read.
+        // Kept in its own words, because they are the true ones, with ours added: the whole
+        // difficulty of this failure is that the number in it disagrees with the model's.
+        if (isOverflow(detail)) {
+          throw new ContextOverflow(
+            contextLimit > 0
+              ? `${detail} — this agent was working to ${compact(contextLimit)} tokens (${stated}). ${advice}`
+              : `${detail} — ${advice}`,
+          );
+        }
         if (strictSchemas && isGrammarError(detail)) {
           const notice = "server could not build a grammar; retrying without pattern/format";
           console.warn(`[agent] ${notice}`);

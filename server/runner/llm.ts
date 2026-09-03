@@ -26,6 +26,8 @@ export interface Resolved {
   /** This agent's own standing instruction, if it has one. Not the job — the job is the lane's. */
   systemPrompt: string;
   maxTokens: number;
+  /** What the operator says this model reads. Zero means ask the endpoint — see `contextLimitFor`. */
+  contextLength: number;
   temperature: number;
   maxToolIterations: number;
   toolDiscovery: "eager" | "ondemand";
@@ -62,6 +64,7 @@ export async function resolveAgent(agent: Agent, config?: Settings): Promise<Res
     // the expected case. What the agent is asked to *do* is composed at the lane.
     systemPrompt: agent.systemPrompt,
     maxTokens: num(agent.maxTokens, base.maxTokens),
+    contextLength: num(agent.contextLength, base.contextLength),
     temperature: num(agent.temperature, base.temperature, -1),
     maxToolIterations: num(agent.maxToolIterations, base.maxToolIterations),
     toolDiscovery: agent.toolDiscovery === "inherit" ? base.toolDiscovery : agent.toolDiscovery,
@@ -134,18 +137,97 @@ export function getClient(config: Pick<Resolved, "baseUrl" | "apiKey" | "request
 }
 
 /**
- * Model ids an endpoint reports. With no agent named it asks the one in settings, which is
+ * The context window, spelled every way a server spells it.
+ *
+ * None of these is in the OpenAI listing schema, so every server that says anything says it as
+ * an extra key of its own: `context_length` is llama.cpp and LM Studio, `max_model_len` vLLM,
+ * `n_ctx` the raw llama bindings. Whichever turns up first is taken — a server reporting two
+ * of them is reporting the same number twice.
+ */
+const CONTEXT_KEYS = [
+  "context_length",
+  "max_context_window",
+  "max_model_len",
+  "context_window",
+  "n_ctx",
+];
+
+function contextLengthOf(model: object): number {
+  const record = model as Record<string, unknown>;
+  for (const key of CONTEXT_KEYS) {
+    const value = record[key];
+    if (typeof value === "number" && value > 0) return value;
+  }
+  return 0;
+}
+
+/** A model an endpoint offers, and what it says the model will read. Zero means it did not say. */
+export interface ModelInfo {
+  id: string;
+  contextLength: number;
+}
+
+/**
+ * The last listing from each endpoint, so a run can size its window without a round trip.
+ *
+ * Keyed the same way the clients are, because two endpoints are two different sets of models
+ * and one of them having answered says nothing about the other. It is only ever a cache of
+ * something asked for anyway: nothing here refreshes it, and a listing that fails leaves
+ * whatever was there rather than emptying it.
+ */
+const listings = new Map<string, ModelInfo[]>();
+
+type Endpoint = Pick<Resolved, "baseUrl" | "apiKey" | "requestTimeoutSeconds">;
+
+const endpointKey = (config: Endpoint) =>
+  JSON.stringify([config.baseUrl, config.apiKey || "kanban-server"]);
+
+async function askEndpoint(config: Endpoint): Promise<ModelInfo[]> {
+  const { data } = await getClient(config).models.list();
+  const models = data
+    .map((model) => ({ id: model.id, contextLength: contextLengthOf(model) }))
+    .sort((a, b) => a.id.localeCompare(b.id));
+  listings.set(endpointKey(config), models);
+  return models;
+}
+
+/** The endpoint Settings names, as the shape the client and the listing cache both want. */
+const settingsEndpoint = (base: Settings): Endpoint => ({
+  baseUrl: base.baseUrl,
+  apiKey: base.apiKey || process.env.OPENAI_API_KEY || "",
+  requestTimeoutSeconds: base.requestTimeoutSeconds,
+});
+
+/**
+ * The models an endpoint reports. With no agent named it asks the one in settings, which is
  * what the settings page needs; with one, it asks that agent's own endpoint.
  */
-export async function listModels(agentId?: string | null): Promise<string[]> {
+export async function listModels(agentId?: string | null): Promise<ModelInfo[]> {
   const base = await loadSettings();
-  const config = agentId
-    ? await resolveAgentId(agentId)
-    : {
-        baseUrl: base.baseUrl,
-        apiKey: base.apiKey || process.env.OPENAI_API_KEY || "",
-        requestTimeoutSeconds: base.requestTimeoutSeconds,
-      };
-  const { data } = await getClient(config).models.list();
-  return data.map((model) => model.id).sort((a, b) => a.localeCompare(b));
+  return askEndpoint(agentId ? await resolveAgentId(agentId) : settingsEndpoint(base));
+}
+
+/**
+ * How much this agent's model will read, in tokens. Zero means nobody knows.
+ *
+ * The operator's number wins outright: an endpoint can report the window a model was *built*
+ * with while serving it in a much smaller one — llama.cpp will happily load a 256k model at
+ * `-c 16384` and go on listing it as 256k — and a run refused on the honest-looking number is
+ * a run that fails at the endpoint instead. Otherwise the listing is asked, once per endpoint,
+ * and a server that will not list models still has to be able to run a turn: a failure here
+ * is an unknown window, not a failed run.
+ */
+export async function contextLimitFor(config: Resolved): Promise<number> {
+  if (config.contextLength > 0) return config.contextLength;
+  // A failure is not remembered: an endpoint that was down when the last run started is not an
+  // endpoint with no models, and the one listing this costs is nothing beside the run itself.
+  if (!listings.has(endpointKey(config))) {
+    try {
+      await askEndpoint(config);
+    } catch {
+      return 0;
+    }
+  }
+  const listed = listings.get(endpointKey(config)) ?? [];
+  return listed.find((model) => model.id === config.model)?.contextLength ?? 0;
 }

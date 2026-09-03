@@ -117,6 +117,12 @@ export const agents = pgTable("agents", {
    */
   systemPrompt: text().notNull().default(""),
   maxTokens: integer().notNull().default(0),
+  /**
+   * How much this model will read, in tokens. Zero inherits, and a Settings that is also zero
+   * asks the endpoint. Set it when the endpoint will not say — or says something other than
+   * what the model was actually loaded with, which is the case worth having a field for.
+   */
+  contextLength: integer().notNull().default(0),
   temperature: real().notNull().default(-1),
   /** Ceiling on tool round-trips in one run, so a stuck agent cannot loop forever. */
   maxToolIterations: integer().notNull().default(0),
@@ -648,6 +654,11 @@ export const settings = pgTable("settings", {
   apiKey: text().notNull().default(""),
   model: text().notNull().default(""),
   maxTokens: integer().notNull().default(4096),
+  /**
+   * The context window every agent that names none of its own is held to. Zero — the default —
+   * asks the endpoint for it, which is right whenever the endpoint answers honestly.
+   */
+  contextLength: integer().notNull().default(0),
   temperature: real().notNull().default(0.7),
   maxToolIterations: integer().notNull().default(20),
   toolDiscovery: text({ enum: ["eager", "ondemand"] })

@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/select";
 import { AgentModelsDocument } from "@/gql/graphql";
 import { request } from "@/lib/gql";
+import { compactTokens } from "@/lib/runs";
 
 // Radix refuses an empty item value, so the two non-model choices carry sentinels.
 const DEFAULT = "__default__";
@@ -76,9 +77,13 @@ export function ModelSelect({
     );
   }
 
-  // A model saved before the server offered it still has to show as the current choice.
+  // A model saved before the server offered it still has to show as the current choice — with
+  // no window against it, because a model the endpoint is not listing has told us nothing.
   const listed = models.data?.models ?? [];
-  const options = value && !listed.includes(value) ? [value, ...listed] : listed;
+  const options =
+    value && !listed.some((model) => model.id === value)
+      ? [{ id: value, contextLength: 0 }, ...listed]
+      : listed;
 
   return (
     <Select
@@ -94,9 +99,14 @@ export function ModelSelect({
       </SelectTrigger>
       <SelectContent>
         {defaultLabel ? <SelectItem value={DEFAULT}>{defaultLabel}</SelectItem> : null}
-        {options.map((name) => (
-          <SelectItem key={name} value={name} className="font-mono">
-            {name}
+        {options.map((model) => (
+          <SelectItem key={model.id} value={model.id} className="font-mono">
+            {model.id}
+            {model.contextLength ? (
+              <span className="ml-2 font-sans text-muted-foreground text-xs">
+                {compactTokens(model.contextLength)} context
+              </span>
+            ) : null}
           </SelectItem>
         ))}
         {models.isFetching && options.length === 0 ? (

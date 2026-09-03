@@ -4,6 +4,7 @@ query Settings {
     baseUrl
     model
     maxTokens
+    contextLength
     temperature
     maxToolIterations
     toolDiscovery

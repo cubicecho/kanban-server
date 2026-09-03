@@ -106,6 +106,7 @@ interface Form {
   baseUrl: string;
   model: string;
   maxTokens: number;
+  contextLength: number;
   temperature: number;
   maxToolIterations: number;
   toolDiscovery: SettingsToolDiscoveryEnum;
@@ -125,6 +126,7 @@ const toForm = (row: Loaded): Form => ({
   baseUrl: row.baseUrl,
   model: row.model,
   maxTokens: row.maxTokens,
+  contextLength: row.contextLength,
   temperature: row.temperature,
   maxToolIterations: row.maxToolIterations,
   toolDiscovery: row.toolDiscovery,
@@ -140,6 +142,7 @@ const toForm = (row: Loaded): Form => ({
 /** The numeric fields, by the label above each rather than by its column name. */
 const NUMBERS = [
   ["maxTokens", "Max tokens"],
+  ["contextLength", "Context window"],
   ["temperature", "Temperature"],
   ["maxToolIterations", "Max tool steps"],
   ["requestTimeoutSeconds", "Silence before giving up"],
@@ -291,6 +294,19 @@ export function SettingsRoute() {
                   value={form.maxTokens}
                   onChange={(event) => field("maxTokens", Number(event.target.value))}
                 />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="contextLength">Context window</Label>
+                <Input
+                  id="contextLength"
+                  type="number"
+                  value={form.contextLength}
+                  onChange={(event) => field("contextLength", Number(event.target.value))}
+                />
+                <p className="text-xs text-muted-foreground">
+                  0 asks the endpoint. Set it when the endpoint reports a window it is not actually
+                  serving the model in.
+                </p>
               </div>
               <div className="flex flex-col gap-2">
                 <Label htmlFor="temperature">Temperature</Label>

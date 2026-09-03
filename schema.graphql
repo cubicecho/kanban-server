@@ -138,6 +138,7 @@ type Agent {
   model: String!
   systemPrompt: String!
   maxTokens: Int!
+  contextLength: Int!
   temperature: Float!
   maxToolIterations: Int!
   toolDiscovery: AgentsToolDiscoveryEnum!
@@ -242,6 +243,7 @@ type AgentAggregate {
 
 type AgentAvgAggregate {
   maxTokens: Float
+  contextLength: Float
   temperature: Float
   maxToolIterations: Float
   requestTimeoutSeconds: Float
@@ -250,6 +252,7 @@ type AgentAvgAggregate {
 
 type AgentSumAggregate {
   maxTokens: Float
+  contextLength: Float
   temperature: Float
   maxToolIterations: Float
   requestTimeoutSeconds: Float
@@ -263,6 +266,7 @@ type AgentMinAggregate {
   model: String
   systemPrompt: String
   maxTokens: Int
+  contextLength: Int
   temperature: Float
   maxToolIterations: Int
   toolDiscovery: AgentsToolDiscoveryEnum
@@ -279,6 +283,7 @@ type AgentMaxAggregate {
   model: String
   systemPrompt: String
   maxTokens: Int
+  contextLength: Int
   temperature: Float
   maxToolIterations: Int
   toolDiscovery: AgentsToolDiscoveryEnum
@@ -296,6 +301,7 @@ type AgentCountNonNullAggregate {
   model: Int!
   systemPrompt: Int!
   maxTokens: Int!
+  contextLength: Int!
   temperature: Int!
   maxToolIterations: Int!
   toolDiscovery: Int!
@@ -312,6 +318,7 @@ type AgentCountDistinctAggregate {
   model: Int!
   systemPrompt: Int!
   maxTokens: Int!
+  contextLength: Int!
   temperature: Int!
   maxToolIterations: Int!
   toolDiscovery: Int!
@@ -342,6 +349,7 @@ type AgentGroupKeys {
   model: String
   systemPrompt: String
   maxTokens: Int
+  contextLength: Int
   temperature: Float
   maxToolIterations: Int
   toolDiscovery: AgentsToolDiscoveryEnum
@@ -1866,6 +1874,7 @@ type Setting {
   baseUrl: String!
   model: String!
   maxTokens: Int!
+  contextLength: Int!
   temperature: Float!
   maxToolIterations: Int!
   toolDiscovery: SettingsToolDiscoveryEnum!
@@ -1903,6 +1912,7 @@ type SettingAggregate {
 
 type SettingAvgAggregate {
   maxTokens: Float
+  contextLength: Float
   temperature: Float
   maxToolIterations: Float
   requestTimeoutSeconds: Float
@@ -1913,6 +1923,7 @@ type SettingAvgAggregate {
 
 type SettingSumAggregate {
   maxTokens: Float
+  contextLength: Float
   temperature: Float
   maxToolIterations: Float
   requestTimeoutSeconds: Float
@@ -1926,6 +1937,7 @@ type SettingMinAggregate {
   baseUrl: String
   model: String
   maxTokens: Int
+  contextLength: Int
   temperature: Float
   maxToolIterations: Int
   toolDiscovery: SettingsToolDiscoveryEnum
@@ -1943,6 +1955,7 @@ type SettingMaxAggregate {
   baseUrl: String
   model: String
   maxTokens: Int
+  contextLength: Int
   temperature: Float
   maxToolIterations: Int
   toolDiscovery: SettingsToolDiscoveryEnum
@@ -1960,6 +1973,7 @@ type SettingCountNonNullAggregate {
   baseUrl: Int!
   model: Int!
   maxTokens: Int!
+  contextLength: Int!
   temperature: Int!
   maxToolIterations: Int!
   toolDiscovery: Int!
@@ -1977,6 +1991,7 @@ type SettingCountDistinctAggregate {
   baseUrl: Int!
   model: Int!
   maxTokens: Int!
+  contextLength: Int!
   temperature: Int!
   maxToolIterations: Int!
   toolDiscovery: Int!
@@ -2008,6 +2023,7 @@ type SettingGroupKeys {
   baseUrl: String
   model: String
   maxTokens: Int
+  contextLength: Int
   temperature: Float
   maxToolIterations: Int
   toolDiscovery: SettingsToolDiscoveryEnum
@@ -2395,6 +2411,7 @@ input CreateAgentInput {
   model: String
   systemPrompt: String
   maxTokens: Int
+  contextLength: Int
   temperature: Float
   maxToolIterations: Int
   toolDiscovery: AgentsToolDiscoveryEnum
@@ -2412,6 +2429,7 @@ input UpdateAgentInput {
   model: String
   systemPrompt: String
   maxTokens: Int
+  contextLength: Int
   temperature: Float
   maxToolIterations: Int
   toolDiscovery: AgentsToolDiscoveryEnum
@@ -2438,6 +2456,7 @@ input AgentFilters {
   model: StringFilter
   systemPrompt: StringFilter
   maxTokens: IntFilter
+  contextLength: IntFilter
   temperature: FloatFilter
   maxToolIterations: IntFilter
   toolDiscovery: AgentsToolDiscoveryEnumFilter
@@ -2719,6 +2738,7 @@ input AgentOrderBy {
   model: InnerOrder
   systemPrompt: InnerOrder
   maxTokens: InnerOrder
+  contextLength: InnerOrder
   temperature: InnerOrder
   maxToolIterations: InnerOrder
   toolDiscovery: InnerOrder
@@ -2742,6 +2762,7 @@ input AgentHaving {
 
 input AgentAvgHaving {
   maxTokens: AggregateNumberFilter
+  contextLength: AggregateNumberFilter
   temperature: AggregateNumberFilter
   maxToolIterations: AggregateNumberFilter
   requestTimeoutSeconds: AggregateNumberFilter
@@ -2750,6 +2771,7 @@ input AgentAvgHaving {
 
 input AgentSumHaving {
   maxTokens: AggregateNumberFilter
+  contextLength: AggregateNumberFilter
   temperature: AggregateNumberFilter
   maxToolIterations: AggregateNumberFilter
   requestTimeoutSeconds: AggregateNumberFilter
@@ -2758,6 +2780,7 @@ input AgentSumHaving {
 
 input AgentMinHaving {
   maxTokens: AggregateNumberFilter
+  contextLength: AggregateNumberFilter
   temperature: AggregateNumberFilter
   maxToolIterations: AggregateNumberFilter
   requestTimeoutSeconds: AggregateNumberFilter
@@ -2766,6 +2789,7 @@ input AgentMinHaving {
 
 input AgentMaxHaving {
   maxTokens: AggregateNumberFilter
+  contextLength: AggregateNumberFilter
   temperature: AggregateNumberFilter
   maxToolIterations: AggregateNumberFilter
   requestTimeoutSeconds: AggregateNumberFilter
@@ -2780,6 +2804,7 @@ input AgentCountNonNullHaving {
   model: AggregateNumberFilter
   systemPrompt: AggregateNumberFilter
   maxTokens: AggregateNumberFilter
+  contextLength: AggregateNumberFilter
   temperature: AggregateNumberFilter
   maxToolIterations: AggregateNumberFilter
   toolDiscovery: AggregateNumberFilter
@@ -2796,6 +2821,7 @@ input AgentCountDistinctHaving {
   model: AggregateNumberFilter
   systemPrompt: AggregateNumberFilter
   maxTokens: AggregateNumberFilter
+  contextLength: AggregateNumberFilter
   temperature: AggregateNumberFilter
   maxToolIterations: AggregateNumberFilter
   toolDiscovery: AggregateNumberFilter
@@ -4879,6 +4905,7 @@ input UpdateSettingInput {
   baseUrl: String
   model: String
   maxTokens: Int
+  contextLength: Int
   temperature: Float
   maxToolIterations: Int
   toolDiscovery: SettingsToolDiscoveryEnum
@@ -4905,6 +4932,7 @@ input SettingFilters {
   baseUrl: StringFilter
   model: StringFilter
   maxTokens: IntFilter
+  contextLength: IntFilter
   temperature: FloatFilter
   maxToolIterations: IntFilter
   toolDiscovery: SettingsToolDiscoveryEnumFilter
@@ -5005,6 +5033,7 @@ input SettingOrderBy {
   baseUrl: InnerOrder
   model: InnerOrder
   maxTokens: InnerOrder
+  contextLength: InnerOrder
   temperature: InnerOrder
   maxToolIterations: InnerOrder
   toolDiscovery: InnerOrder
@@ -5031,6 +5060,7 @@ input SettingHaving {
 
 input SettingAvgHaving {
   maxTokens: AggregateNumberFilter
+  contextLength: AggregateNumberFilter
   temperature: AggregateNumberFilter
   maxToolIterations: AggregateNumberFilter
   requestTimeoutSeconds: AggregateNumberFilter
@@ -5041,6 +5071,7 @@ input SettingAvgHaving {
 
 input SettingSumHaving {
   maxTokens: AggregateNumberFilter
+  contextLength: AggregateNumberFilter
   temperature: AggregateNumberFilter
   maxToolIterations: AggregateNumberFilter
   requestTimeoutSeconds: AggregateNumberFilter
@@ -5051,6 +5082,7 @@ input SettingSumHaving {
 
 input SettingMinHaving {
   maxTokens: AggregateNumberFilter
+  contextLength: AggregateNumberFilter
   temperature: AggregateNumberFilter
   maxToolIterations: AggregateNumberFilter
   requestTimeoutSeconds: AggregateNumberFilter
@@ -5061,6 +5093,7 @@ input SettingMinHaving {
 
 input SettingMaxHaving {
   maxTokens: AggregateNumberFilter
+  contextLength: AggregateNumberFilter
   temperature: AggregateNumberFilter
   maxToolIterations: AggregateNumberFilter
   requestTimeoutSeconds: AggregateNumberFilter
@@ -5074,6 +5107,7 @@ input SettingCountNonNullHaving {
   baseUrl: AggregateNumberFilter
   model: AggregateNumberFilter
   maxTokens: AggregateNumberFilter
+  contextLength: AggregateNumberFilter
   temperature: AggregateNumberFilter
   maxToolIterations: AggregateNumberFilter
   toolDiscovery: AggregateNumberFilter
@@ -5091,6 +5125,7 @@ input SettingCountDistinctHaving {
   baseUrl: AggregateNumberFilter
   model: AggregateNumberFilter
   maxTokens: AggregateNumberFilter
+  contextLength: AggregateNumberFilter
   temperature: AggregateNumberFilter
   maxToolIterations: AggregateNumberFilter
   toolDiscovery: AggregateNumberFilter
@@ -5496,9 +5531,9 @@ type Query {
   ): [SettingGroupBy!]!
 
   """
-  Model ids an OpenAI-compatible server reports. With no `agentId` this asks the endpoint in Settings; with one it asks that agent's own endpoint, which is the list that agent can actually choose from.
+  The models an OpenAI-compatible server reports, with the context window it claims for each. With no `agentId` this asks the endpoint in Settings; with one it asks that agent's own endpoint, which is the list that agent can actually choose from.
   """
-  models(agentId: String): [String!]!
+  models(agentId: String): [Model!]!
 
   """
   The cards this one is waiting on that are not finished yet — the reason a card sits in a lane its agent never picks it up from. Empty means nothing is in its way. Worked out from the cards as they stand every time it is asked, rather than read off the card, because the answer changes when some other card finishes and nothing would go back to rewrite it. An archived dependency is not in the way: taking one off the board is a decision that it does not have to happen.
@@ -5575,6 +5610,7 @@ enum AgentDistinctColumn {
   model
   systemPrompt
   maxTokens
+  contextLength
   temperature
   maxToolIterations
   toolDiscovery
@@ -5593,6 +5629,7 @@ enum AgentGroupByColumn {
   model
   systemPrompt
   maxTokens
+  contextLength
   temperature
   maxToolIterations
   toolDiscovery
@@ -5788,6 +5825,7 @@ enum SettingDistinctColumn {
   baseUrl
   model
   maxTokens
+  contextLength
   temperature
   maxToolIterations
   toolDiscovery
@@ -5806,6 +5844,7 @@ enum SettingGroupByColumn {
   baseUrl
   model
   maxTokens
+  contextLength
   temperature
   maxToolIterations
   toolDiscovery
@@ -5816,6 +5855,18 @@ enum SettingGroupByColumn {
   workerIntervalSeconds
   refineAgentId
   refinePrompt
+}
+
+"""
+A model an OpenAI-compatible endpoint offers, and how much of it it will read.
+"""
+type Model {
+  id: String!
+
+  """
+  The context window this endpoint reports for the model, in tokens. Zero means it reported none — the OpenAI listing has no field for it, so only servers that add one of their own say anything. A number here is what the endpoint claims and not necessarily what it is serving: a model built for 256k can be loaded in a window a sixteenth of that and go on being listed as 256k, which is why an agent may override it.
+  """
+  contextLength: Int!
 }
 
 """
