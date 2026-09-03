@@ -432,6 +432,17 @@ switch needs its name said outright, and the label names the action rather than 
 twenty-five times, seven of those as the same local `const onError` — and `nameList` in
 `src/lib/text.ts` is the "and 2 more" that trails a list of what a delete is about to take.
 
+`form-dialog.tsx` is the same argument taken as far as it goes: the seven dialogs on this server
+differ in their fields and in nothing else, so the shell — the open/close wiring, the header, the
+scrolling body, a footer with a ghost Cancel and a Save that says "Saving…" — is written once and
+they pass what is theirs. `dirty` is asked for rather than worked out, because only the caller
+knows what its fields are; `aside` is whatever sits at the far end of the footer and is what
+splits it, being a second action (Test connection, Delete project) or a word about why Save is
+refusing. What the shell is really for is the guard: six of the seven closed through
+`useDiscardGuard` and the seventh, written before it existed, wired `onOpenChange` straight into
+`onClose` and quietly lost a typed template name to a stray Escape. A guard a caller cannot see is
+a guard a caller cannot forget.
+
 ## Code style
 
 - Biome-enforced: double quotes, semicolons, trailing commas, 2-space indent, 100 line width,

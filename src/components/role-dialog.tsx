@@ -1,16 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { useDiscardGuard } from "@/components/discard-guard";
 import { useFieldError } from "@/components/field-error";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { FormDialog } from "@/components/form-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -65,12 +56,9 @@ export function RoleDialog({ role, onClose }: { role?: Role; onClose: () => void
   const [contract, setContract] = useState<string>(role?.contract ?? "work");
   const [prompt, setPrompt] = useState(role?.prompt ?? "");
 
-  const { close, guard } = useDiscardGuard(
-    useDirty({ name, description, contract, prompt }),
-    onClose,
-  );
   // Said where the field is, before the button is pressed, rather than thrown as an error from
   // inside the mutation and landed in the far corner of the screen as a toast.
+  const dirty = useDirty({ name, description, contract, prompt });
   const nameError = useFieldError("role-name", name.trim() ? "" : "A role needs a name.");
 
   const save = useMutation({
@@ -94,85 +82,74 @@ export function RoleDialog({ role, onClose }: { role?: Role; onClose: () => void
   const chosen = CONTRACTS.find((row) => row.value === contract);
 
   return (
-    <Dialog open onOpenChange={(open) => !open && close()}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>{role ? "Edit role" : "New role"}</DialogTitle>
-          <DialogDescription>
-            A kind of lane. Every lane of this kind is told this, so editing it changes all of them
-            at once.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="flex flex-col gap-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="role-name">Name</Label>
-              <Input
-                id="role-name"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                placeholder="Testing"
-                {...nameError.field}
-              />
-              {nameError.error}
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="role-contract">Answers with</Label>
-              <Select value={contract} onValueChange={setContract}>
-                <SelectTrigger id="role-contract" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {CONTRACTS.map((row) => (
-                    <SelectItem key={row.value} value={row.value}>
-                      {row.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <p className="-mt-2 text-xs text-muted-foreground">{chosen?.hint}</p>
-
+    <FormDialog
+      title={role ? "Edit role" : "New role"}
+      description="A kind of lane. Every lane of this kind is told this, so editing it changes all of them at once."
+      width="2xl"
+      dirty={dirty}
+      onClose={onClose}
+      onSave={() => save.mutate()}
+      saving={save.isPending}
+      canSave={!nameError.invalid}
+    >
+      <div className="flex flex-col gap-4">
+        <div className="grid gap-4 sm:grid-cols-2">
           <div className="flex flex-col gap-2">
-            <Label htmlFor="role-description">Description</Label>
+            <Label htmlFor="role-name">Name</Label>
             <Input
-              id="role-description"
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              placeholder="Runs the suite and says what broke"
+              id="role-name"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="Testing"
+              {...nameError.field}
             />
-            <p className="text-xs text-muted-foreground">
-              One line, to pick this kind of lane by. It is never sent to a model.
-            </p>
+            {nameError.error}
           </div>
-
           <div className="flex flex-col gap-2">
-            <Label htmlFor="role-prompt">Prompt</Label>
-            <Textarea
-              id="role-prompt"
-              rows={10}
-              value={prompt}
-              onChange={(event) => setPrompt(event.target.value)}
-              placeholder="What an agent working a lane of this kind is told."
-            />
-            <p className="text-xs text-muted-foreground">
-              A lane may add to this on its own board. It never replaces it.
-            </p>
+            <Label htmlFor="role-contract">Answers with</Label>
+            <Select value={contract} onValueChange={setContract}>
+              <SelectTrigger id="role-contract" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {CONTRACTS.map((row) => (
+                  <SelectItem key={row.value} value={row.value}>
+                    {row.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
+        <p className="-mt-2 text-xs text-muted-foreground">{chosen?.hint}</p>
 
-        <DialogFooter>
-          <Button variant="ghost" onClick={close}>
-            Cancel
-          </Button>
-          <Button onClick={() => save.mutate()} disabled={nameError.invalid || save.isPending}>
-            {save.isPending ? "Saving…" : "Save"}
-          </Button>
-        </DialogFooter>
-        {guard}
-      </DialogContent>
-    </Dialog>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="role-description">Description</Label>
+          <Input
+            id="role-description"
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+            placeholder="Runs the suite and says what broke"
+          />
+          <p className="text-xs text-muted-foreground">
+            One line, to pick this kind of lane by. It is never sent to a model.
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="role-prompt">Prompt</Label>
+          <Textarea
+            id="role-prompt"
+            rows={10}
+            value={prompt}
+            onChange={(event) => setPrompt(event.target.value)}
+            placeholder="What an agent working a lane of this kind is told."
+          />
+          <p className="text-xs text-muted-foreground">
+            A lane may add to this on its own board. It never replaces it.
+          </p>
+        </div>
+      </div>
+    </FormDialog>
   );
 }
