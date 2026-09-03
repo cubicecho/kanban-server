@@ -24,7 +24,7 @@ mutation ApplyBoardTemplate($projectId: String!, $templateId: String!) {
 }
 
 mutation DeleteBoardTemplate($id: String!) {
-  deleteBoardTemplateSingle(where: { id: { eq: $id } }) {
+  deleteBoardTemplate(where: { id: { eq: $id } }) {
     id
   }
 }

@@ -19,7 +19,7 @@ query Settings {
 }
 
 mutation UpdateSettings($set: UpdateSettingInput!) {
-  updateSettingSingle(where: { id: { eq: "default" } }, set: $set) {
+  updateSetting(where: { id: { eq: "default" } }, set: $set) {
     id
   }
 }

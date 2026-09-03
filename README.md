@@ -487,6 +487,14 @@ is queryable as soon as it exists. Hand-written fields fill the gaps that CRUD c
 `submitCard`, `runCard`, `stopCard`, `stopTask`, `moveCard`, `setAgentServers`,
 `testMcpServer`, `reconnectMcp`, `setApiKey` and `setAgentApiKey` on the mutation side.
 
+Tables are keyed in the plural and the schema is built with `typeNameMapper: "singularize"`, so
+the singular and the plural of a table's own name are what tell one row from many: `card` and
+`cards` on the query side, `createCard`/`createCards`, `updateCard`/`updateCards`,
+`deleteCard`/`deleteCards` on the mutation side. Nothing carries a `Single` any more —
+drizzle-graphql 13 lets the suffixes reach the update and delete pairs, which until then only the
+insert one obeyed, and a `deleteCardSingle` that was really *the* delete read to an agent as a
+variant it had to choose between.
+
 - **`POST /graphql`** — the API, plus GraphiQL in a browser.
 - **`/mcp`** — the same server offered to agents as MCP tools; see below. Not for the web app,
   which talks only GraphQL.
@@ -517,11 +525,11 @@ Thirty-six tools, chosen in `server/mcp-endpoint.ts` rather than projected from 
 
 - **read** — `projects`, `lanes`, `cards`, `tasks`, `runs`, `agents`, `roles`, `run_events`,
   `card_events`, `card_notes`, `blockers`, `spend`, `board_templates`
-- **projects** — `create_project`, `update_project_single`
-- **tasks** — `create_task`, `refine_task`, `make_card`, `delete_task_single`
-- **cards** — `submit_card`, `create_card`, `update_card_single`, `delete_card_single`,
-  `set_card_deps`, `move_card`, `retry_card`, `archive_card`, `restore_card`, `run_card`,
-  `stop_card`, `stop_task`, `add_card_note`, `update_card_note`, `delete_card_note`
+- **projects** — `create_project`, `update_project`
+- **tasks** — `create_task`, `refine_task`, `make_card`, `delete_task`
+- **cards** — `submit_card`, `create_card`, `update_card`, `delete_card`, `set_card_deps`,
+  `move_card`, `retry_card`, `archive_card`, `restore_card`, `run_card`, `stop_card`,
+  `stop_task`, `add_card_note`, `update_card_note`, `delete_card_note`
 - **boards** — `save_board_template`, `apply_board_template`
 
 `submit_card` is the one to reach for: describe what you want and it lands at the board's front
@@ -572,9 +580,9 @@ done, and gains an idempotent one, because a second call finds nothing in flight
 
 Left out on purpose: the settings row and `setApiKey` (which model runs where, on whose key, is
 the operator's business, not a visiting agent's), writes to agents and MCP servers, the aggregates
-and group-bys, every bulk mutation — `deleteCard` with no `where` empties the table, where
-`deleteCardSingle` cannot — and deleting a project, which takes its whole board and history with
-it and is worth the walk to the UI. Each tool selects one level of fields, so a listing of cards
+and group-bys, every bulk mutation — `deleteCards` with no `where` empties the table, where
+`deleteCard` cannot — and deleting a project, which takes its whole board and history with it
+and is worth the walk to the UI. Each tool selects one level of fields, so a listing of cards
 does not drag every run's output along with it.
 
 The whole listing is about 662 kB, which is worth saying because it very nearly was not. The
@@ -585,7 +593,9 @@ that recursion out at every level, and the listing runs to megabytes of tool def
 over before a client can call anything. graphql-mcp builds each input type once and emits a `$ref`
 for the repeats, so the relation filters cost almost nothing and stay — `where: { cards: { some:
 { status: { eq: "error" } } } }` is a question worth being able to ask. A test holds every tool
-under 150 kB and the listing under 1.2 MB.
+under 100 kB and the listing under 1 MB, and asserts that a column offers only the operators it
+can take: drizzle-graphql 12 stopped generating one filter shape for every column, so a timestamp
+no longer advertises `ilike` and an enum no longer advertises `startsWith`.
 
 Unknown fields in a tool's arguments are rejected rather than dropped: a misspelled key comes back
 as `Unrecognized key: "order"` instead of a success with that part of the request quietly

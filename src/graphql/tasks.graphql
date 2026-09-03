@@ -98,7 +98,7 @@ mutation SubmitCard($projectId: String!, $title: String!, $body: String!) {
 }
 
 mutation DeleteTask($id: String!) {
-  deleteTaskSingle(where: { id: { eq: $id } }) {
+  deleteTask(where: { id: { eq: $id } }) {
     id
   }
 }

@@ -153,7 +153,7 @@ test("retryCard puts a rejected card back in play where it stands", async () => 
   // brought it here, which is why a retry can clear the status without erasing the feedback.
   await run(
     `mutation Fail($id: String!) {
-       updateCardSingle(
+       updateCard(
          where: { id: { eq: $id } }
          set: { status: rejected, attempts: 3 }
        ) { id }
@@ -185,7 +185,7 @@ test("retryCard puts a rejected card back in play where it stands", async () => 
   );
   await run(
     `mutation Break($id: String!) {
-       updateCardSingle(
+       updateCard(
          where: { id: { eq: $id } }
          set: { status: error, error: "ECONNREFUSED" }
        ) { id }
@@ -236,7 +236,7 @@ test("blockers names what a card is waiting on, and stops naming it when it stop
 
   await run(
     `mutation Done($id: String!) {
-       updateCardSingle(where: { id: { eq: $id } }, set: { status: done }) { id }
+       updateCard(where: { id: { eq: $id } }, set: { status: done }) { id }
      }`,
     { id: migration.id },
   );
@@ -545,13 +545,13 @@ test("a board saved under a name is drawn onto the next project the same shape",
   const [, , doing, review, done] = drawn;
   await run(
     `mutation Widen($id: String!) {
-       updateLaneSingle(where: { id: { eq: $id } }, set: { wipLimit: 3 }) { id }
+       updateLane(where: { id: { eq: $id } }, set: { wipLimit: 3 }) { id }
      }`,
     { id: doing.id },
   );
   await run(
     `mutation Budget($id: String!) {
-       updateLaneSingle(where: { id: { eq: $id } }, set: { maxAttempts: 2 }) { id }
+       updateLane(where: { id: { eq: $id } }, set: { maxAttempts: 2 }) { id }
      }`,
     { id: review.id },
   );

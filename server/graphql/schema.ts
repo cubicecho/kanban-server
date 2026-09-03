@@ -320,7 +320,7 @@ async function wouldCycle(
  * outright while anything is running: a rare, recoverable no rather than a wrong yes. Throwing
  * here rolls the mutation back before it writes.
  */
-/** The one id a `...Single` write names, where it names one. */
+/** The one id a single-row write names, where it names one. */
 function whereId(args: unknown): string | undefined {
   const where = (args as { where?: { id?: { eq?: unknown } } } | undefined)?.where;
   return typeof where?.id?.eq === "string" ? where.id.eq : undefined;

@@ -2166,51 +2166,6 @@ input RolesContractEnumFilter {
   """Not equal to"""
   ne: RolesContractEnum
 
-  """Less than"""
-  lt: RolesContractEnum
-
-  """Less than or equal to"""
-  lte: RolesContractEnum
-
-  """Greater than"""
-  gt: RolesContractEnum
-
-  """Greater than or equal to"""
-  gte: RolesContractEnum
-  like: String
-  notLike: String
-  ilike: String
-  notIlike: String
-
-  """
-  Matches values starting with the given string. `%`, `_` and `\` are matched literally.
-  """
-  startsWith: String
-
-  """
-  Matches values ending with the given string. `%`, `_` and `\` are matched literally.
-  """
-  endsWith: String
-
-  """
-  Matches values containing the given string. `%`, `_` and `\` are matched literally.
-  """
-  contains: String
-
-  """Case-insensitive `startsWith`."""
-  iStartsWith: String
-
-  """Case-insensitive `endsWith`."""
-  iEndsWith: String
-
-  """Case-insensitive `contains`."""
-  iContains: String
-
-  """
-  When true, every comparison operator in this object matches case-insensitively — `eq`, `ne`, the ordering operators, `inArray`/`notInArray` and the pattern operators all compare `lower(column)` against `lower(operand)`. Applies only to the operators beside it; a nested `AND`/`OR`/`NOT` branch sets its own.
-  """
-  insensitive: Boolean
-
   """Matches any one of these values (SQL `IN`)"""
   inArray: [RolesContractEnum!]
 
@@ -2251,39 +2206,6 @@ input DateTimeFilter {
 
   """Greater than or equal to"""
   gte: DateTime
-  like: String
-  notLike: String
-  ilike: String
-  notIlike: String
-
-  """
-  Matches values starting with the given string. `%`, `_` and `\` are matched literally.
-  """
-  startsWith: String
-
-  """
-  Matches values ending with the given string. `%`, `_` and `\` are matched literally.
-  """
-  endsWith: String
-
-  """
-  Matches values containing the given string. `%`, `_` and `\` are matched literally.
-  """
-  contains: String
-
-  """Case-insensitive `startsWith`."""
-  iStartsWith: String
-
-  """Case-insensitive `endsWith`."""
-  iEndsWith: String
-
-  """Case-insensitive `contains`."""
-  iContains: String
-
-  """
-  When true, every comparison operator in this object matches case-insensitively — `eq`, `ne`, the ordering operators, `inArray`/`notInArray` and the pattern operators all compare `lower(column)` against `lower(operand)`. Applies only to the operators beside it; a nested `AND`/`OR`/`NOT` branch sets its own.
-  """
-  insensitive: Boolean
 
   """Matches any one of these values (SQL `IN`)"""
   inArray: [DateTime!]
@@ -2485,51 +2407,6 @@ input BooleanFilter {
   """Not equal to"""
   ne: Boolean
 
-  """Less than"""
-  lt: Boolean
-
-  """Less than or equal to"""
-  lte: Boolean
-
-  """Greater than"""
-  gt: Boolean
-
-  """Greater than or equal to"""
-  gte: Boolean
-  like: String
-  notLike: String
-  ilike: String
-  notIlike: String
-
-  """
-  Matches values starting with the given string. `%`, `_` and `\` are matched literally.
-  """
-  startsWith: String
-
-  """
-  Matches values ending with the given string. `%`, `_` and `\` are matched literally.
-  """
-  endsWith: String
-
-  """
-  Matches values containing the given string. `%`, `_` and `\` are matched literally.
-  """
-  contains: String
-
-  """Case-insensitive `startsWith`."""
-  iStartsWith: String
-
-  """Case-insensitive `endsWith`."""
-  iEndsWith: String
-
-  """Case-insensitive `contains`."""
-  iContains: String
-
-  """
-  When true, every comparison operator in this object matches case-insensitively — `eq`, `ne`, the ordering operators, `inArray`/`notInArray` and the pattern operators all compare `lower(column)` against `lower(operand)`. Applies only to the operators beside it; a nested `AND`/`OR`/`NOT` branch sets its own.
-  """
-  insensitive: Boolean
-
   """Matches any one of these values (SQL `IN`)"""
   inArray: [Boolean!]
 
@@ -2640,51 +2517,6 @@ input AgentsToolDiscoveryEnumFilter {
 
   """Not equal to"""
   ne: AgentsToolDiscoveryEnum
-
-  """Less than"""
-  lt: AgentsToolDiscoveryEnum
-
-  """Less than or equal to"""
-  lte: AgentsToolDiscoveryEnum
-
-  """Greater than"""
-  gt: AgentsToolDiscoveryEnum
-
-  """Greater than or equal to"""
-  gte: AgentsToolDiscoveryEnum
-  like: String
-  notLike: String
-  ilike: String
-  notIlike: String
-
-  """
-  Matches values starting with the given string. `%`, `_` and `\` are matched literally.
-  """
-  startsWith: String
-
-  """
-  Matches values ending with the given string. `%`, `_` and `\` are matched literally.
-  """
-  endsWith: String
-
-  """
-  Matches values containing the given string. `%`, `_` and `\` are matched literally.
-  """
-  contains: String
-
-  """Case-insensitive `startsWith`."""
-  iStartsWith: String
-
-  """Case-insensitive `endsWith`."""
-  iEndsWith: String
-
-  """Case-insensitive `contains`."""
-  iContains: String
-
-  """
-  When true, every comparison operator in this object matches case-insensitively — `eq`, `ne`, the ordering operators, `inArray`/`notInArray` and the pattern operators all compare `lower(column)` against `lower(operand)`. Applies only to the operators beside it; a nested `AND`/`OR`/`NOT` branch sets its own.
-  """
-  insensitive: Boolean
 
   """Matches any one of these values (SQL `IN`)"""
   inArray: [AgentsToolDiscoveryEnum!]
@@ -2895,51 +2727,6 @@ input McpServersTransportEnumFilter {
 
   """Not equal to"""
   ne: McpServersTransportEnum
-
-  """Less than"""
-  lt: McpServersTransportEnum
-
-  """Less than or equal to"""
-  lte: McpServersTransportEnum
-
-  """Greater than"""
-  gt: McpServersTransportEnum
-
-  """Greater than or equal to"""
-  gte: McpServersTransportEnum
-  like: String
-  notLike: String
-  ilike: String
-  notIlike: String
-
-  """
-  Matches values starting with the given string. `%`, `_` and `\` are matched literally.
-  """
-  startsWith: String
-
-  """
-  Matches values ending with the given string. `%`, `_` and `\` are matched literally.
-  """
-  endsWith: String
-
-  """
-  Matches values containing the given string. `%`, `_` and `\` are matched literally.
-  """
-  contains: String
-
-  """Case-insensitive `startsWith`."""
-  iStartsWith: String
-
-  """Case-insensitive `endsWith`."""
-  iEndsWith: String
-
-  """Case-insensitive `contains`."""
-  iContains: String
-
-  """
-  When true, every comparison operator in this object matches case-insensitively — `eq`, `ne`, the ordering operators, `inArray`/`notInArray` and the pattern operators all compare `lower(column)` against `lower(operand)`. Applies only to the operators beside it; a nested `AND`/`OR`/`NOT` branch sets its own.
-  """
-  insensitive: Boolean
 
   """Matches any one of these values (SQL `IN`)"""
   inArray: [McpServersTransportEnum!]
@@ -3626,51 +3413,6 @@ input MessagesRoleEnumFilter {
   """Not equal to"""
   ne: MessagesRoleEnum
 
-  """Less than"""
-  lt: MessagesRoleEnum
-
-  """Less than or equal to"""
-  lte: MessagesRoleEnum
-
-  """Greater than"""
-  gt: MessagesRoleEnum
-
-  """Greater than or equal to"""
-  gte: MessagesRoleEnum
-  like: String
-  notLike: String
-  ilike: String
-  notIlike: String
-
-  """
-  Matches values starting with the given string. `%`, `_` and `\` are matched literally.
-  """
-  startsWith: String
-
-  """
-  Matches values ending with the given string. `%`, `_` and `\` are matched literally.
-  """
-  endsWith: String
-
-  """
-  Matches values containing the given string. `%`, `_` and `\` are matched literally.
-  """
-  contains: String
-
-  """Case-insensitive `startsWith`."""
-  iStartsWith: String
-
-  """Case-insensitive `endsWith`."""
-  iEndsWith: String
-
-  """Case-insensitive `contains`."""
-  iContains: String
-
-  """
-  When true, every comparison operator in this object matches case-insensitively — `eq`, `ne`, the ordering operators, `inArray`/`notInArray` and the pattern operators all compare `lower(column)` against `lower(operand)`. Applies only to the operators beside it; a nested `AND`/`OR`/`NOT` branch sets its own.
-  """
-  insensitive: Boolean
-
   """Matches any one of these values (SQL `IN`)"""
   inArray: [MessagesRoleEnum!]
 
@@ -3820,51 +3562,6 @@ input CardsStatusEnumFilter {
 
   """Not equal to"""
   ne: CardsStatusEnum
-
-  """Less than"""
-  lt: CardsStatusEnum
-
-  """Less than or equal to"""
-  lte: CardsStatusEnum
-
-  """Greater than"""
-  gt: CardsStatusEnum
-
-  """Greater than or equal to"""
-  gte: CardsStatusEnum
-  like: String
-  notLike: String
-  ilike: String
-  notIlike: String
-
-  """
-  Matches values starting with the given string. `%`, `_` and `\` are matched literally.
-  """
-  startsWith: String
-
-  """
-  Matches values ending with the given string. `%`, `_` and `\` are matched literally.
-  """
-  endsWith: String
-
-  """
-  Matches values containing the given string. `%`, `_` and `\` are matched literally.
-  """
-  contains: String
-
-  """Case-insensitive `startsWith`."""
-  iStartsWith: String
-
-  """Case-insensitive `endsWith`."""
-  iEndsWith: String
-
-  """Case-insensitive `contains`."""
-  iContains: String
-
-  """
-  When true, every comparison operator in this object matches case-insensitively — `eq`, `ne`, the ordering operators, `inArray`/`notInArray` and the pattern operators all compare `lower(column)` against `lower(operand)`. Applies only to the operators beside it; a nested `AND`/`OR`/`NOT` branch sets its own.
-  """
-  insensitive: Boolean
 
   """Matches any one of these values (SQL `IN`)"""
   inArray: [CardsStatusEnum!]
@@ -4123,51 +3820,6 @@ input CardNotesKindEnumFilter {
   """Not equal to"""
   ne: CardNotesKindEnum
 
-  """Less than"""
-  lt: CardNotesKindEnum
-
-  """Less than or equal to"""
-  lte: CardNotesKindEnum
-
-  """Greater than"""
-  gt: CardNotesKindEnum
-
-  """Greater than or equal to"""
-  gte: CardNotesKindEnum
-  like: String
-  notLike: String
-  ilike: String
-  notIlike: String
-
-  """
-  Matches values starting with the given string. `%`, `_` and `\` are matched literally.
-  """
-  startsWith: String
-
-  """
-  Matches values ending with the given string. `%`, `_` and `\` are matched literally.
-  """
-  endsWith: String
-
-  """
-  Matches values containing the given string. `%`, `_` and `\` are matched literally.
-  """
-  contains: String
-
-  """Case-insensitive `startsWith`."""
-  iStartsWith: String
-
-  """Case-insensitive `endsWith`."""
-  iEndsWith: String
-
-  """Case-insensitive `contains`."""
-  iContains: String
-
-  """
-  When true, every comparison operator in this object matches case-insensitively — `eq`, `ne`, the ordering operators, `inArray`/`notInArray` and the pattern operators all compare `lower(column)` against `lower(operand)`. Applies only to the operators beside it; a nested `AND`/`OR`/`NOT` branch sets its own.
-  """
-  insensitive: Boolean
-
   """Matches any one of these values (SQL `IN`)"""
   inArray: [CardNotesKindEnum!]
 
@@ -4196,51 +3848,6 @@ input CardNotesAuthorEnumFilter {
 
   """Not equal to"""
   ne: CardNotesAuthorEnum
-
-  """Less than"""
-  lt: CardNotesAuthorEnum
-
-  """Less than or equal to"""
-  lte: CardNotesAuthorEnum
-
-  """Greater than"""
-  gt: CardNotesAuthorEnum
-
-  """Greater than or equal to"""
-  gte: CardNotesAuthorEnum
-  like: String
-  notLike: String
-  ilike: String
-  notIlike: String
-
-  """
-  Matches values starting with the given string. `%`, `_` and `\` are matched literally.
-  """
-  startsWith: String
-
-  """
-  Matches values ending with the given string. `%`, `_` and `\` are matched literally.
-  """
-  endsWith: String
-
-  """
-  Matches values containing the given string. `%`, `_` and `\` are matched literally.
-  """
-  contains: String
-
-  """Case-insensitive `startsWith`."""
-  iStartsWith: String
-
-  """Case-insensitive `endsWith`."""
-  iEndsWith: String
-
-  """Case-insensitive `contains`."""
-  iContains: String
-
-  """
-  When true, every comparison operator in this object matches case-insensitively — `eq`, `ne`, the ordering operators, `inArray`/`notInArray` and the pattern operators all compare `lower(column)` against `lower(operand)`. Applies only to the operators beside it; a nested `AND`/`OR`/`NOT` branch sets its own.
-  """
-  insensitive: Boolean
 
   """Matches any one of these values (SQL `IN`)"""
   inArray: [CardNotesAuthorEnum!]
@@ -4352,51 +3959,6 @@ input CardEventsActorEnumFilter {
 
   """Not equal to"""
   ne: CardEventsActorEnum
-
-  """Less than"""
-  lt: CardEventsActorEnum
-
-  """Less than or equal to"""
-  lte: CardEventsActorEnum
-
-  """Greater than"""
-  gt: CardEventsActorEnum
-
-  """Greater than or equal to"""
-  gte: CardEventsActorEnum
-  like: String
-  notLike: String
-  ilike: String
-  notIlike: String
-
-  """
-  Matches values starting with the given string. `%`, `_` and `\` are matched literally.
-  """
-  startsWith: String
-
-  """
-  Matches values ending with the given string. `%`, `_` and `\` are matched literally.
-  """
-  endsWith: String
-
-  """
-  Matches values containing the given string. `%`, `_` and `\` are matched literally.
-  """
-  contains: String
-
-  """Case-insensitive `startsWith`."""
-  iStartsWith: String
-
-  """Case-insensitive `endsWith`."""
-  iEndsWith: String
-
-  """Case-insensitive `contains`."""
-  iContains: String
-
-  """
-  When true, every comparison operator in this object matches case-insensitively — `eq`, `ne`, the ordering operators, `inArray`/`notInArray` and the pattern operators all compare `lower(column)` against `lower(operand)`. Applies only to the operators beside it; a nested `AND`/`OR`/`NOT` branch sets its own.
-  """
-  insensitive: Boolean
 
   """Matches any one of these values (SQL `IN`)"""
   inArray: [CardEventsActorEnum!]
@@ -4527,51 +4089,6 @@ input RunsKindEnumFilter {
   """Not equal to"""
   ne: RunsKindEnum
 
-  """Less than"""
-  lt: RunsKindEnum
-
-  """Less than or equal to"""
-  lte: RunsKindEnum
-
-  """Greater than"""
-  gt: RunsKindEnum
-
-  """Greater than or equal to"""
-  gte: RunsKindEnum
-  like: String
-  notLike: String
-  ilike: String
-  notIlike: String
-
-  """
-  Matches values starting with the given string. `%`, `_` and `\` are matched literally.
-  """
-  startsWith: String
-
-  """
-  Matches values ending with the given string. `%`, `_` and `\` are matched literally.
-  """
-  endsWith: String
-
-  """
-  Matches values containing the given string. `%`, `_` and `\` are matched literally.
-  """
-  contains: String
-
-  """Case-insensitive `startsWith`."""
-  iStartsWith: String
-
-  """Case-insensitive `endsWith`."""
-  iEndsWith: String
-
-  """Case-insensitive `contains`."""
-  iContains: String
-
-  """
-  When true, every comparison operator in this object matches case-insensitively — `eq`, `ne`, the ordering operators, `inArray`/`notInArray` and the pattern operators all compare `lower(column)` against `lower(operand)`. Applies only to the operators beside it; a nested `AND`/`OR`/`NOT` branch sets its own.
-  """
-  insensitive: Boolean
-
   """Matches any one of these values (SQL `IN`)"""
   inArray: [RunsKindEnum!]
 
@@ -4601,51 +4118,6 @@ input RunsStatusEnumFilter {
   """Not equal to"""
   ne: RunsStatusEnum
 
-  """Less than"""
-  lt: RunsStatusEnum
-
-  """Less than or equal to"""
-  lte: RunsStatusEnum
-
-  """Greater than"""
-  gt: RunsStatusEnum
-
-  """Greater than or equal to"""
-  gte: RunsStatusEnum
-  like: String
-  notLike: String
-  ilike: String
-  notIlike: String
-
-  """
-  Matches values starting with the given string. `%`, `_` and `\` are matched literally.
-  """
-  startsWith: String
-
-  """
-  Matches values ending with the given string. `%`, `_` and `\` are matched literally.
-  """
-  endsWith: String
-
-  """
-  Matches values containing the given string. `%`, `_` and `\` are matched literally.
-  """
-  contains: String
-
-  """Case-insensitive `startsWith`."""
-  iStartsWith: String
-
-  """Case-insensitive `endsWith`."""
-  iEndsWith: String
-
-  """Case-insensitive `contains`."""
-  iContains: String
-
-  """
-  When true, every comparison operator in this object matches case-insensitively — `eq`, `ne`, the ordering operators, `inArray`/`notInArray` and the pattern operators all compare `lower(column)` against `lower(operand)`. Applies only to the operators beside it; a nested `AND`/`OR`/`NOT` branch sets its own.
-  """
-  insensitive: Boolean
-
   """Matches any one of these values (SQL `IN`)"""
   inArray: [RunsStatusEnum!]
 
@@ -4674,51 +4146,6 @@ input RunsVerdictEnumFilter {
 
   """Not equal to"""
   ne: RunsVerdictEnum
-
-  """Less than"""
-  lt: RunsVerdictEnum
-
-  """Less than or equal to"""
-  lte: RunsVerdictEnum
-
-  """Greater than"""
-  gt: RunsVerdictEnum
-
-  """Greater than or equal to"""
-  gte: RunsVerdictEnum
-  like: String
-  notLike: String
-  ilike: String
-  notIlike: String
-
-  """
-  Matches values starting with the given string. `%`, `_` and `\` are matched literally.
-  """
-  startsWith: String
-
-  """
-  Matches values ending with the given string. `%`, `_` and `\` are matched literally.
-  """
-  endsWith: String
-
-  """
-  Matches values containing the given string. `%`, `_` and `\` are matched literally.
-  """
-  contains: String
-
-  """Case-insensitive `startsWith`."""
-  iStartsWith: String
-
-  """Case-insensitive `endsWith`."""
-  iEndsWith: String
-
-  """Case-insensitive `contains`."""
-  iContains: String
-
-  """
-  When true, every comparison operator in this object matches case-insensitively — `eq`, `ne`, the ordering operators, `inArray`/`notInArray` and the pattern operators all compare `lower(column)` against `lower(operand)`. Applies only to the operators beside it; a nested `AND`/`OR`/`NOT` branch sets its own.
-  """
-  insensitive: Boolean
 
   """Matches any one of these values (SQL `IN`)"""
   inArray: [RunsVerdictEnum!]
@@ -4960,51 +4387,6 @@ input SettingsToolDiscoveryEnumFilter {
 
   """Not equal to"""
   ne: SettingsToolDiscoveryEnum
-
-  """Less than"""
-  lt: SettingsToolDiscoveryEnum
-
-  """Less than or equal to"""
-  lte: SettingsToolDiscoveryEnum
-
-  """Greater than"""
-  gt: SettingsToolDiscoveryEnum
-
-  """Greater than or equal to"""
-  gte: SettingsToolDiscoveryEnum
-  like: String
-  notLike: String
-  ilike: String
-  notIlike: String
-
-  """
-  Matches values starting with the given string. `%`, `_` and `\` are matched literally.
-  """
-  startsWith: String
-
-  """
-  Matches values ending with the given string. `%`, `_` and `\` are matched literally.
-  """
-  endsWith: String
-
-  """
-  Matches values containing the given string. `%`, `_` and `\` are matched literally.
-  """
-  contains: String
-
-  """Case-insensitive `startsWith`."""
-  iStartsWith: String
-
-  """Case-insensitive `endsWith`."""
-  iEndsWith: String
-
-  """Case-insensitive `contains`."""
-  iContains: String
-
-  """
-  When true, every comparison operator in this object matches case-insensitively — `eq`, `ne`, the ordering operators, `inArray`/`notInArray` and the pattern operators all compare `lower(column)` against `lower(operand)`. Applies only to the operators beside it; a nested `AND`/`OR`/`NOT` branch sets its own.
-  """
-  insensitive: Boolean
 
   """Matches any one of these values (SQL `IN`)"""
   inArray: [SettingsToolDiscoveryEnum!]
@@ -5965,125 +5347,125 @@ type Spend {
 type Mutation {
   createRoles(values: [CreateRoleInput!]!): [Role!]!
   createRole(values: CreateRoleInput!): Role!
-  updateRole(set: UpdateRoleInput!, where: RoleFilters): [Role!]!
+  updateRoles(set: UpdateRoleInput!, where: RoleFilters): [Role!]!
 
   """
   Each entry's updated rows, in entry order. An entry whose `where` matched no rows contributes `null` in its slot; an entry that matched several contributes each of its rows.
   """
   updateRolesMany(updates: [UpdateRoleManyInput!]!): [Role]!
-  updateRoleSingle(set: UpdateRoleInput!, where: RoleFilters!): Role
-  deleteRole(where: RoleFilters): [Role!]!
-  deleteRoleSingle(where: RoleFilters!): Role
+  updateRole(set: UpdateRoleInput!, where: RoleFilters!): Role
+  deleteRoles(where: RoleFilters): [Role!]!
+  deleteRole(where: RoleFilters!): Role
   createAgents(values: [CreateAgentInput!]!): [Agent!]!
   createAgent(values: CreateAgentInput!): Agent!
-  updateAgent(set: UpdateAgentInput!, where: AgentFilters): [Agent!]!
+  updateAgents(set: UpdateAgentInput!, where: AgentFilters): [Agent!]!
 
   """
   Each entry's updated rows, in entry order. An entry whose `where` matched no rows contributes `null` in its slot; an entry that matched several contributes each of its rows.
   """
   updateAgentsMany(updates: [UpdateAgentManyInput!]!): [Agent]!
-  updateAgentSingle(set: UpdateAgentInput!, where: AgentFilters!): Agent
-  deleteAgent(where: AgentFilters): [Agent!]!
-  deleteAgentSingle(where: AgentFilters!): Agent
+  updateAgent(set: UpdateAgentInput!, where: AgentFilters!): Agent
+  deleteAgents(where: AgentFilters): [Agent!]!
+  deleteAgent(where: AgentFilters!): Agent
   createMcpServers(values: [CreateMcpServerInput!]!): [McpServer!]!
   createMcpServer(values: CreateMcpServerInput!): McpServer!
-  updateMcpServer(set: UpdateMcpServerInput!, where: McpServerFilters): [McpServer!]!
+  updateMcpServers(set: UpdateMcpServerInput!, where: McpServerFilters): [McpServer!]!
 
   """
   Each entry's updated rows, in entry order. An entry whose `where` matched no rows contributes `null` in its slot; an entry that matched several contributes each of its rows.
   """
   updateMcpServersMany(updates: [UpdateMcpServerManyInput!]!): [McpServer]!
-  updateMcpServerSingle(set: UpdateMcpServerInput!, where: McpServerFilters!): McpServer
-  deleteMcpServer(where: McpServerFilters): [McpServer!]!
-  deleteMcpServerSingle(where: McpServerFilters!): McpServer
+  updateMcpServer(set: UpdateMcpServerInput!, where: McpServerFilters!): McpServer
+  deleteMcpServers(where: McpServerFilters): [McpServer!]!
+  deleteMcpServer(where: McpServerFilters!): McpServer
   createAgentServers(values: [CreateAgentServerInput!]!): [AgentServer!]!
   createAgentServer(values: CreateAgentServerInput!): AgentServer!
-  updateAgentServer(set: UpdateAgentServerInput!, where: AgentServerFilters): [AgentServer!]!
+  updateAgentServers(set: UpdateAgentServerInput!, where: AgentServerFilters): [AgentServer!]!
 
   """
   Each entry's updated rows, in entry order. An entry whose `where` matched no rows contributes `null` in its slot; an entry that matched several contributes each of its rows.
   """
   updateAgentServersMany(updates: [UpdateAgentServerManyInput!]!): [AgentServer]!
-  updateAgentServerSingle(set: UpdateAgentServerInput!, where: AgentServerFilters!): AgentServer
-  deleteAgentServer(where: AgentServerFilters): [AgentServer!]!
-  deleteAgentServerSingle(where: AgentServerFilters!): AgentServer
+  updateAgentServer(set: UpdateAgentServerInput!, where: AgentServerFilters!): AgentServer
+  deleteAgentServers(where: AgentServerFilters): [AgentServer!]!
+  deleteAgentServer(where: AgentServerFilters!): AgentServer
   createProjects(values: [CreateProjectInput!]!): [Project!]!
   createProject(values: CreateProjectInput!): Project!
-  updateProject(set: UpdateProjectInput!, where: ProjectFilters): [Project!]!
+  updateProjects(set: UpdateProjectInput!, where: ProjectFilters): [Project!]!
 
   """
   Each entry's updated rows, in entry order. An entry whose `where` matched no rows contributes `null` in its slot; an entry that matched several contributes each of its rows.
   """
   updateProjectsMany(updates: [UpdateProjectManyInput!]!): [Project]!
-  updateProjectSingle(set: UpdateProjectInput!, where: ProjectFilters!): Project
-  deleteProject(where: ProjectFilters): [Project!]!
-  deleteProjectSingle(where: ProjectFilters!): Project
+  updateProject(set: UpdateProjectInput!, where: ProjectFilters!): Project
+  deleteProjects(where: ProjectFilters): [Project!]!
+  deleteProject(where: ProjectFilters!): Project
   createLanes(values: [CreateLaneInput!]!): [Lane!]!
   createLane(values: CreateLaneInput!): Lane!
-  updateLane(set: UpdateLaneInput!, where: LaneFilters): [Lane!]!
+  updateLanes(set: UpdateLaneInput!, where: LaneFilters): [Lane!]!
 
   """
   Each entry's updated rows, in entry order. An entry whose `where` matched no rows contributes `null` in its slot; an entry that matched several contributes each of its rows.
   """
   updateLanesMany(updates: [UpdateLaneManyInput!]!): [Lane]!
-  updateLaneSingle(set: UpdateLaneInput!, where: LaneFilters!): Lane
-  deleteLane(where: LaneFilters): [Lane!]!
-  deleteLaneSingle(where: LaneFilters!): Lane
+  updateLane(set: UpdateLaneInput!, where: LaneFilters!): Lane
+  deleteLanes(where: LaneFilters): [Lane!]!
+  deleteLane(where: LaneFilters!): Lane
   createTasks(values: [CreateTaskInput!]!): [Task!]!
   createTask(values: CreateTaskInput!): Task!
-  updateTask(set: UpdateTaskInput!, where: TaskFilters): [Task!]!
+  updateTasks(set: UpdateTaskInput!, where: TaskFilters): [Task!]!
 
   """
   Each entry's updated rows, in entry order. An entry whose `where` matched no rows contributes `null` in its slot; an entry that matched several contributes each of its rows.
   """
   updateTasksMany(updates: [UpdateTaskManyInput!]!): [Task]!
-  updateTaskSingle(set: UpdateTaskInput!, where: TaskFilters!): Task
-  deleteTask(where: TaskFilters): [Task!]!
-  deleteTaskSingle(where: TaskFilters!): Task
+  updateTask(set: UpdateTaskInput!, where: TaskFilters!): Task
+  deleteTasks(where: TaskFilters): [Task!]!
+  deleteTask(where: TaskFilters!): Task
   createMessages(values: [CreateMessageInput!]!): [Message!]!
   createMessage(values: CreateMessageInput!): Message!
-  updateMessage(set: UpdateMessageInput!, where: MessageFilters): [Message!]!
+  updateMessages(set: UpdateMessageInput!, where: MessageFilters): [Message!]!
 
   """
   Each entry's updated rows, in entry order. An entry whose `where` matched no rows contributes `null` in its slot; an entry that matched several contributes each of its rows.
   """
   updateMessagesMany(updates: [UpdateMessageManyInput!]!): [Message]!
-  updateMessageSingle(set: UpdateMessageInput!, where: MessageFilters!): Message
-  deleteMessage(where: MessageFilters): [Message!]!
-  deleteMessageSingle(where: MessageFilters!): Message
+  updateMessage(set: UpdateMessageInput!, where: MessageFilters!): Message
+  deleteMessages(where: MessageFilters): [Message!]!
+  deleteMessage(where: MessageFilters!): Message
   createCards(values: [CreateCardInput!]!): [Card!]!
   createCard(values: CreateCardInput!): Card!
-  updateCard(set: UpdateCardInput!, where: CardFilters): [Card!]!
+  updateCards(set: UpdateCardInput!, where: CardFilters): [Card!]!
 
   """
   Each entry's updated rows, in entry order. An entry whose `where` matched no rows contributes `null` in its slot; an entry that matched several contributes each of its rows.
   """
   updateCardsMany(updates: [UpdateCardManyInput!]!): [Card]!
-  updateCardSingle(set: UpdateCardInput!, where: CardFilters!): Card
-  deleteCard(where: CardFilters): [Card!]!
-  deleteCardSingle(where: CardFilters!): Card
+  updateCard(set: UpdateCardInput!, where: CardFilters!): Card
+  deleteCards(where: CardFilters): [Card!]!
+  deleteCard(where: CardFilters!): Card
   createCardDeps(values: [CreateCardDepInput!]!): [CardDep!]!
   createCardDep(values: CreateCardDepInput!): CardDep!
-  updateCardDep(set: UpdateCardDepInput!, where: CardDepFilters): [CardDep!]!
+  updateCardDeps(set: UpdateCardDepInput!, where: CardDepFilters): [CardDep!]!
 
   """
   Each entry's updated rows, in entry order. An entry whose `where` matched no rows contributes `null` in its slot; an entry that matched several contributes each of its rows.
   """
   updateCardDepsMany(updates: [UpdateCardDepManyInput!]!): [CardDep]!
-  updateCardDepSingle(set: UpdateCardDepInput!, where: CardDepFilters!): CardDep
-  deleteCardDep(where: CardDepFilters): [CardDep!]!
-  deleteCardDepSingle(where: CardDepFilters!): CardDep
-  deleteRun(where: RunFilters): [Run!]!
-  deleteRunSingle(where: RunFilters!): Run
-  deleteBoardTemplate(where: BoardTemplateFilters): [BoardTemplate!]!
-  deleteBoardTemplateSingle(where: BoardTemplateFilters!): BoardTemplate
-  updateSetting(set: UpdateSettingInput!, where: SettingFilters): [Setting!]!
+  updateCardDep(set: UpdateCardDepInput!, where: CardDepFilters!): CardDep
+  deleteCardDeps(where: CardDepFilters): [CardDep!]!
+  deleteCardDep(where: CardDepFilters!): CardDep
+  deleteRuns(where: RunFilters): [Run!]!
+  deleteRun(where: RunFilters!): Run
+  deleteBoardTemplates(where: BoardTemplateFilters): [BoardTemplate!]!
+  deleteBoardTemplate(where: BoardTemplateFilters!): BoardTemplate
+  updateSettings(set: UpdateSettingInput!, where: SettingFilters): [Setting!]!
 
   """
   Each entry's updated rows, in entry order. An entry whose `where` matched no rows contributes `null` in its slot; an entry that matched several contributes each of its rows.
   """
   updateSettingsMany(updates: [UpdateSettingManyInput!]!): [Setting]!
-  updateSettingSingle(set: UpdateSettingInput!, where: SettingFilters!): Setting
+  updateSetting(set: UpdateSettingInput!, where: SettingFilters!): Setting
 
   """
   One turn of talking a task into shape: says something to the refining agent and resolves once it has answered. The answer is appended to the task's messages and the task's title and brief are rewritten from it, so read the task back after this to see where the brief has got to. A task can be talked about for as long as you like; `makeCard` is what ends the conversation by putting it on the board.

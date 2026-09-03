@@ -95,7 +95,7 @@ test("blocked means what the server means by it, archived dependencies and all",
 
   await run(
     `mutation Finish($id: String!) {
-       updateCardSingle(where: { id: { eq: $id } }, set: { status: done }) { id }
+       updateCard(where: { id: { eq: $id } }, set: { status: done }) { id }
      }`,
     { id: id("done") },
   );
@@ -123,7 +123,7 @@ test("blocked means what the server means by it, archived dependencies and all",
 
   await run(
     `mutation Finish($id: String!) {
-       updateCardSingle(where: { id: { eq: $id } }, set: { status: done }) { id }
+       updateCard(where: { id: { eq: $id } }, set: { status: done }) { id }
      }`,
     { id: id("outstanding") },
   );

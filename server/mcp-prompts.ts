@@ -175,7 +175,7 @@ In this order, because the order matters:
 4. \`submit_card\` with the first piece of work. It goes in whole; the front door is what breaks
    it up, so say everything rather than pre-dividing it yourself.
 5. Leave \`autoRun\` alone until Intake has run and you have read the cards it wrote — that first
-   card needs \`run_card\` by hand. When they look right, \`update_project_single\` with
+   card needs \`run_card\` by hand. When they look right, \`update_project\` with
    \`set: { autoRun: true }\` and the board starts working itself.
 
 Finish by reporting the project id, its lanes and which agent is on each, and the cards that
@@ -246,13 +246,13 @@ Finish by reporting the ids of what you created and which lanes they are sitting
    - \`add_card_note\` and then \`retry_card\` — the card is right and the agent went wrong, and
      what you know about why is worth telling the next one.
    - \`retry_card\` — the failure was transient, or its cause was fixed elsewhere.
-   - \`update_card_single\` and then \`retry_card\` — the card itself was wrong: too big, or vague
-     about what done means.
+   - \`update_card\` and then \`retry_card\` — the card itself was wrong: too big, or vague about
+     what done means.
    - \`move_card\` — the card belongs at a different station.
    - \`archive_card\` — nobody is going to do it, but it happened and is worth keeping. This is
      also what to reach for on a Done pile long enough to be in the way.
-   - \`delete_card_single\` — it should never have been written. \`stop_card\` first if something
-     is running on it.
+   - \`delete_card\` — it should never have been written. \`stop_card\` first if something is
+     running on it.
 6. Look at \`spend\` for the project while you are here, and mention it if the board has cost more
    than the work on it looks worth.
 

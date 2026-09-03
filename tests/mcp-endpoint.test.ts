@@ -7,6 +7,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import express from "express";
+import type { GraphQLInputObjectType } from "graphql";
 import { afterAll, beforeAll, expect, test } from "vitest";
 import { stop } from "./fixtures/teardown.ts";
 
@@ -66,6 +67,67 @@ async function raw(name: string, args: Record<string, unknown> = {}) {
   return { isError: result.isError === true, text: content.text };
 }
 
+/** A node of a tool's JSON Schema, as far as reaching the keys of its `where` argument needs. */
+interface SchemaNode {
+  $ref?: string;
+  anyOf?: SchemaNode[];
+  allOf?: SchemaNode[];
+  properties?: Record<string, SchemaNode>;
+  definitions?: Record<string, SchemaNode>;
+  $defs?: Record<string, SchemaNode>;
+}
+
+/**
+ * Follows a tool's schema to the object a pointer names, whichever shape the driver rendered it
+ * in.
+ *
+ * zod decides where a shared object lands and the two majors disagree: v3 writes it inline, v4
+ * hoists it into `definitions` and leaves a `$ref`. An optional argument is then wrapped again —
+ * `anyOf: [it, null]` where a null branch is advertised, `allOf: [it]` where it is not. All of
+ * them are correct JSON Schema and none is this repo's choice, so these tests follow a pointer
+ * rather than a layout: what is being asserted is which keys a client can send, not how the
+ * conversion of the week spelled them.
+ */
+function resolve(root: SchemaNode) {
+  const defs = root.definitions ?? root.$defs ?? {};
+  const deref = (node: SchemaNode | undefined, depth = 0): SchemaNode | undefined => {
+    if (!node || depth > 8) return node;
+    if (node.$ref)
+      return deref(defs[node.$ref.replace(/^#\/(definitions|\$defs)\//, "")], depth + 1);
+    // A nullable argument is `anyOf: [the type, null]`; the type is the half with content. One
+    // with no null branch is a single-element `allOf`, which has only that half.
+    const branches = node.anyOf ?? node.allOf;
+    if (branches)
+      return deref(
+        branches.find((branch) => branch.$ref ?? branch.properties),
+        depth + 1,
+      );
+    return node;
+  };
+  return deref;
+}
+
+/** The property names of a tool's `where` argument: the columns it can be filtered on. */
+function whereKeys(root: SchemaNode): string[] {
+  const deref = resolve(root);
+  return Object.keys(deref(root.properties?.where)?.properties ?? {});
+}
+
+/** The operators offered on one column of a tool's `where`. */
+function operatorsOn(root: SchemaNode, column: string): string[] {
+  const deref = resolve(root);
+  const where = deref(root.properties?.where);
+  return Object.keys(deref(where?.properties?.[column])?.properties ?? {});
+}
+
+/** The input schema of one tool, by the name a client sees. */
+async function inputSchemaOf(tool: string): Promise<SchemaNode> {
+  const { tools } = await client.listTools();
+  const found = tools.find((each) => each.name === tool);
+  if (!found) throw new Error(`no tool named ${tool}`);
+  return found.inputSchema as SchemaNode;
+}
+
 test("offers the board tools, and only those", async () => {
   const { tools } = await client.listTools();
   const names = tools.map((tool) => tool.name).sort();
@@ -85,9 +147,9 @@ test("offers the board tools, and only those", async () => {
     "create_card",
     "create_project",
     "create_task",
+    "delete_card",
     "delete_card_note",
-    "delete_card_single",
-    "delete_task_single",
+    "delete_task",
     "lanes",
     "make_card",
     "move_card",
@@ -106,19 +168,19 @@ test("offers the board tools, and only those", async () => {
     "stop_task",
     "submit_card",
     "tasks",
+    "update_card",
     "update_card_note",
-    "update_card_single",
-    "update_project_single",
+    "update_project",
   ]);
 
   // The settings row holds the API key; agents hold their own. Neither is a visitor's to
   // rewrite, and a bulk delete with no `where` empties a table in one call.
   expect(names).not.toContain("set_api_key");
   expect(names).not.toContain("settings");
-  expect(names).not.toContain("update_agent_single");
+  expect(names).not.toContain("update_agent");
   expect(names).not.toContain("mcp_servers");
-  expect(names).not.toContain("delete_card");
-  expect(names).not.toContain("delete_project_single");
+  expect(names).not.toContain("delete_cards");
+  expect(names).not.toContain("delete_project");
 });
 
 test("offers the prompts alongside the tools, and says so on the way in", async () => {
@@ -172,6 +234,66 @@ test("renders a prompt, arguments and all", async () => {
   expect(rendered.type === "text" && rendered.text).toContain("the migration");
 });
 
+test("filters a card on its columns, and reaches them through whatever shape it is rendered in", async () => {
+  const cards = await inputSchemaOf("cards");
+
+  // The `where` a client is handed is the board's own columns and the three combinators, and
+  // the assertion is that they are *reachable*: the driver hoists shared objects behind a
+  // `$ref` and wraps an optional in a null branch, and both of those have changed under us
+  // without the surface changing at all. A test written against the layout goes green on a
+  // filter nobody can send.
+  expect(whereKeys(cards)).toEqual(
+    expect.arrayContaining([
+      "id",
+      "projectId",
+      "laneId",
+      "status",
+      "archivedAt",
+      "OR",
+      "AND",
+      "NOT",
+    ]),
+  );
+
+  // The filter is generated from the table, so a column added to `cards` is filterable the day
+  // it exists — this is the half of that promise a client actually meets.
+  const { schema } = await import("../server/graphql/schema.ts");
+  const filters = schema.getType("CardFilters") as GraphQLInputObjectType;
+  for (const column of ["parentId", "attempts", "acceptance"]) {
+    expect(Object.keys(filters.getFields()), column).toContain(column);
+    expect(whereKeys(cards), column).toContain(column);
+  }
+});
+
+test("offers a column only the operators that column can take", async () => {
+  const cards = await inputSchemaOf("cards");
+  const projects = await inputSchemaOf("projects");
+
+  // A string takes all of them, and is the reason the others ever had them: one filter type
+  // was generated for every column, so a boolean advertised `startsWith` and a timestamp
+  // advertised `ilike`. They are not merely useless — an agent reading the listing has to read
+  // past them on every column of every tool, and they were most of what an enum filter was.
+  expect(operatorsOn(cards, "title")).toEqual(
+    expect.arrayContaining(["eq", "ne", "like", "ilike", "contains", "inArray", "isNull"]),
+  );
+
+  // Ordering and set membership are everyone's; the text operators are not.
+  const text = ["like", "notLike", "ilike", "startsWith", "endsWith", "contains", "insensitive"];
+  for (const [tool, column] of [
+    [cards, "position"],
+    [cards, "attempts"],
+    [cards, "archivedAt"],
+    [cards, "status"],
+    [projects, "autoRun"],
+  ] as const) {
+    const operators = operatorsOn(tool, column);
+    expect(operators, column).toEqual(expect.arrayContaining(["eq", "ne", "inArray", "isNull"]));
+    for (const operator of text) {
+      expect(operators, `${column} offers ${operator}`).not.toContain(operator);
+    }
+  }
+});
+
 test("advertises tools small enough for a client to read", async () => {
   const { tools } = await client.listTools();
 
@@ -180,11 +302,18 @@ test("advertises tools small enough for a client to read", async () => {
   // cards, each card filtered back by its project — and a driver that rebuilds those types per
   // route rather than emitting a `$ref` writes the recursion out at every level. That is a
   // difference of orders of magnitude, and it lands before a single call can be made.
+  //
+  // The listing is ~835 kB and the largest tool ~68 kB, down from ~1.1 MB and ~88 kB: drizzle-
+  // graphql 12 gives each column type only the operators it can use, so a timestamp no longer
+  // advertises `ilike` and an enum no longer advertises `startsWith`. The bounds sit above that
+  // because the exact figure is not ours to hold — it has moved on a zod major before now — and
+  // what is being caught is the order of magnitude, which a return to per-route copies trips by
+  // thirty times.
   const sizes = tools.map((tool) => [tool.name, JSON.stringify(tool).length] as const);
   for (const [name, size] of sizes) {
-    expect(size, `${name} is ${(size / 1024).toFixed(0)} kB`).toBeLessThan(150_000);
+    expect(size, `${name} is ${(size / 1024).toFixed(0)} kB`).toBeLessThan(100_000);
   }
-  expect(sizes.reduce((total, [, size]) => total + size, 0)).toBeLessThan(1_200_000);
+  expect(sizes.reduce((total, [, size]) => total + size, 0)).toBeLessThan(1_000_000);
 });
 
 test("makes a project, hands it a task, and reads the board back", async () => {
@@ -220,7 +349,7 @@ test("makes a project, hands it a task, and reads the board back", async () => {
   // Nothing has run, so this is empty for the project rather than missing.
   expect(await call("runs", { where: { projectId: { eq: projectId } } })).toEqual({ runs: [] });
 
-  await call("delete_task_single", { where: { id: { eq: task.createTask.id } } });
+  await call("delete_task", { where: { id: { eq: task.createTask.id } } });
   expect(await call("tasks", { where: { projectId: { eq: projectId } } })).toEqual({ tasks: [] });
 });
 
@@ -328,16 +457,16 @@ test("marks only the tools that actually destroy something", async () => {
   // gates on this hint should be spending the operator's attention on the deletes.
   expect(flagged("destructiveHint")).toEqual([
     "apply_board_template",
+    "delete_card",
     "delete_card_note",
-    "delete_card_single",
-    "delete_task_single",
+    "delete_task",
     "save_board_template",
     "set_card_deps",
     "stop_card",
     "stop_task",
+    "update_card",
     "update_card_note",
-    "update_card_single",
-    "update_project_single",
+    "update_project",
   ]);
 
   // Landing the same way twice. Every read is one, so the interesting half is the writes:
@@ -350,9 +479,9 @@ test("marks only the tools that actually destroy something", async () => {
     "create_card",
     "create_project",
     "create_task",
+    "delete_card",
     "delete_card_note",
-    "delete_card_single",
-    "delete_task_single",
+    "delete_task",
     "make_card",
     "move_card",
     "refine_task",
@@ -364,16 +493,16 @@ test("marks only the tools that actually destroy something", async () => {
     "stop_card",
     "stop_task",
     "submit_card",
+    "update_card",
     "update_card_note",
-    "update_card_single",
-    "update_project_single",
+    "update_project",
   ]);
   expect(flagged("idempotentHint").filter((name) => writes.has(name))).toEqual([
     "apply_board_template",
     "archive_card",
+    "delete_card",
     "delete_card_note",
-    "delete_card_single",
-    "delete_task_single",
+    "delete_task",
     "move_card",
     "restore_card",
     "retry_card",

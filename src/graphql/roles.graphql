@@ -26,13 +26,13 @@ mutation CreateRole($values: CreateRoleInput!) {
 }
 
 mutation UpdateRole($id: String!, $set: UpdateRoleInput!) {
-  updateRoleSingle(where: { id: { eq: $id } }, set: $set) {
+  updateRole(where: { id: { eq: $id } }, set: $set) {
     id
   }
 }
 
 mutation DeleteRole($id: String!) {
-  deleteRoleSingle(where: { id: { eq: $id } }) {
+  deleteRole(where: { id: { eq: $id } }) {
     id
   }
 }

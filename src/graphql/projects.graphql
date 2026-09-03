@@ -17,13 +17,13 @@ mutation CreateProject($values: CreateProjectInput!) {
 }
 
 mutation UpdateProject($id: String!, $set: UpdateProjectInput!) {
-  updateProjectSingle(where: { id: { eq: $id } }, set: $set) {
+  updateProject(where: { id: { eq: $id } }, set: $set) {
     id
   }
 }
 
 mutation DeleteProject($id: String!) {
-  deleteProjectSingle(where: { id: { eq: $id } }) {
+  deleteProject(where: { id: { eq: $id } }) {
     id
   }
 }

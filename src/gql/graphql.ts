@@ -536,44 +536,18 @@ export type AgentsToolDiscoveryEnumFilter = {
   NOT?: InputMaybe<AgentsToolDiscoveryEnumFilter>;
   /** At least one branch matches; ANDed with any sibling operators */
   OR?: InputMaybe<Array<AgentsToolDiscoveryEnumFilter>>;
-  /** Matches values containing the given string. `%`, `_` and `\` are matched literally. */
-  contains?: InputMaybe<Scalars['String']['input']>;
-  /** Matches values ending with the given string. `%`, `_` and `\` are matched literally. */
-  endsWith?: InputMaybe<Scalars['String']['input']>;
   /** Equal to */
   eq?: InputMaybe<AgentsToolDiscoveryEnum>;
-  /** Greater than */
-  gt?: InputMaybe<AgentsToolDiscoveryEnum>;
-  /** Greater than or equal to */
-  gte?: InputMaybe<AgentsToolDiscoveryEnum>;
-  /** Case-insensitive `contains`. */
-  iContains?: InputMaybe<Scalars['String']['input']>;
-  /** Case-insensitive `endsWith`. */
-  iEndsWith?: InputMaybe<Scalars['String']['input']>;
-  /** Case-insensitive `startsWith`. */
-  iStartsWith?: InputMaybe<Scalars['String']['input']>;
-  ilike?: InputMaybe<Scalars['String']['input']>;
   /** Matches any one of these values (SQL `IN`) */
   inArray?: InputMaybe<Array<AgentsToolDiscoveryEnum>>;
-  /** When true, every comparison operator in this object matches case-insensitively — `eq`, `ne`, the ordering operators, `inArray`/`notInArray` and the pattern operators all compare `lower(column)` against `lower(operand)`. Applies only to the operators beside it; a nested `AND`/`OR`/`NOT` branch sets its own. */
-  insensitive?: InputMaybe<Scalars['Boolean']['input']>;
   /** When true, matches rows where the column is not NULL */
   isNotNull?: InputMaybe<Scalars['Boolean']['input']>;
   /** When true, matches rows where the column is NULL */
   isNull?: InputMaybe<Scalars['Boolean']['input']>;
-  like?: InputMaybe<Scalars['String']['input']>;
-  /** Less than */
-  lt?: InputMaybe<AgentsToolDiscoveryEnum>;
-  /** Less than or equal to */
-  lte?: InputMaybe<AgentsToolDiscoveryEnum>;
   /** Not equal to */
   ne?: InputMaybe<AgentsToolDiscoveryEnum>;
-  notIlike?: InputMaybe<Scalars['String']['input']>;
   /** Matches none of these values (SQL `NOT IN`) */
   notInArray?: InputMaybe<Array<AgentsToolDiscoveryEnum>>;
-  notLike?: InputMaybe<Scalars['String']['input']>;
-  /** Matches values starting with the given string. `%`, `_` and `\` are matched literally. */
-  startsWith?: InputMaybe<Scalars['String']['input']>;
 };
 
 /** Compares an aggregated value. Several operators in one filter are ANDed together. */
@@ -719,44 +693,18 @@ export type BooleanFilter = {
   NOT?: InputMaybe<BooleanFilter>;
   /** At least one branch matches; ANDed with any sibling operators */
   OR?: InputMaybe<Array<BooleanFilter>>;
-  /** Matches values containing the given string. `%`, `_` and `\` are matched literally. */
-  contains?: InputMaybe<Scalars['String']['input']>;
-  /** Matches values ending with the given string. `%`, `_` and `\` are matched literally. */
-  endsWith?: InputMaybe<Scalars['String']['input']>;
   /** Equal to */
   eq?: InputMaybe<Scalars['Boolean']['input']>;
-  /** Greater than */
-  gt?: InputMaybe<Scalars['Boolean']['input']>;
-  /** Greater than or equal to */
-  gte?: InputMaybe<Scalars['Boolean']['input']>;
-  /** Case-insensitive `contains`. */
-  iContains?: InputMaybe<Scalars['String']['input']>;
-  /** Case-insensitive `endsWith`. */
-  iEndsWith?: InputMaybe<Scalars['String']['input']>;
-  /** Case-insensitive `startsWith`. */
-  iStartsWith?: InputMaybe<Scalars['String']['input']>;
-  ilike?: InputMaybe<Scalars['String']['input']>;
   /** Matches any one of these values (SQL `IN`) */
   inArray?: InputMaybe<Array<Scalars['Boolean']['input']>>;
-  /** When true, every comparison operator in this object matches case-insensitively — `eq`, `ne`, the ordering operators, `inArray`/`notInArray` and the pattern operators all compare `lower(column)` against `lower(operand)`. Applies only to the operators beside it; a nested `AND`/`OR`/`NOT` branch sets its own. */
-  insensitive?: InputMaybe<Scalars['Boolean']['input']>;
   /** When true, matches rows where the column is not NULL */
   isNotNull?: InputMaybe<Scalars['Boolean']['input']>;
   /** When true, matches rows where the column is NULL */
   isNull?: InputMaybe<Scalars['Boolean']['input']>;
-  like?: InputMaybe<Scalars['String']['input']>;
-  /** Less than */
-  lt?: InputMaybe<Scalars['Boolean']['input']>;
-  /** Less than or equal to */
-  lte?: InputMaybe<Scalars['Boolean']['input']>;
   /** Not equal to */
   ne?: InputMaybe<Scalars['Boolean']['input']>;
-  notIlike?: InputMaybe<Scalars['String']['input']>;
   /** Matches none of these values (SQL `NOT IN`) */
   notInArray?: InputMaybe<Array<Scalars['Boolean']['input']>>;
-  notLike?: InputMaybe<Scalars['String']['input']>;
-  /** Matches values starting with the given string. `%`, `_` and `\` are matched literally. */
-  startsWith?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type Card = {
@@ -1373,44 +1321,18 @@ export type CardEventsActorEnumFilter = {
   NOT?: InputMaybe<CardEventsActorEnumFilter>;
   /** At least one branch matches; ANDed with any sibling operators */
   OR?: InputMaybe<Array<CardEventsActorEnumFilter>>;
-  /** Matches values containing the given string. `%`, `_` and `\` are matched literally. */
-  contains?: InputMaybe<Scalars['String']['input']>;
-  /** Matches values ending with the given string. `%`, `_` and `\` are matched literally. */
-  endsWith?: InputMaybe<Scalars['String']['input']>;
   /** Equal to */
   eq?: InputMaybe<CardEventsActorEnum>;
-  /** Greater than */
-  gt?: InputMaybe<CardEventsActorEnum>;
-  /** Greater than or equal to */
-  gte?: InputMaybe<CardEventsActorEnum>;
-  /** Case-insensitive `contains`. */
-  iContains?: InputMaybe<Scalars['String']['input']>;
-  /** Case-insensitive `endsWith`. */
-  iEndsWith?: InputMaybe<Scalars['String']['input']>;
-  /** Case-insensitive `startsWith`. */
-  iStartsWith?: InputMaybe<Scalars['String']['input']>;
-  ilike?: InputMaybe<Scalars['String']['input']>;
   /** Matches any one of these values (SQL `IN`) */
   inArray?: InputMaybe<Array<CardEventsActorEnum>>;
-  /** When true, every comparison operator in this object matches case-insensitively — `eq`, `ne`, the ordering operators, `inArray`/`notInArray` and the pattern operators all compare `lower(column)` against `lower(operand)`. Applies only to the operators beside it; a nested `AND`/`OR`/`NOT` branch sets its own. */
-  insensitive?: InputMaybe<Scalars['Boolean']['input']>;
   /** When true, matches rows where the column is not NULL */
   isNotNull?: InputMaybe<Scalars['Boolean']['input']>;
   /** When true, matches rows where the column is NULL */
   isNull?: InputMaybe<Scalars['Boolean']['input']>;
-  like?: InputMaybe<Scalars['String']['input']>;
-  /** Less than */
-  lt?: InputMaybe<CardEventsActorEnum>;
-  /** Less than or equal to */
-  lte?: InputMaybe<CardEventsActorEnum>;
   /** Not equal to */
   ne?: InputMaybe<CardEventsActorEnum>;
-  notIlike?: InputMaybe<Scalars['String']['input']>;
   /** Matches none of these values (SQL `NOT IN`) */
   notInArray?: InputMaybe<Array<CardEventsActorEnum>>;
-  notLike?: InputMaybe<Scalars['String']['input']>;
-  /** Matches values starting with the given string. `%`, `_` and `\` are matched literally. */
-  startsWith?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type CardFilters = {
@@ -1784,44 +1706,18 @@ export type CardNotesAuthorEnumFilter = {
   NOT?: InputMaybe<CardNotesAuthorEnumFilter>;
   /** At least one branch matches; ANDed with any sibling operators */
   OR?: InputMaybe<Array<CardNotesAuthorEnumFilter>>;
-  /** Matches values containing the given string. `%`, `_` and `\` are matched literally. */
-  contains?: InputMaybe<Scalars['String']['input']>;
-  /** Matches values ending with the given string. `%`, `_` and `\` are matched literally. */
-  endsWith?: InputMaybe<Scalars['String']['input']>;
   /** Equal to */
   eq?: InputMaybe<CardNotesAuthorEnum>;
-  /** Greater than */
-  gt?: InputMaybe<CardNotesAuthorEnum>;
-  /** Greater than or equal to */
-  gte?: InputMaybe<CardNotesAuthorEnum>;
-  /** Case-insensitive `contains`. */
-  iContains?: InputMaybe<Scalars['String']['input']>;
-  /** Case-insensitive `endsWith`. */
-  iEndsWith?: InputMaybe<Scalars['String']['input']>;
-  /** Case-insensitive `startsWith`. */
-  iStartsWith?: InputMaybe<Scalars['String']['input']>;
-  ilike?: InputMaybe<Scalars['String']['input']>;
   /** Matches any one of these values (SQL `IN`) */
   inArray?: InputMaybe<Array<CardNotesAuthorEnum>>;
-  /** When true, every comparison operator in this object matches case-insensitively — `eq`, `ne`, the ordering operators, `inArray`/`notInArray` and the pattern operators all compare `lower(column)` against `lower(operand)`. Applies only to the operators beside it; a nested `AND`/`OR`/`NOT` branch sets its own. */
-  insensitive?: InputMaybe<Scalars['Boolean']['input']>;
   /** When true, matches rows where the column is not NULL */
   isNotNull?: InputMaybe<Scalars['Boolean']['input']>;
   /** When true, matches rows where the column is NULL */
   isNull?: InputMaybe<Scalars['Boolean']['input']>;
-  like?: InputMaybe<Scalars['String']['input']>;
-  /** Less than */
-  lt?: InputMaybe<CardNotesAuthorEnum>;
-  /** Less than or equal to */
-  lte?: InputMaybe<CardNotesAuthorEnum>;
   /** Not equal to */
   ne?: InputMaybe<CardNotesAuthorEnum>;
-  notIlike?: InputMaybe<Scalars['String']['input']>;
   /** Matches none of these values (SQL `NOT IN`) */
   notInArray?: InputMaybe<Array<CardNotesAuthorEnum>>;
-  notLike?: InputMaybe<Scalars['String']['input']>;
-  /** Matches values starting with the given string. `%`, `_` and `\` are matched literally. */
-  startsWith?: InputMaybe<Scalars['String']['input']>;
 };
 
 export enum CardNotesKindEnum {
@@ -1840,44 +1736,18 @@ export type CardNotesKindEnumFilter = {
   NOT?: InputMaybe<CardNotesKindEnumFilter>;
   /** At least one branch matches; ANDed with any sibling operators */
   OR?: InputMaybe<Array<CardNotesKindEnumFilter>>;
-  /** Matches values containing the given string. `%`, `_` and `\` are matched literally. */
-  contains?: InputMaybe<Scalars['String']['input']>;
-  /** Matches values ending with the given string. `%`, `_` and `\` are matched literally. */
-  endsWith?: InputMaybe<Scalars['String']['input']>;
   /** Equal to */
   eq?: InputMaybe<CardNotesKindEnum>;
-  /** Greater than */
-  gt?: InputMaybe<CardNotesKindEnum>;
-  /** Greater than or equal to */
-  gte?: InputMaybe<CardNotesKindEnum>;
-  /** Case-insensitive `contains`. */
-  iContains?: InputMaybe<Scalars['String']['input']>;
-  /** Case-insensitive `endsWith`. */
-  iEndsWith?: InputMaybe<Scalars['String']['input']>;
-  /** Case-insensitive `startsWith`. */
-  iStartsWith?: InputMaybe<Scalars['String']['input']>;
-  ilike?: InputMaybe<Scalars['String']['input']>;
   /** Matches any one of these values (SQL `IN`) */
   inArray?: InputMaybe<Array<CardNotesKindEnum>>;
-  /** When true, every comparison operator in this object matches case-insensitively — `eq`, `ne`, the ordering operators, `inArray`/`notInArray` and the pattern operators all compare `lower(column)` against `lower(operand)`. Applies only to the operators beside it; a nested `AND`/`OR`/`NOT` branch sets its own. */
-  insensitive?: InputMaybe<Scalars['Boolean']['input']>;
   /** When true, matches rows where the column is not NULL */
   isNotNull?: InputMaybe<Scalars['Boolean']['input']>;
   /** When true, matches rows where the column is NULL */
   isNull?: InputMaybe<Scalars['Boolean']['input']>;
-  like?: InputMaybe<Scalars['String']['input']>;
-  /** Less than */
-  lt?: InputMaybe<CardNotesKindEnum>;
-  /** Less than or equal to */
-  lte?: InputMaybe<CardNotesKindEnum>;
   /** Not equal to */
   ne?: InputMaybe<CardNotesKindEnum>;
-  notIlike?: InputMaybe<Scalars['String']['input']>;
   /** Matches none of these values (SQL `NOT IN`) */
   notInArray?: InputMaybe<Array<CardNotesKindEnum>>;
-  notLike?: InputMaybe<Scalars['String']['input']>;
-  /** Matches values starting with the given string. `%`, `_` and `\` are matched literally. */
-  startsWith?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type CardOrderBy = {
@@ -1934,44 +1804,18 @@ export type CardsStatusEnumFilter = {
   NOT?: InputMaybe<CardsStatusEnumFilter>;
   /** At least one branch matches; ANDed with any sibling operators */
   OR?: InputMaybe<Array<CardsStatusEnumFilter>>;
-  /** Matches values containing the given string. `%`, `_` and `\` are matched literally. */
-  contains?: InputMaybe<Scalars['String']['input']>;
-  /** Matches values ending with the given string. `%`, `_` and `\` are matched literally. */
-  endsWith?: InputMaybe<Scalars['String']['input']>;
   /** Equal to */
   eq?: InputMaybe<CardsStatusEnum>;
-  /** Greater than */
-  gt?: InputMaybe<CardsStatusEnum>;
-  /** Greater than or equal to */
-  gte?: InputMaybe<CardsStatusEnum>;
-  /** Case-insensitive `contains`. */
-  iContains?: InputMaybe<Scalars['String']['input']>;
-  /** Case-insensitive `endsWith`. */
-  iEndsWith?: InputMaybe<Scalars['String']['input']>;
-  /** Case-insensitive `startsWith`. */
-  iStartsWith?: InputMaybe<Scalars['String']['input']>;
-  ilike?: InputMaybe<Scalars['String']['input']>;
   /** Matches any one of these values (SQL `IN`) */
   inArray?: InputMaybe<Array<CardsStatusEnum>>;
-  /** When true, every comparison operator in this object matches case-insensitively — `eq`, `ne`, the ordering operators, `inArray`/`notInArray` and the pattern operators all compare `lower(column)` against `lower(operand)`. Applies only to the operators beside it; a nested `AND`/`OR`/`NOT` branch sets its own. */
-  insensitive?: InputMaybe<Scalars['Boolean']['input']>;
   /** When true, matches rows where the column is not NULL */
   isNotNull?: InputMaybe<Scalars['Boolean']['input']>;
   /** When true, matches rows where the column is NULL */
   isNull?: InputMaybe<Scalars['Boolean']['input']>;
-  like?: InputMaybe<Scalars['String']['input']>;
-  /** Less than */
-  lt?: InputMaybe<CardsStatusEnum>;
-  /** Less than or equal to */
-  lte?: InputMaybe<CardsStatusEnum>;
   /** Not equal to */
   ne?: InputMaybe<CardsStatusEnum>;
-  notIlike?: InputMaybe<Scalars['String']['input']>;
   /** Matches none of these values (SQL `NOT IN`) */
   notInArray?: InputMaybe<Array<CardsStatusEnum>>;
-  notLike?: InputMaybe<Scalars['String']['input']>;
-  /** Matches values starting with the given string. `%`, `_` and `\` are matched literally. */
-  startsWith?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type CreateAgentInput = {
@@ -2097,44 +1941,26 @@ export type DateTimeFilter = {
   NOT?: InputMaybe<DateTimeFilter>;
   /** At least one branch matches; ANDed with any sibling operators */
   OR?: InputMaybe<Array<DateTimeFilter>>;
-  /** Matches values containing the given string. `%`, `_` and `\` are matched literally. */
-  contains?: InputMaybe<Scalars['String']['input']>;
-  /** Matches values ending with the given string. `%`, `_` and `\` are matched literally. */
-  endsWith?: InputMaybe<Scalars['String']['input']>;
   /** Equal to */
   eq?: InputMaybe<Scalars['DateTime']['input']>;
   /** Greater than */
   gt?: InputMaybe<Scalars['DateTime']['input']>;
   /** Greater than or equal to */
   gte?: InputMaybe<Scalars['DateTime']['input']>;
-  /** Case-insensitive `contains`. */
-  iContains?: InputMaybe<Scalars['String']['input']>;
-  /** Case-insensitive `endsWith`. */
-  iEndsWith?: InputMaybe<Scalars['String']['input']>;
-  /** Case-insensitive `startsWith`. */
-  iStartsWith?: InputMaybe<Scalars['String']['input']>;
-  ilike?: InputMaybe<Scalars['String']['input']>;
   /** Matches any one of these values (SQL `IN`) */
   inArray?: InputMaybe<Array<Scalars['DateTime']['input']>>;
-  /** When true, every comparison operator in this object matches case-insensitively — `eq`, `ne`, the ordering operators, `inArray`/`notInArray` and the pattern operators all compare `lower(column)` against `lower(operand)`. Applies only to the operators beside it; a nested `AND`/`OR`/`NOT` branch sets its own. */
-  insensitive?: InputMaybe<Scalars['Boolean']['input']>;
   /** When true, matches rows where the column is not NULL */
   isNotNull?: InputMaybe<Scalars['Boolean']['input']>;
   /** When true, matches rows where the column is NULL */
   isNull?: InputMaybe<Scalars['Boolean']['input']>;
-  like?: InputMaybe<Scalars['String']['input']>;
   /** Less than */
   lt?: InputMaybe<Scalars['DateTime']['input']>;
   /** Less than or equal to */
   lte?: InputMaybe<Scalars['DateTime']['input']>;
   /** Not equal to */
   ne?: InputMaybe<Scalars['DateTime']['input']>;
-  notIlike?: InputMaybe<Scalars['String']['input']>;
   /** Matches none of these values (SQL `NOT IN`) */
   notInArray?: InputMaybe<Array<Scalars['DateTime']['input']>>;
-  notLike?: InputMaybe<Scalars['String']['input']>;
-  /** Matches values starting with the given string. `%`, `_` and `\` are matched literally. */
-  startsWith?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type FloatFilter = {
@@ -2831,44 +2657,18 @@ export type McpServersTransportEnumFilter = {
   NOT?: InputMaybe<McpServersTransportEnumFilter>;
   /** At least one branch matches; ANDed with any sibling operators */
   OR?: InputMaybe<Array<McpServersTransportEnumFilter>>;
-  /** Matches values containing the given string. `%`, `_` and `\` are matched literally. */
-  contains?: InputMaybe<Scalars['String']['input']>;
-  /** Matches values ending with the given string. `%`, `_` and `\` are matched literally. */
-  endsWith?: InputMaybe<Scalars['String']['input']>;
   /** Equal to */
   eq?: InputMaybe<McpServersTransportEnum>;
-  /** Greater than */
-  gt?: InputMaybe<McpServersTransportEnum>;
-  /** Greater than or equal to */
-  gte?: InputMaybe<McpServersTransportEnum>;
-  /** Case-insensitive `contains`. */
-  iContains?: InputMaybe<Scalars['String']['input']>;
-  /** Case-insensitive `endsWith`. */
-  iEndsWith?: InputMaybe<Scalars['String']['input']>;
-  /** Case-insensitive `startsWith`. */
-  iStartsWith?: InputMaybe<Scalars['String']['input']>;
-  ilike?: InputMaybe<Scalars['String']['input']>;
   /** Matches any one of these values (SQL `IN`) */
   inArray?: InputMaybe<Array<McpServersTransportEnum>>;
-  /** When true, every comparison operator in this object matches case-insensitively — `eq`, `ne`, the ordering operators, `inArray`/`notInArray` and the pattern operators all compare `lower(column)` against `lower(operand)`. Applies only to the operators beside it; a nested `AND`/`OR`/`NOT` branch sets its own. */
-  insensitive?: InputMaybe<Scalars['Boolean']['input']>;
   /** When true, matches rows where the column is not NULL */
   isNotNull?: InputMaybe<Scalars['Boolean']['input']>;
   /** When true, matches rows where the column is NULL */
   isNull?: InputMaybe<Scalars['Boolean']['input']>;
-  like?: InputMaybe<Scalars['String']['input']>;
-  /** Less than */
-  lt?: InputMaybe<McpServersTransportEnum>;
-  /** Less than or equal to */
-  lte?: InputMaybe<McpServersTransportEnum>;
   /** Not equal to */
   ne?: InputMaybe<McpServersTransportEnum>;
-  notIlike?: InputMaybe<Scalars['String']['input']>;
   /** Matches none of these values (SQL `NOT IN`) */
   notInArray?: InputMaybe<Array<McpServersTransportEnum>>;
-  notLike?: InputMaybe<Scalars['String']['input']>;
-  /** Matches values starting with the given string. `%`, `_` and `\` are matched literally. */
-  startsWith?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type McpTool = {
@@ -3041,44 +2841,18 @@ export type MessagesRoleEnumFilter = {
   NOT?: InputMaybe<MessagesRoleEnumFilter>;
   /** At least one branch matches; ANDed with any sibling operators */
   OR?: InputMaybe<Array<MessagesRoleEnumFilter>>;
-  /** Matches values containing the given string. `%`, `_` and `\` are matched literally. */
-  contains?: InputMaybe<Scalars['String']['input']>;
-  /** Matches values ending with the given string. `%`, `_` and `\` are matched literally. */
-  endsWith?: InputMaybe<Scalars['String']['input']>;
   /** Equal to */
   eq?: InputMaybe<MessagesRoleEnum>;
-  /** Greater than */
-  gt?: InputMaybe<MessagesRoleEnum>;
-  /** Greater than or equal to */
-  gte?: InputMaybe<MessagesRoleEnum>;
-  /** Case-insensitive `contains`. */
-  iContains?: InputMaybe<Scalars['String']['input']>;
-  /** Case-insensitive `endsWith`. */
-  iEndsWith?: InputMaybe<Scalars['String']['input']>;
-  /** Case-insensitive `startsWith`. */
-  iStartsWith?: InputMaybe<Scalars['String']['input']>;
-  ilike?: InputMaybe<Scalars['String']['input']>;
   /** Matches any one of these values (SQL `IN`) */
   inArray?: InputMaybe<Array<MessagesRoleEnum>>;
-  /** When true, every comparison operator in this object matches case-insensitively — `eq`, `ne`, the ordering operators, `inArray`/`notInArray` and the pattern operators all compare `lower(column)` against `lower(operand)`. Applies only to the operators beside it; a nested `AND`/`OR`/`NOT` branch sets its own. */
-  insensitive?: InputMaybe<Scalars['Boolean']['input']>;
   /** When true, matches rows where the column is not NULL */
   isNotNull?: InputMaybe<Scalars['Boolean']['input']>;
   /** When true, matches rows where the column is NULL */
   isNull?: InputMaybe<Scalars['Boolean']['input']>;
-  like?: InputMaybe<Scalars['String']['input']>;
-  /** Less than */
-  lt?: InputMaybe<MessagesRoleEnum>;
-  /** Less than or equal to */
-  lte?: InputMaybe<MessagesRoleEnum>;
   /** Not equal to */
   ne?: InputMaybe<MessagesRoleEnum>;
-  notIlike?: InputMaybe<Scalars['String']['input']>;
   /** Matches none of these values (SQL `NOT IN`) */
   notInArray?: InputMaybe<Array<MessagesRoleEnum>>;
-  notLike?: InputMaybe<Scalars['String']['input']>;
-  /** Matches values starting with the given string. `%`, `_` and `\` are matched literally. */
-  startsWith?: InputMaybe<Scalars['String']['input']>;
 };
 
 /** A model an OpenAI-compatible endpoint offers, and how much of it it will read. */
@@ -3115,32 +2889,32 @@ export type Mutation = {
   createRoles: Array<Role>;
   createTask: Task;
   createTasks: Array<Task>;
-  deleteAgent: Array<Agent>;
-  deleteAgentServer: Array<AgentServer>;
-  deleteAgentServerSingle?: Maybe<AgentServer>;
-  deleteAgentSingle?: Maybe<Agent>;
-  deleteBoardTemplate: Array<BoardTemplate>;
-  deleteBoardTemplateSingle?: Maybe<BoardTemplate>;
-  deleteCard: Array<Card>;
-  deleteCardDep: Array<CardDep>;
-  deleteCardDepSingle?: Maybe<CardDep>;
+  deleteAgent?: Maybe<Agent>;
+  deleteAgentServer?: Maybe<AgentServer>;
+  deleteAgentServers: Array<AgentServer>;
+  deleteAgents: Array<Agent>;
+  deleteBoardTemplate?: Maybe<BoardTemplate>;
+  deleteBoardTemplates: Array<BoardTemplate>;
+  deleteCard?: Maybe<Card>;
+  deleteCardDep?: Maybe<CardDep>;
+  deleteCardDeps: Array<CardDep>;
   /** Takes a note back, so the next agent working the card stops being told it. Only a note somebody wrote, for the same reason `updateCardNote` is. A verdict that explained a move stays readable through that move in `card_events`. */
   deleteCardNote: Scalars['Boolean']['output'];
-  deleteCardSingle?: Maybe<Card>;
-  deleteLane: Array<Lane>;
-  deleteLaneSingle?: Maybe<Lane>;
-  deleteMcpServer: Array<McpServer>;
-  deleteMcpServerSingle?: Maybe<McpServer>;
-  deleteMessage: Array<Message>;
-  deleteMessageSingle?: Maybe<Message>;
-  deleteProject: Array<Project>;
-  deleteProjectSingle?: Maybe<Project>;
-  deleteRole: Array<Role>;
-  deleteRoleSingle?: Maybe<Role>;
-  deleteRun: Array<Run>;
-  deleteRunSingle?: Maybe<Run>;
-  deleteTask: Array<Task>;
-  deleteTaskSingle?: Maybe<Task>;
+  deleteCards: Array<Card>;
+  deleteLane?: Maybe<Lane>;
+  deleteLanes: Array<Lane>;
+  deleteMcpServer?: Maybe<McpServer>;
+  deleteMcpServers: Array<McpServer>;
+  deleteMessage?: Maybe<Message>;
+  deleteMessages: Array<Message>;
+  deleteProject?: Maybe<Project>;
+  deleteProjects: Array<Project>;
+  deleteRole?: Maybe<Role>;
+  deleteRoles: Array<Role>;
+  deleteRun?: Maybe<Run>;
+  deleteRuns: Array<Run>;
+  deleteTask?: Maybe<Task>;
+  deleteTasks: Array<Task>;
   /** Ends a refining conversation by putting it on the board: writes the task's title and brief as one card in the project's intake lane, linked back to the task. It is one card and not many — breaking work up is a station on the board now, so a card landing in a lane that expands is what turns it into the cards that carry it out. The conversation is left exactly where it is and can go on afterwards. */
   makeCard: Card;
   /** Puts a card in a lane, at a position, and renumbers the cards around it so the board stays in the order it looks like. Omit `position` to drop it at the end. A card that had failed comes back to `idle` with its attempts forgiven, which is what makes dragging one back a retry; a card an agent is working cannot be moved out from under it, and nor can an archived one — `restoreCard` is what puts that back on the board. Say why in `note` and the agent that picks the card up is told it, the same way a reviewer's rejection reaches one: moving a card back without saying what was wrong with it buys a second attempt identical to the first. */
@@ -3173,50 +2947,50 @@ export type Mutation = {
   submitCard: Card;
   /** Connects to a config that need not be saved yet and lists its tools, so a server can be checked before an agent depends on it. */
   testMcpServer: McpProbe;
-  updateAgent: Array<Agent>;
-  updateAgentServer: Array<AgentServer>;
-  updateAgentServerSingle?: Maybe<AgentServer>;
+  updateAgent?: Maybe<Agent>;
+  updateAgentServer?: Maybe<AgentServer>;
+  updateAgentServers: Array<AgentServer>;
   /** Each entry's updated rows, in entry order. An entry whose `where` matched no rows contributes `null` in its slot; an entry that matched several contributes each of its rows. */
   updateAgentServersMany: Array<Maybe<AgentServer>>;
-  updateAgentSingle?: Maybe<Agent>;
+  updateAgents: Array<Agent>;
   /** Each entry's updated rows, in entry order. An entry whose `where` matched no rows contributes `null` in its slot; an entry that matched several contributes each of its rows. */
   updateAgentsMany: Array<Maybe<Agent>>;
-  updateCard: Array<Card>;
-  updateCardDep: Array<CardDep>;
-  updateCardDepSingle?: Maybe<CardDep>;
+  updateCard?: Maybe<Card>;
+  updateCardDep?: Maybe<CardDep>;
+  updateCardDeps: Array<CardDep>;
   /** Each entry's updated rows, in entry order. An entry whose `where` matched no rows contributes `null` in its slot; an entry that matched several contributes each of its rows. */
   updateCardDepsMany: Array<Maybe<CardDep>>;
   /** Rewrites a note. Only a note somebody wrote: an agent's report and a reviewer's verdict are an account of what happened, and an account that can be corrected afterwards is worth no more than no account at all. */
   updateCardNote: CardNote;
-  updateCardSingle?: Maybe<Card>;
+  updateCards: Array<Card>;
   /** Each entry's updated rows, in entry order. An entry whose `where` matched no rows contributes `null` in its slot; an entry that matched several contributes each of its rows. */
   updateCardsMany: Array<Maybe<Card>>;
-  updateLane: Array<Lane>;
-  updateLaneSingle?: Maybe<Lane>;
+  updateLane?: Maybe<Lane>;
+  updateLanes: Array<Lane>;
   /** Each entry's updated rows, in entry order. An entry whose `where` matched no rows contributes `null` in its slot; an entry that matched several contributes each of its rows. */
   updateLanesMany: Array<Maybe<Lane>>;
-  updateMcpServer: Array<McpServer>;
-  updateMcpServerSingle?: Maybe<McpServer>;
+  updateMcpServer?: Maybe<McpServer>;
+  updateMcpServers: Array<McpServer>;
   /** Each entry's updated rows, in entry order. An entry whose `where` matched no rows contributes `null` in its slot; an entry that matched several contributes each of its rows. */
   updateMcpServersMany: Array<Maybe<McpServer>>;
-  updateMessage: Array<Message>;
-  updateMessageSingle?: Maybe<Message>;
+  updateMessage?: Maybe<Message>;
+  updateMessages: Array<Message>;
   /** Each entry's updated rows, in entry order. An entry whose `where` matched no rows contributes `null` in its slot; an entry that matched several contributes each of its rows. */
   updateMessagesMany: Array<Maybe<Message>>;
-  updateProject: Array<Project>;
-  updateProjectSingle?: Maybe<Project>;
+  updateProject?: Maybe<Project>;
+  updateProjects: Array<Project>;
   /** Each entry's updated rows, in entry order. An entry whose `where` matched no rows contributes `null` in its slot; an entry that matched several contributes each of its rows. */
   updateProjectsMany: Array<Maybe<Project>>;
-  updateRole: Array<Role>;
-  updateRoleSingle?: Maybe<Role>;
+  updateRole?: Maybe<Role>;
+  updateRoles: Array<Role>;
   /** Each entry's updated rows, in entry order. An entry whose `where` matched no rows contributes `null` in its slot; an entry that matched several contributes each of its rows. */
   updateRolesMany: Array<Maybe<Role>>;
-  updateSetting: Array<Setting>;
-  updateSettingSingle?: Maybe<Setting>;
+  updateSetting?: Maybe<Setting>;
+  updateSettings: Array<Setting>;
   /** Each entry's updated rows, in entry order. An entry whose `where` matched no rows contributes `null` in its slot; an entry that matched several contributes each of its rows. */
   updateSettingsMany: Array<Maybe<Setting>>;
-  updateTask: Array<Task>;
-  updateTaskSingle?: Maybe<Task>;
+  updateTask?: Maybe<Task>;
+  updateTasks: Array<Task>;
   /** Each entry's updated rows, in entry order. An entry whose `where` matched no rows contributes `null` in its slot; an entry that matched several contributes each of its rows. */
   updateTasksMany: Array<Maybe<Task>>;
 };
@@ -3340,47 +3114,47 @@ export type MutationCreateTasksArgs = {
 
 
 export type MutationDeleteAgentArgs = {
-  where?: InputMaybe<AgentFilters>;
-};
-
-
-export type MutationDeleteAgentServerArgs = {
-  where?: InputMaybe<AgentServerFilters>;
-};
-
-
-export type MutationDeleteAgentServerSingleArgs = {
-  where: AgentServerFilters;
-};
-
-
-export type MutationDeleteAgentSingleArgs = {
   where: AgentFilters;
 };
 
 
-export type MutationDeleteBoardTemplateArgs = {
-  where?: InputMaybe<BoardTemplateFilters>;
+export type MutationDeleteAgentServerArgs = {
+  where: AgentServerFilters;
 };
 
 
-export type MutationDeleteBoardTemplateSingleArgs = {
+export type MutationDeleteAgentServersArgs = {
+  where?: InputMaybe<AgentServerFilters>;
+};
+
+
+export type MutationDeleteAgentsArgs = {
+  where?: InputMaybe<AgentFilters>;
+};
+
+
+export type MutationDeleteBoardTemplateArgs = {
   where: BoardTemplateFilters;
 };
 
 
+export type MutationDeleteBoardTemplatesArgs = {
+  where?: InputMaybe<BoardTemplateFilters>;
+};
+
+
 export type MutationDeleteCardArgs = {
-  where?: InputMaybe<CardFilters>;
+  where: CardFilters;
 };
 
 
 export type MutationDeleteCardDepArgs = {
-  where?: InputMaybe<CardDepFilters>;
+  where: CardDepFilters;
 };
 
 
-export type MutationDeleteCardDepSingleArgs = {
-  where: CardDepFilters;
+export type MutationDeleteCardDepsArgs = {
+  where?: InputMaybe<CardDepFilters>;
 };
 
 
@@ -3389,78 +3163,78 @@ export type MutationDeleteCardNoteArgs = {
 };
 
 
-export type MutationDeleteCardSingleArgs = {
-  where: CardFilters;
+export type MutationDeleteCardsArgs = {
+  where?: InputMaybe<CardFilters>;
 };
 
 
 export type MutationDeleteLaneArgs = {
-  where?: InputMaybe<LaneFilters>;
-};
-
-
-export type MutationDeleteLaneSingleArgs = {
   where: LaneFilters;
 };
 
 
-export type MutationDeleteMcpServerArgs = {
-  where?: InputMaybe<McpServerFilters>;
+export type MutationDeleteLanesArgs = {
+  where?: InputMaybe<LaneFilters>;
 };
 
 
-export type MutationDeleteMcpServerSingleArgs = {
+export type MutationDeleteMcpServerArgs = {
   where: McpServerFilters;
 };
 
 
-export type MutationDeleteMessageArgs = {
-  where?: InputMaybe<MessageFilters>;
+export type MutationDeleteMcpServersArgs = {
+  where?: InputMaybe<McpServerFilters>;
 };
 
 
-export type MutationDeleteMessageSingleArgs = {
+export type MutationDeleteMessageArgs = {
   where: MessageFilters;
 };
 
 
-export type MutationDeleteProjectArgs = {
-  where?: InputMaybe<ProjectFilters>;
+export type MutationDeleteMessagesArgs = {
+  where?: InputMaybe<MessageFilters>;
 };
 
 
-export type MutationDeleteProjectSingleArgs = {
+export type MutationDeleteProjectArgs = {
   where: ProjectFilters;
 };
 
 
-export type MutationDeleteRoleArgs = {
-  where?: InputMaybe<RoleFilters>;
+export type MutationDeleteProjectsArgs = {
+  where?: InputMaybe<ProjectFilters>;
 };
 
 
-export type MutationDeleteRoleSingleArgs = {
+export type MutationDeleteRoleArgs = {
   where: RoleFilters;
 };
 
 
-export type MutationDeleteRunArgs = {
-  where?: InputMaybe<RunFilters>;
+export type MutationDeleteRolesArgs = {
+  where?: InputMaybe<RoleFilters>;
 };
 
 
-export type MutationDeleteRunSingleArgs = {
+export type MutationDeleteRunArgs = {
   where: RunFilters;
 };
 
 
-export type MutationDeleteTaskArgs = {
-  where?: InputMaybe<TaskFilters>;
+export type MutationDeleteRunsArgs = {
+  where?: InputMaybe<RunFilters>;
 };
 
 
-export type MutationDeleteTaskSingleArgs = {
+export type MutationDeleteTaskArgs = {
   where: TaskFilters;
+};
+
+
+export type MutationDeleteTasksArgs = {
+  where?: InputMaybe<TaskFilters>;
 };
 
 
@@ -3553,19 +3327,19 @@ export type MutationTestMcpServerArgs = {
 
 export type MutationUpdateAgentArgs = {
   set: UpdateAgentInput;
-  where?: InputMaybe<AgentFilters>;
+  where: AgentFilters;
 };
 
 
 export type MutationUpdateAgentServerArgs = {
   set: UpdateAgentServerInput;
-  where?: InputMaybe<AgentServerFilters>;
+  where: AgentServerFilters;
 };
 
 
-export type MutationUpdateAgentServerSingleArgs = {
+export type MutationUpdateAgentServersArgs = {
   set: UpdateAgentServerInput;
-  where: AgentServerFilters;
+  where?: InputMaybe<AgentServerFilters>;
 };
 
 
@@ -3574,9 +3348,9 @@ export type MutationUpdateAgentServersManyArgs = {
 };
 
 
-export type MutationUpdateAgentSingleArgs = {
+export type MutationUpdateAgentsArgs = {
   set: UpdateAgentInput;
-  where: AgentFilters;
+  where?: InputMaybe<AgentFilters>;
 };
 
 
@@ -3587,19 +3361,19 @@ export type MutationUpdateAgentsManyArgs = {
 
 export type MutationUpdateCardArgs = {
   set: UpdateCardInput;
-  where?: InputMaybe<CardFilters>;
+  where: CardFilters;
 };
 
 
 export type MutationUpdateCardDepArgs = {
   set: UpdateCardDepInput;
-  where?: InputMaybe<CardDepFilters>;
+  where: CardDepFilters;
 };
 
 
-export type MutationUpdateCardDepSingleArgs = {
+export type MutationUpdateCardDepsArgs = {
   set: UpdateCardDepInput;
-  where: CardDepFilters;
+  where?: InputMaybe<CardDepFilters>;
 };
 
 
@@ -3614,9 +3388,9 @@ export type MutationUpdateCardNoteArgs = {
 };
 
 
-export type MutationUpdateCardSingleArgs = {
+export type MutationUpdateCardsArgs = {
   set: UpdateCardInput;
-  where: CardFilters;
+  where?: InputMaybe<CardFilters>;
 };
 
 
@@ -3627,13 +3401,13 @@ export type MutationUpdateCardsManyArgs = {
 
 export type MutationUpdateLaneArgs = {
   set: UpdateLaneInput;
-  where?: InputMaybe<LaneFilters>;
+  where: LaneFilters;
 };
 
 
-export type MutationUpdateLaneSingleArgs = {
+export type MutationUpdateLanesArgs = {
   set: UpdateLaneInput;
-  where: LaneFilters;
+  where?: InputMaybe<LaneFilters>;
 };
 
 
@@ -3644,13 +3418,13 @@ export type MutationUpdateLanesManyArgs = {
 
 export type MutationUpdateMcpServerArgs = {
   set: UpdateMcpServerInput;
-  where?: InputMaybe<McpServerFilters>;
+  where: McpServerFilters;
 };
 
 
-export type MutationUpdateMcpServerSingleArgs = {
+export type MutationUpdateMcpServersArgs = {
   set: UpdateMcpServerInput;
-  where: McpServerFilters;
+  where?: InputMaybe<McpServerFilters>;
 };
 
 
@@ -3661,13 +3435,13 @@ export type MutationUpdateMcpServersManyArgs = {
 
 export type MutationUpdateMessageArgs = {
   set: UpdateMessageInput;
-  where?: InputMaybe<MessageFilters>;
+  where: MessageFilters;
 };
 
 
-export type MutationUpdateMessageSingleArgs = {
+export type MutationUpdateMessagesArgs = {
   set: UpdateMessageInput;
-  where: MessageFilters;
+  where?: InputMaybe<MessageFilters>;
 };
 
 
@@ -3678,13 +3452,13 @@ export type MutationUpdateMessagesManyArgs = {
 
 export type MutationUpdateProjectArgs = {
   set: UpdateProjectInput;
-  where?: InputMaybe<ProjectFilters>;
+  where: ProjectFilters;
 };
 
 
-export type MutationUpdateProjectSingleArgs = {
+export type MutationUpdateProjectsArgs = {
   set: UpdateProjectInput;
-  where: ProjectFilters;
+  where?: InputMaybe<ProjectFilters>;
 };
 
 
@@ -3695,13 +3469,13 @@ export type MutationUpdateProjectsManyArgs = {
 
 export type MutationUpdateRoleArgs = {
   set: UpdateRoleInput;
-  where?: InputMaybe<RoleFilters>;
+  where: RoleFilters;
 };
 
 
-export type MutationUpdateRoleSingleArgs = {
+export type MutationUpdateRolesArgs = {
   set: UpdateRoleInput;
-  where: RoleFilters;
+  where?: InputMaybe<RoleFilters>;
 };
 
 
@@ -3712,13 +3486,13 @@ export type MutationUpdateRolesManyArgs = {
 
 export type MutationUpdateSettingArgs = {
   set: UpdateSettingInput;
-  where?: InputMaybe<SettingFilters>;
+  where: SettingFilters;
 };
 
 
-export type MutationUpdateSettingSingleArgs = {
+export type MutationUpdateSettingsArgs = {
   set: UpdateSettingInput;
-  where: SettingFilters;
+  where?: InputMaybe<SettingFilters>;
 };
 
 
@@ -3729,13 +3503,13 @@ export type MutationUpdateSettingsManyArgs = {
 
 export type MutationUpdateTaskArgs = {
   set: UpdateTaskInput;
-  where?: InputMaybe<TaskFilters>;
+  where: TaskFilters;
 };
 
 
-export type MutationUpdateTaskSingleArgs = {
+export type MutationUpdateTasksArgs = {
   set: UpdateTaskInput;
-  where: TaskFilters;
+  where?: InputMaybe<TaskFilters>;
 };
 
 
@@ -4734,44 +4508,18 @@ export type RolesContractEnumFilter = {
   NOT?: InputMaybe<RolesContractEnumFilter>;
   /** At least one branch matches; ANDed with any sibling operators */
   OR?: InputMaybe<Array<RolesContractEnumFilter>>;
-  /** Matches values containing the given string. `%`, `_` and `\` are matched literally. */
-  contains?: InputMaybe<Scalars['String']['input']>;
-  /** Matches values ending with the given string. `%`, `_` and `\` are matched literally. */
-  endsWith?: InputMaybe<Scalars['String']['input']>;
   /** Equal to */
   eq?: InputMaybe<RolesContractEnum>;
-  /** Greater than */
-  gt?: InputMaybe<RolesContractEnum>;
-  /** Greater than or equal to */
-  gte?: InputMaybe<RolesContractEnum>;
-  /** Case-insensitive `contains`. */
-  iContains?: InputMaybe<Scalars['String']['input']>;
-  /** Case-insensitive `endsWith`. */
-  iEndsWith?: InputMaybe<Scalars['String']['input']>;
-  /** Case-insensitive `startsWith`. */
-  iStartsWith?: InputMaybe<Scalars['String']['input']>;
-  ilike?: InputMaybe<Scalars['String']['input']>;
   /** Matches any one of these values (SQL `IN`) */
   inArray?: InputMaybe<Array<RolesContractEnum>>;
-  /** When true, every comparison operator in this object matches case-insensitively — `eq`, `ne`, the ordering operators, `inArray`/`notInArray` and the pattern operators all compare `lower(column)` against `lower(operand)`. Applies only to the operators beside it; a nested `AND`/`OR`/`NOT` branch sets its own. */
-  insensitive?: InputMaybe<Scalars['Boolean']['input']>;
   /** When true, matches rows where the column is not NULL */
   isNotNull?: InputMaybe<Scalars['Boolean']['input']>;
   /** When true, matches rows where the column is NULL */
   isNull?: InputMaybe<Scalars['Boolean']['input']>;
-  like?: InputMaybe<Scalars['String']['input']>;
-  /** Less than */
-  lt?: InputMaybe<RolesContractEnum>;
-  /** Less than or equal to */
-  lte?: InputMaybe<RolesContractEnum>;
   /** Not equal to */
   ne?: InputMaybe<RolesContractEnum>;
-  notIlike?: InputMaybe<Scalars['String']['input']>;
   /** Matches none of these values (SQL `NOT IN`) */
   notInArray?: InputMaybe<Array<RolesContractEnum>>;
-  notLike?: InputMaybe<Scalars['String']['input']>;
-  /** Matches values starting with the given string. `%`, `_` and `\` are matched literally. */
-  startsWith?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type Run = {
@@ -5186,44 +4934,18 @@ export type RunsKindEnumFilter = {
   NOT?: InputMaybe<RunsKindEnumFilter>;
   /** At least one branch matches; ANDed with any sibling operators */
   OR?: InputMaybe<Array<RunsKindEnumFilter>>;
-  /** Matches values containing the given string. `%`, `_` and `\` are matched literally. */
-  contains?: InputMaybe<Scalars['String']['input']>;
-  /** Matches values ending with the given string. `%`, `_` and `\` are matched literally. */
-  endsWith?: InputMaybe<Scalars['String']['input']>;
   /** Equal to */
   eq?: InputMaybe<RunsKindEnum>;
-  /** Greater than */
-  gt?: InputMaybe<RunsKindEnum>;
-  /** Greater than or equal to */
-  gte?: InputMaybe<RunsKindEnum>;
-  /** Case-insensitive `contains`. */
-  iContains?: InputMaybe<Scalars['String']['input']>;
-  /** Case-insensitive `endsWith`. */
-  iEndsWith?: InputMaybe<Scalars['String']['input']>;
-  /** Case-insensitive `startsWith`. */
-  iStartsWith?: InputMaybe<Scalars['String']['input']>;
-  ilike?: InputMaybe<Scalars['String']['input']>;
   /** Matches any one of these values (SQL `IN`) */
   inArray?: InputMaybe<Array<RunsKindEnum>>;
-  /** When true, every comparison operator in this object matches case-insensitively — `eq`, `ne`, the ordering operators, `inArray`/`notInArray` and the pattern operators all compare `lower(column)` against `lower(operand)`. Applies only to the operators beside it; a nested `AND`/`OR`/`NOT` branch sets its own. */
-  insensitive?: InputMaybe<Scalars['Boolean']['input']>;
   /** When true, matches rows where the column is not NULL */
   isNotNull?: InputMaybe<Scalars['Boolean']['input']>;
   /** When true, matches rows where the column is NULL */
   isNull?: InputMaybe<Scalars['Boolean']['input']>;
-  like?: InputMaybe<Scalars['String']['input']>;
-  /** Less than */
-  lt?: InputMaybe<RunsKindEnum>;
-  /** Less than or equal to */
-  lte?: InputMaybe<RunsKindEnum>;
   /** Not equal to */
   ne?: InputMaybe<RunsKindEnum>;
-  notIlike?: InputMaybe<Scalars['String']['input']>;
   /** Matches none of these values (SQL `NOT IN`) */
   notInArray?: InputMaybe<Array<RunsKindEnum>>;
-  notLike?: InputMaybe<Scalars['String']['input']>;
-  /** Matches values starting with the given string. `%`, `_` and `\` are matched literally. */
-  startsWith?: InputMaybe<Scalars['String']['input']>;
 };
 
 export enum RunsStatusEnum {
@@ -5244,44 +4966,18 @@ export type RunsStatusEnumFilter = {
   NOT?: InputMaybe<RunsStatusEnumFilter>;
   /** At least one branch matches; ANDed with any sibling operators */
   OR?: InputMaybe<Array<RunsStatusEnumFilter>>;
-  /** Matches values containing the given string. `%`, `_` and `\` are matched literally. */
-  contains?: InputMaybe<Scalars['String']['input']>;
-  /** Matches values ending with the given string. `%`, `_` and `\` are matched literally. */
-  endsWith?: InputMaybe<Scalars['String']['input']>;
   /** Equal to */
   eq?: InputMaybe<RunsStatusEnum>;
-  /** Greater than */
-  gt?: InputMaybe<RunsStatusEnum>;
-  /** Greater than or equal to */
-  gte?: InputMaybe<RunsStatusEnum>;
-  /** Case-insensitive `contains`. */
-  iContains?: InputMaybe<Scalars['String']['input']>;
-  /** Case-insensitive `endsWith`. */
-  iEndsWith?: InputMaybe<Scalars['String']['input']>;
-  /** Case-insensitive `startsWith`. */
-  iStartsWith?: InputMaybe<Scalars['String']['input']>;
-  ilike?: InputMaybe<Scalars['String']['input']>;
   /** Matches any one of these values (SQL `IN`) */
   inArray?: InputMaybe<Array<RunsStatusEnum>>;
-  /** When true, every comparison operator in this object matches case-insensitively — `eq`, `ne`, the ordering operators, `inArray`/`notInArray` and the pattern operators all compare `lower(column)` against `lower(operand)`. Applies only to the operators beside it; a nested `AND`/`OR`/`NOT` branch sets its own. */
-  insensitive?: InputMaybe<Scalars['Boolean']['input']>;
   /** When true, matches rows where the column is not NULL */
   isNotNull?: InputMaybe<Scalars['Boolean']['input']>;
   /** When true, matches rows where the column is NULL */
   isNull?: InputMaybe<Scalars['Boolean']['input']>;
-  like?: InputMaybe<Scalars['String']['input']>;
-  /** Less than */
-  lt?: InputMaybe<RunsStatusEnum>;
-  /** Less than or equal to */
-  lte?: InputMaybe<RunsStatusEnum>;
   /** Not equal to */
   ne?: InputMaybe<RunsStatusEnum>;
-  notIlike?: InputMaybe<Scalars['String']['input']>;
   /** Matches none of these values (SQL `NOT IN`) */
   notInArray?: InputMaybe<Array<RunsStatusEnum>>;
-  notLike?: InputMaybe<Scalars['String']['input']>;
-  /** Matches values starting with the given string. `%`, `_` and `\` are matched literally. */
-  startsWith?: InputMaybe<Scalars['String']['input']>;
 };
 
 export enum RunsVerdictEnum {
@@ -5300,44 +4996,18 @@ export type RunsVerdictEnumFilter = {
   NOT?: InputMaybe<RunsVerdictEnumFilter>;
   /** At least one branch matches; ANDed with any sibling operators */
   OR?: InputMaybe<Array<RunsVerdictEnumFilter>>;
-  /** Matches values containing the given string. `%`, `_` and `\` are matched literally. */
-  contains?: InputMaybe<Scalars['String']['input']>;
-  /** Matches values ending with the given string. `%`, `_` and `\` are matched literally. */
-  endsWith?: InputMaybe<Scalars['String']['input']>;
   /** Equal to */
   eq?: InputMaybe<RunsVerdictEnum>;
-  /** Greater than */
-  gt?: InputMaybe<RunsVerdictEnum>;
-  /** Greater than or equal to */
-  gte?: InputMaybe<RunsVerdictEnum>;
-  /** Case-insensitive `contains`. */
-  iContains?: InputMaybe<Scalars['String']['input']>;
-  /** Case-insensitive `endsWith`. */
-  iEndsWith?: InputMaybe<Scalars['String']['input']>;
-  /** Case-insensitive `startsWith`. */
-  iStartsWith?: InputMaybe<Scalars['String']['input']>;
-  ilike?: InputMaybe<Scalars['String']['input']>;
   /** Matches any one of these values (SQL `IN`) */
   inArray?: InputMaybe<Array<RunsVerdictEnum>>;
-  /** When true, every comparison operator in this object matches case-insensitively — `eq`, `ne`, the ordering operators, `inArray`/`notInArray` and the pattern operators all compare `lower(column)` against `lower(operand)`. Applies only to the operators beside it; a nested `AND`/`OR`/`NOT` branch sets its own. */
-  insensitive?: InputMaybe<Scalars['Boolean']['input']>;
   /** When true, matches rows where the column is not NULL */
   isNotNull?: InputMaybe<Scalars['Boolean']['input']>;
   /** When true, matches rows where the column is NULL */
   isNull?: InputMaybe<Scalars['Boolean']['input']>;
-  like?: InputMaybe<Scalars['String']['input']>;
-  /** Less than */
-  lt?: InputMaybe<RunsVerdictEnum>;
-  /** Less than or equal to */
-  lte?: InputMaybe<RunsVerdictEnum>;
   /** Not equal to */
   ne?: InputMaybe<RunsVerdictEnum>;
-  notIlike?: InputMaybe<Scalars['String']['input']>;
   /** Matches none of these values (SQL `NOT IN`) */
   notInArray?: InputMaybe<Array<RunsVerdictEnum>>;
-  notLike?: InputMaybe<Scalars['String']['input']>;
-  /** Matches values starting with the given string. `%`, `_` and `\` are matched literally. */
-  startsWith?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type Setting = {
@@ -5680,44 +5350,18 @@ export type SettingsToolDiscoveryEnumFilter = {
   NOT?: InputMaybe<SettingsToolDiscoveryEnumFilter>;
   /** At least one branch matches; ANDed with any sibling operators */
   OR?: InputMaybe<Array<SettingsToolDiscoveryEnumFilter>>;
-  /** Matches values containing the given string. `%`, `_` and `\` are matched literally. */
-  contains?: InputMaybe<Scalars['String']['input']>;
-  /** Matches values ending with the given string. `%`, `_` and `\` are matched literally. */
-  endsWith?: InputMaybe<Scalars['String']['input']>;
   /** Equal to */
   eq?: InputMaybe<SettingsToolDiscoveryEnum>;
-  /** Greater than */
-  gt?: InputMaybe<SettingsToolDiscoveryEnum>;
-  /** Greater than or equal to */
-  gte?: InputMaybe<SettingsToolDiscoveryEnum>;
-  /** Case-insensitive `contains`. */
-  iContains?: InputMaybe<Scalars['String']['input']>;
-  /** Case-insensitive `endsWith`. */
-  iEndsWith?: InputMaybe<Scalars['String']['input']>;
-  /** Case-insensitive `startsWith`. */
-  iStartsWith?: InputMaybe<Scalars['String']['input']>;
-  ilike?: InputMaybe<Scalars['String']['input']>;
   /** Matches any one of these values (SQL `IN`) */
   inArray?: InputMaybe<Array<SettingsToolDiscoveryEnum>>;
-  /** When true, every comparison operator in this object matches case-insensitively — `eq`, `ne`, the ordering operators, `inArray`/`notInArray` and the pattern operators all compare `lower(column)` against `lower(operand)`. Applies only to the operators beside it; a nested `AND`/`OR`/`NOT` branch sets its own. */
-  insensitive?: InputMaybe<Scalars['Boolean']['input']>;
   /** When true, matches rows where the column is not NULL */
   isNotNull?: InputMaybe<Scalars['Boolean']['input']>;
   /** When true, matches rows where the column is NULL */
   isNull?: InputMaybe<Scalars['Boolean']['input']>;
-  like?: InputMaybe<Scalars['String']['input']>;
-  /** Less than */
-  lt?: InputMaybe<SettingsToolDiscoveryEnum>;
-  /** Less than or equal to */
-  lte?: InputMaybe<SettingsToolDiscoveryEnum>;
   /** Not equal to */
   ne?: InputMaybe<SettingsToolDiscoveryEnum>;
-  notIlike?: InputMaybe<Scalars['String']['input']>;
   /** Matches none of these values (SQL `NOT IN`) */
   notInArray?: InputMaybe<Array<SettingsToolDiscoveryEnum>>;
-  notLike?: InputMaybe<Scalars['String']['input']>;
-  /** Matches values starting with the given string. `%`, `_` and `\` are matched literally. */
-  startsWith?: InputMaybe<Scalars['String']['input']>;
 };
 
 /** What has been spent on a project, or on one task in it, added up from the run rows themselves rather than from a counter — a counter would keep climbing after retention deleted the runs behind it. */
@@ -6227,14 +5871,14 @@ export type UpdateAgentMutationVariables = Exact<{
 }>;
 
 
-export type UpdateAgentMutation = { updateAgentSingle?: { id: string } | null };
+export type UpdateAgentMutation = { updateAgent?: { id: string } | null };
 
 export type DeleteAgentMutationVariables = Exact<{
   id: Scalars['String']['input'];
 }>;
 
 
-export type DeleteAgentMutation = { deleteAgentSingle?: { id: string } | null };
+export type DeleteAgentMutation = { deleteAgent?: { id: string } | null };
 
 export type SetAgentServersMutationVariables = Exact<{
   agentId: Scalars['String']['input'];
@@ -6348,14 +5992,14 @@ export type UpdateCardMutationVariables = Exact<{
 }>;
 
 
-export type UpdateCardMutation = { updateCardSingle?: { id: string } | null };
+export type UpdateCardMutation = { updateCard?: { id: string } | null };
 
 export type DeleteCardMutationVariables = Exact<{
   id: Scalars['String']['input'];
 }>;
 
 
-export type DeleteCardMutation = { deleteCardSingle?: { id: string } | null };
+export type DeleteCardMutation = { deleteCard?: { id: string } | null };
 
 export type CreateLaneMutationVariables = Exact<{
   values: CreateLaneInput;
@@ -6370,14 +6014,14 @@ export type UpdateLaneMutationVariables = Exact<{
 }>;
 
 
-export type UpdateLaneMutation = { updateLaneSingle?: { id: string } | null };
+export type UpdateLaneMutation = { updateLane?: { id: string } | null };
 
 export type DeleteLaneMutationVariables = Exact<{
   id: Scalars['String']['input'];
 }>;
 
 
-export type DeleteLaneMutation = { deleteLaneSingle?: { id: string } | null };
+export type DeleteLaneMutation = { deleteLane?: { id: string } | null };
 
 export type CardDepsQueryVariables = Exact<{
   cardId: Scalars['String']['input'];
@@ -6404,14 +6048,14 @@ export type UpdateMcpServerMutationVariables = Exact<{
 }>;
 
 
-export type UpdateMcpServerMutation = { updateMcpServerSingle?: { id: string } | null };
+export type UpdateMcpServerMutation = { updateMcpServer?: { id: string } | null };
 
 export type DeleteMcpServerMutationVariables = Exact<{
   id: Scalars['String']['input'];
 }>;
 
 
-export type DeleteMcpServerMutation = { deleteMcpServerSingle?: { id: string } | null };
+export type DeleteMcpServerMutation = { deleteMcpServer?: { id: string } | null };
 
 export type TestMcpServerMutationVariables = Exact<{
   config: McpConnectionInput;
@@ -6473,14 +6117,14 @@ export type UpdateProjectMutationVariables = Exact<{
 }>;
 
 
-export type UpdateProjectMutation = { updateProjectSingle?: { id: string } | null };
+export type UpdateProjectMutation = { updateProject?: { id: string } | null };
 
 export type DeleteProjectMutationVariables = Exact<{
   id: Scalars['String']['input'];
 }>;
 
 
-export type DeleteProjectMutation = { deleteProjectSingle?: { id: string } | null };
+export type DeleteProjectMutation = { deleteProject?: { id: string } | null };
 
 export type RolesQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -6500,14 +6144,14 @@ export type UpdateRoleMutationVariables = Exact<{
 }>;
 
 
-export type UpdateRoleMutation = { updateRoleSingle?: { id: string } | null };
+export type UpdateRoleMutation = { updateRole?: { id: string } | null };
 
 export type DeleteRoleMutationVariables = Exact<{
   id: Scalars['String']['input'];
 }>;
 
 
-export type DeleteRoleMutation = { deleteRoleSingle?: { id: string } | null };
+export type DeleteRoleMutation = { deleteRole?: { id: string } | null };
 
 export type RunsQueryVariables = Exact<{
   projectId?: InputMaybe<Scalars['String']['input']>;
@@ -6529,7 +6173,7 @@ export type DeleteRunMutationVariables = Exact<{
 }>;
 
 
-export type DeleteRunMutation = { deleteRunSingle?: { id: string } | null };
+export type DeleteRunMutation = { deleteRun?: { id: string } | null };
 
 export type RunEventsSubscriptionVariables = Exact<{
   runId: Scalars['String']['input'];
@@ -6555,7 +6199,7 @@ export type UpdateSettingsMutationVariables = Exact<{
 }>;
 
 
-export type UpdateSettingsMutation = { updateSettingSingle?: { id: string } | null };
+export type UpdateSettingsMutation = { updateSetting?: { id: string } | null };
 
 export type SetApiKeyMutationVariables = Exact<{
   apiKey: Scalars['String']['input'];
@@ -6639,7 +6283,7 @@ export type DeleteTaskMutationVariables = Exact<{
 }>;
 
 
-export type DeleteTaskMutation = { deleteTaskSingle?: { id: string } | null };
+export type DeleteTaskMutation = { deleteTask?: { id: string } | null };
 
 export type StopTaskMutationVariables = Exact<{
   taskId: Scalars['String']['input'];
@@ -6675,14 +6319,14 @@ export type DeleteBoardTemplateMutationVariables = Exact<{
 }>;
 
 
-export type DeleteBoardTemplateMutation = { deleteBoardTemplateSingle?: { id: string } | null };
+export type DeleteBoardTemplateMutation = { deleteBoardTemplate?: { id: string } | null };
 
 
 export const AgentsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"Agents"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"agents"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"orderBy"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"name"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"direction"},"value":{"kind":"EnumValue","value":"asc"}},{"kind":"ObjectField","name":{"kind":"Name","value":"priority"},"value":{"kind":"IntValue","value":"1"}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"enabled"}},{"kind":"Field","name":{"kind":"Name","value":"baseUrl"}},{"kind":"Field","name":{"kind":"Name","value":"model"}},{"kind":"Field","name":{"kind":"Name","value":"systemPrompt"}},{"kind":"Field","name":{"kind":"Name","value":"maxTokens"}},{"kind":"Field","name":{"kind":"Name","value":"contextLength"}},{"kind":"Field","name":{"kind":"Name","value":"temperature"}},{"kind":"Field","name":{"kind":"Name","value":"maxToolIterations"}},{"kind":"Field","name":{"kind":"Name","value":"toolDiscovery"}},{"kind":"Field","name":{"kind":"Name","value":"requestTimeoutSeconds"}},{"kind":"Field","name":{"kind":"Name","value":"maxRetries"}},{"kind":"Field","name":{"kind":"Name","value":"servers"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"serverId"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"mcpServers"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"orderBy"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"slug"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"direction"},"value":{"kind":"EnumValue","value":"asc"}},{"kind":"ObjectField","name":{"kind":"Name","value":"priority"},"value":{"kind":"IntValue","value":"1"}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"slug"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"enabled"}}]}},{"kind":"Field","name":{"kind":"Name","value":"lanes"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"agentId"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"project"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"settings"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"baseUrl"}},{"kind":"Field","name":{"kind":"Name","value":"model"}}]}}]}}]} as unknown as DocumentNode<AgentsQuery, AgentsQueryVariables>;
 export const AgentModelsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"AgentModels"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"agentId"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"models"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"agentId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"agentId"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"contextLength"}}]}}]}}]} as unknown as DocumentNode<AgentModelsQuery, AgentModelsQueryVariables>;
 export const CreateAgentDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CreateAgent"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"values"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"CreateAgentInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createAgent"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"values"},"value":{"kind":"Variable","name":{"kind":"Name","value":"values"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<CreateAgentMutation, CreateAgentMutationVariables>;
-export const UpdateAgentDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateAgent"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"set"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UpdateAgentInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateAgentSingle"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"id"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}}]}},{"kind":"Argument","name":{"kind":"Name","value":"set"},"value":{"kind":"Variable","name":{"kind":"Name","value":"set"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<UpdateAgentMutation, UpdateAgentMutationVariables>;
-export const DeleteAgentDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"DeleteAgent"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deleteAgentSingle"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"id"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<DeleteAgentMutation, DeleteAgentMutationVariables>;
+export const UpdateAgentDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateAgent"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"set"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UpdateAgentInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateAgent"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"id"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}}]}},{"kind":"Argument","name":{"kind":"Name","value":"set"},"value":{"kind":"Variable","name":{"kind":"Name","value":"set"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<UpdateAgentMutation, UpdateAgentMutationVariables>;
+export const DeleteAgentDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"DeleteAgent"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deleteAgent"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"id"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<DeleteAgentMutation, DeleteAgentMutationVariables>;
 export const SetAgentServersDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SetAgentServers"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"agentId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"serverIds"}},"type":{"kind":"NonNullType","type":{"kind":"ListType","type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"setAgentServers"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"agentId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"agentId"}}},{"kind":"Argument","name":{"kind":"Name","value":"serverIds"},"value":{"kind":"Variable","name":{"kind":"Name","value":"serverIds"}}}]}]}}]} as unknown as DocumentNode<SetAgentServersMutation, SetAgentServersMutationVariables>;
 export const SetAgentApiKeyDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SetAgentApiKey"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"agentId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"apiKey"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"setAgentApiKey"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"agentId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"agentId"}}},{"kind":"Argument","name":{"kind":"Name","value":"apiKey"},"value":{"kind":"Variable","name":{"kind":"Name","value":"apiKey"}}}]}]}}]} as unknown as DocumentNode<SetAgentApiKeyMutation, SetAgentApiKeyMutationVariables>;
 export const ArchiveDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"Archive"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"projectId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"limit"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"cards"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"Variable","name":{"kind":"Name","value":"limit"}}},{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"projectId"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"projectId"}}}]}},{"kind":"ObjectField","name":{"kind":"Name","value":"archivedAt"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"isNotNull"},"value":{"kind":"BooleanValue","value":true}}]}}]}},{"kind":"Argument","name":{"kind":"Name","value":"orderBy"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"archivedAt"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"direction"},"value":{"kind":"EnumValue","value":"desc"}},{"kind":"ObjectField","name":{"kind":"Name","value":"priority"},"value":{"kind":"IntValue","value":"1"}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"laneId"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"body"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"error"}},{"kind":"Field","name":{"kind":"Name","value":"archivedAt"}},{"kind":"Field","name":{"kind":"Name","value":"lane"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}}]}}]} as unknown as DocumentNode<ArchiveQuery, ArchiveQueryVariables>;
@@ -6697,16 +6341,16 @@ export const SetCardDepsDocument = {"kind":"Document","definitions":[{"kind":"Op
 export const RetryCardDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"RetryCard"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"cardId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"retryCard"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"cardId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"cardId"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"error"}}]}}]}}]} as unknown as DocumentNode<RetryCardMutation, RetryCardMutationVariables>;
 export const StopCardDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"StopCard"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"cardId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"stopCard"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"cardId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"cardId"}}}]}]}}]} as unknown as DocumentNode<StopCardMutation, StopCardMutationVariables>;
 export const CreateCardDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CreateCard"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"values"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"CreateCardInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createCard"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"values"},"value":{"kind":"Variable","name":{"kind":"Name","value":"values"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<CreateCardMutation, CreateCardMutationVariables>;
-export const UpdateCardDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateCard"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"set"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UpdateCardInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateCardSingle"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"id"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}}]}},{"kind":"Argument","name":{"kind":"Name","value":"set"},"value":{"kind":"Variable","name":{"kind":"Name","value":"set"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<UpdateCardMutation, UpdateCardMutationVariables>;
-export const DeleteCardDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"DeleteCard"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deleteCardSingle"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"id"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<DeleteCardMutation, DeleteCardMutationVariables>;
+export const UpdateCardDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateCard"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"set"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UpdateCardInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateCard"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"id"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}}]}},{"kind":"Argument","name":{"kind":"Name","value":"set"},"value":{"kind":"Variable","name":{"kind":"Name","value":"set"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<UpdateCardMutation, UpdateCardMutationVariables>;
+export const DeleteCardDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"DeleteCard"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deleteCard"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"id"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<DeleteCardMutation, DeleteCardMutationVariables>;
 export const CreateLaneDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CreateLane"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"values"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"CreateLaneInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createLane"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"values"},"value":{"kind":"Variable","name":{"kind":"Name","value":"values"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<CreateLaneMutation, CreateLaneMutationVariables>;
-export const UpdateLaneDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateLane"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"set"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UpdateLaneInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateLaneSingle"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"id"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}}]}},{"kind":"Argument","name":{"kind":"Name","value":"set"},"value":{"kind":"Variable","name":{"kind":"Name","value":"set"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<UpdateLaneMutation, UpdateLaneMutationVariables>;
-export const DeleteLaneDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"DeleteLane"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deleteLaneSingle"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"id"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<DeleteLaneMutation, DeleteLaneMutationVariables>;
+export const UpdateLaneDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateLane"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"set"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UpdateLaneInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateLane"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"id"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}}]}},{"kind":"Argument","name":{"kind":"Name","value":"set"},"value":{"kind":"Variable","name":{"kind":"Name","value":"set"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<UpdateLaneMutation, UpdateLaneMutationVariables>;
+export const DeleteLaneDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"DeleteLane"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deleteLane"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"id"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<DeleteLaneMutation, DeleteLaneMutationVariables>;
 export const CardDepsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"CardDeps"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"cardId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"cardDeps"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"cardId"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"cardId"}}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"dependsOnCardId"}},{"kind":"Field","name":{"kind":"Name","value":"dependsOn"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"laneId"}},{"kind":"Field","name":{"kind":"Name","value":"archivedAt"}}]}}]}},{"kind":"Field","alias":{"kind":"Name","value":"blockedBy"},"name":{"kind":"Name","value":"cardDeps"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"dependsOnCardId"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"cardId"}}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"cardId"}},{"kind":"Field","name":{"kind":"Name","value":"card"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"laneId"}},{"kind":"Field","name":{"kind":"Name","value":"archivedAt"}}]}}]}}]}}]} as unknown as DocumentNode<CardDepsQuery, CardDepsQueryVariables>;
 export const McpServersDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"McpServers"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"mcpServers"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"orderBy"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"slug"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"direction"},"value":{"kind":"EnumValue","value":"asc"}},{"kind":"ObjectField","name":{"kind":"Name","value":"priority"},"value":{"kind":"IntValue","value":"1"}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"slug"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"enabled"}},{"kind":"Field","name":{"kind":"Name","value":"transport"}},{"kind":"Field","name":{"kind":"Name","value":"command"}},{"kind":"Field","name":{"kind":"Name","value":"args"}},{"kind":"Field","name":{"kind":"Name","value":"env"}},{"kind":"Field","name":{"kind":"Name","value":"url"}},{"kind":"Field","name":{"kind":"Name","value":"headers"}}]}},{"kind":"Field","name":{"kind":"Name","value":"mcpStatus"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"error"}},{"kind":"Field","name":{"kind":"Name","value":"tools"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}}]}}]}}]}}]} as unknown as DocumentNode<McpServersQuery, McpServersQueryVariables>;
 export const CreateMcpServerDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CreateMcpServer"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"values"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"CreateMcpServerInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createMcpServer"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"values"},"value":{"kind":"Variable","name":{"kind":"Name","value":"values"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<CreateMcpServerMutation, CreateMcpServerMutationVariables>;
-export const UpdateMcpServerDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateMcpServer"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"set"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UpdateMcpServerInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateMcpServerSingle"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"id"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}}]}},{"kind":"Argument","name":{"kind":"Name","value":"set"},"value":{"kind":"Variable","name":{"kind":"Name","value":"set"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<UpdateMcpServerMutation, UpdateMcpServerMutationVariables>;
-export const DeleteMcpServerDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"DeleteMcpServer"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deleteMcpServerSingle"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"id"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<DeleteMcpServerMutation, DeleteMcpServerMutationVariables>;
+export const UpdateMcpServerDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateMcpServer"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"set"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UpdateMcpServerInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateMcpServer"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"id"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}}]}},{"kind":"Argument","name":{"kind":"Name","value":"set"},"value":{"kind":"Variable","name":{"kind":"Name","value":"set"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<UpdateMcpServerMutation, UpdateMcpServerMutationVariables>;
+export const DeleteMcpServerDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"DeleteMcpServer"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deleteMcpServer"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"id"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<DeleteMcpServerMutation, DeleteMcpServerMutationVariables>;
 export const TestMcpServerDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"TestMcpServer"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"config"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"McpConnectionInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"testMcpServer"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"config"},"value":{"kind":"Variable","name":{"kind":"Name","value":"config"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"ok"}},{"kind":"Field","name":{"kind":"Name","value":"error"}},{"kind":"Field","name":{"kind":"Name","value":"tools"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}}]}}]}}]}}]} as unknown as DocumentNode<TestMcpServerMutation, TestMcpServerMutationVariables>;
 export const ReconnectMcpDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"ReconnectMcp"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"reconnectMcp"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"error"}}]}}]}}]} as unknown as DocumentNode<ReconnectMcpMutation, ReconnectMcpMutationVariables>;
 export const CardNotesDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"CardNotes"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"cardId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"cardNotes"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"cardId"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"cardId"}}}]}}]}},{"kind":"Argument","name":{"kind":"Name","value":"orderBy"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"createdAt"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"direction"},"value":{"kind":"EnumValue","value":"asc"}},{"kind":"ObjectField","name":{"kind":"Name","value":"priority"},"value":{"kind":"IntValue","value":"1"}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"author"}},{"kind":"Field","name":{"kind":"Name","value":"body"}},{"kind":"Field","name":{"kind":"Name","value":"runId"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}}]}}]} as unknown as DocumentNode<CardNotesQuery, CardNotesQueryVariables>;
@@ -6715,19 +6359,19 @@ export const UpdateCardNoteDocument = {"kind":"Document","definitions":[{"kind":
 export const DeleteCardNoteDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"DeleteCardNote"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deleteCardNote"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}]}}]} as unknown as DocumentNode<DeleteCardNoteMutation, DeleteCardNoteMutationVariables>;
 export const ProjectsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"Projects"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"projects"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"orderBy"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"name"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"direction"},"value":{"kind":"EnumValue","value":"asc"}},{"kind":"ObjectField","name":{"kind":"Name","value":"priority"},"value":{"kind":"IntValue","value":"1"}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"context"}},{"kind":"Field","name":{"kind":"Name","value":"autoRun"}},{"kind":"Field","name":{"kind":"Name","value":"refineAgentId"}}]}}]}}]} as unknown as DocumentNode<ProjectsQuery, ProjectsQueryVariables>;
 export const CreateProjectDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CreateProject"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"values"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"CreateProjectInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createProject"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"values"},"value":{"kind":"Variable","name":{"kind":"Name","value":"values"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}}]} as unknown as DocumentNode<CreateProjectMutation, CreateProjectMutationVariables>;
-export const UpdateProjectDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateProject"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"set"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UpdateProjectInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateProjectSingle"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"id"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}}]}},{"kind":"Argument","name":{"kind":"Name","value":"set"},"value":{"kind":"Variable","name":{"kind":"Name","value":"set"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<UpdateProjectMutation, UpdateProjectMutationVariables>;
-export const DeleteProjectDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"DeleteProject"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deleteProjectSingle"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"id"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<DeleteProjectMutation, DeleteProjectMutationVariables>;
+export const UpdateProjectDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateProject"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"set"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UpdateProjectInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateProject"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"id"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}}]}},{"kind":"Argument","name":{"kind":"Name","value":"set"},"value":{"kind":"Variable","name":{"kind":"Name","value":"set"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<UpdateProjectMutation, UpdateProjectMutationVariables>;
+export const DeleteProjectDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"DeleteProject"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deleteProject"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"id"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<DeleteProjectMutation, DeleteProjectMutationVariables>;
 export const RolesDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"Roles"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"roles"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"orderBy"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"name"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"direction"},"value":{"kind":"EnumValue","value":"asc"}},{"kind":"ObjectField","name":{"kind":"Name","value":"priority"},"value":{"kind":"IntValue","value":"1"}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"contract"}},{"kind":"Field","name":{"kind":"Name","value":"prompt"}}]}},{"kind":"Field","name":{"kind":"Name","value":"lanes"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"roleId"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"project"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}}]}}]} as unknown as DocumentNode<RolesQuery, RolesQueryVariables>;
 export const CreateRoleDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CreateRole"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"values"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"CreateRoleInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createRole"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"values"},"value":{"kind":"Variable","name":{"kind":"Name","value":"values"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<CreateRoleMutation, CreateRoleMutationVariables>;
-export const UpdateRoleDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateRole"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"set"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UpdateRoleInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateRoleSingle"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"id"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}}]}},{"kind":"Argument","name":{"kind":"Name","value":"set"},"value":{"kind":"Variable","name":{"kind":"Name","value":"set"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<UpdateRoleMutation, UpdateRoleMutationVariables>;
-export const DeleteRoleDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"DeleteRole"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deleteRoleSingle"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"id"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<DeleteRoleMutation, DeleteRoleMutationVariables>;
+export const UpdateRoleDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateRole"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"set"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UpdateRoleInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateRole"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"id"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}}]}},{"kind":"Argument","name":{"kind":"Name","value":"set"},"value":{"kind":"Variable","name":{"kind":"Name","value":"set"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<UpdateRoleMutation, UpdateRoleMutationVariables>;
+export const DeleteRoleDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"DeleteRole"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deleteRole"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"id"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<DeleteRoleMutation, DeleteRoleMutationVariables>;
 export const RunsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"Runs"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"projectId"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"limit"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"runs"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"Variable","name":{"kind":"Name","value":"limit"}}},{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"projectId"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"projectId"}}}]}}]}},{"kind":"Argument","name":{"kind":"Name","value":"orderBy"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"startedAt"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"direction"},"value":{"kind":"EnumValue","value":"desc"}},{"kind":"ObjectField","name":{"kind":"Name","value":"priority"},"value":{"kind":"IntValue","value":"1"}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"startedAt"}},{"kind":"Field","name":{"kind":"Name","value":"finishedAt"}},{"kind":"Field","name":{"kind":"Name","value":"output"}},{"kind":"Field","name":{"kind":"Name","value":"error"}},{"kind":"Field","name":{"kind":"Name","value":"toolCalls"}},{"kind":"Field","name":{"kind":"Name","value":"promptTokens"}},{"kind":"Field","name":{"kind":"Name","value":"completionTokens"}},{"kind":"Field","name":{"kind":"Name","value":"totalTokens"}},{"kind":"Field","name":{"kind":"Name","value":"cardId"}},{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"agent"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"card"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"title"}}]}},{"kind":"Field","name":{"kind":"Name","value":"task"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"title"}}]}}]}}]}}]} as unknown as DocumentNode<RunsQuery, RunsQueryVariables>;
 export const ActiveRunsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"ActiveRuns"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"projectId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"runs"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"IntValue","value":"50"}},{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"projectId"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"projectId"}}}]}},{"kind":"ObjectField","name":{"kind":"Name","value":"status"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"EnumValue","value":"running"}}]}}]}},{"kind":"Argument","name":{"kind":"Name","value":"orderBy"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"startedAt"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"direction"},"value":{"kind":"EnumValue","value":"desc"}},{"kind":"ObjectField","name":{"kind":"Name","value":"priority"},"value":{"kind":"IntValue","value":"1"}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"cardId"}},{"kind":"Field","name":{"kind":"Name","value":"taskId"}}]}}]}}]} as unknown as DocumentNode<ActiveRunsQuery, ActiveRunsQueryVariables>;
-export const DeleteRunDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"DeleteRun"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deleteRunSingle"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"id"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<DeleteRunMutation, DeleteRunMutationVariables>;
+export const DeleteRunDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"DeleteRun"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deleteRun"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"id"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<DeleteRunMutation, DeleteRunMutationVariables>;
 export const RunEventsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"subscription","name":{"kind":"Name","value":"RunEvents"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"runId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"runEvents"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"runId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"runId"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"seq"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"text"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"ok"}},{"kind":"Field","name":{"kind":"Name","value":"usage"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"promptTokens"}},{"kind":"Field","name":{"kind":"Name","value":"completionTokens"}},{"kind":"Field","name":{"kind":"Name","value":"totalTokens"}}]}}]}}]}}]} as unknown as DocumentNode<RunEventsSubscription, RunEventsSubscriptionVariables>;
 export const CardRunsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"CardRuns"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"cardId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"runs"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"IntValue","value":"20"}},{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"cardId"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"cardId"}}}]}}]}},{"kind":"Argument","name":{"kind":"Name","value":"orderBy"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"startedAt"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"direction"},"value":{"kind":"EnumValue","value":"desc"}},{"kind":"ObjectField","name":{"kind":"Name","value":"priority"},"value":{"kind":"IntValue","value":"1"}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"verdict"}},{"kind":"Field","name":{"kind":"Name","value":"startedAt"}},{"kind":"Field","name":{"kind":"Name","value":"finishedAt"}},{"kind":"Field","name":{"kind":"Name","value":"output"}},{"kind":"Field","name":{"kind":"Name","value":"error"}},{"kind":"Field","name":{"kind":"Name","value":"totalTokens"}},{"kind":"Field","name":{"kind":"Name","value":"agent"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"lane"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"cardEvents"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"IntValue","value":"50"}},{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"cardId"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"cardId"}}}]}}]}},{"kind":"Argument","name":{"kind":"Name","value":"orderBy"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"createdAt"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"direction"},"value":{"kind":"EnumValue","value":"desc"}},{"kind":"ObjectField","name":{"kind":"Name","value":"priority"},"value":{"kind":"IntValue","value":"1"}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"runId"}},{"kind":"Field","name":{"kind":"Name","value":"note"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"body"}}]}},{"kind":"Field","name":{"kind":"Name","value":"actor"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"fromLane"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"toLane"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}}]}}]} as unknown as DocumentNode<CardRunsQuery, CardRunsQueryVariables>;
 export const SettingsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"Settings"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"settings"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"baseUrl"}},{"kind":"Field","name":{"kind":"Name","value":"model"}},{"kind":"Field","name":{"kind":"Name","value":"maxTokens"}},{"kind":"Field","name":{"kind":"Name","value":"contextLength"}},{"kind":"Field","name":{"kind":"Name","value":"temperature"}},{"kind":"Field","name":{"kind":"Name","value":"maxToolIterations"}},{"kind":"Field","name":{"kind":"Name","value":"toolDiscovery"}},{"kind":"Field","name":{"kind":"Name","value":"toolSelectModel"}},{"kind":"Field","name":{"kind":"Name","value":"requestTimeoutSeconds"}},{"kind":"Field","name":{"kind":"Name","value":"maxRetries"}},{"kind":"Field","name":{"kind":"Name","value":"runRetentionDays"}},{"kind":"Field","name":{"kind":"Name","value":"workerIntervalSeconds"}},{"kind":"Field","name":{"kind":"Name","value":"refineAgentId"}},{"kind":"Field","name":{"kind":"Name","value":"refinePrompt"}}]}}]}}]} as unknown as DocumentNode<SettingsQuery, SettingsQueryVariables>;
-export const UpdateSettingsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateSettings"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"set"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UpdateSettingInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateSettingSingle"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"id"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"StringValue","value":"default","block":false}}]}}]}},{"kind":"Argument","name":{"kind":"Name","value":"set"},"value":{"kind":"Variable","name":{"kind":"Name","value":"set"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<UpdateSettingsMutation, UpdateSettingsMutationVariables>;
+export const UpdateSettingsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateSettings"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"set"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UpdateSettingInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateSetting"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"id"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"StringValue","value":"default","block":false}}]}}]}},{"kind":"Argument","name":{"kind":"Name","value":"set"},"value":{"kind":"Variable","name":{"kind":"Name","value":"set"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<UpdateSettingsMutation, UpdateSettingsMutationVariables>;
 export const SetApiKeyDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SetApiKey"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"apiKey"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"setApiKey"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"apiKey"},"value":{"kind":"Variable","name":{"kind":"Name","value":"apiKey"}}}]}]}}]} as unknown as DocumentNode<SetApiKeyMutation, SetApiKeyMutationVariables>;
 export const SpendDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"Spend"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"projectId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"taskId"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"days"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"spend"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"projectId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"projectId"}}},{"kind":"Argument","name":{"kind":"Name","value":"taskId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"taskId"}}},{"kind":"Argument","name":{"kind":"Name","value":"days"},"value":{"kind":"Variable","name":{"kind":"Name","value":"days"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"runs"}},{"kind":"Field","name":{"kind":"Name","value":"promptTokens"}},{"kind":"Field","name":{"kind":"Name","value":"completionTokens"}},{"kind":"Field","name":{"kind":"Name","value":"totalTokens"}},{"kind":"Field","name":{"kind":"Name","value":"days"}},{"kind":"Field","name":{"kind":"Name","value":"from"}},{"kind":"Field","name":{"kind":"Name","value":"retentionDays"}}]}}]}}]} as unknown as DocumentNode<SpendQuery, SpendQueryVariables>;
 export const ProjectIssuesDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"ProjectIssues"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"projectId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"verdicts"},"name":{"kind":"Name","value":"cardNotes"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"IntValue","value":"200"}},{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"kind"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"EnumValue","value":"verdict"}}]}},{"kind":"ObjectField","name":{"kind":"Name","value":"card"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"projectId"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"projectId"}}}]}},{"kind":"ObjectField","name":{"kind":"Name","value":"archivedAt"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"isNull"},"value":{"kind":"BooleanValue","value":true}}]}},{"kind":"ObjectField","name":{"kind":"Name","value":"status"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"EnumValue","value":"rejected"}}]}}]}}]}},{"kind":"Argument","name":{"kind":"Name","value":"orderBy"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"createdAt"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"direction"},"value":{"kind":"EnumValue","value":"desc"}},{"kind":"ObjectField","name":{"kind":"Name","value":"priority"},"value":{"kind":"IntValue","value":"1"}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"cardId"}},{"kind":"Field","name":{"kind":"Name","value":"body"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}},{"kind":"Field","alias":{"kind":"Name","value":"failures"},"name":{"kind":"Name","value":"runs"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"IntValue","value":"20"}},{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"projectId"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"projectId"}}}]}},{"kind":"ObjectField","name":{"kind":"Name","value":"status"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"EnumValue","value":"error"}}]}}]}},{"kind":"Argument","name":{"kind":"Name","value":"orderBy"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"startedAt"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"direction"},"value":{"kind":"EnumValue","value":"desc"}},{"kind":"ObjectField","name":{"kind":"Name","value":"priority"},"value":{"kind":"IntValue","value":"1"}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"error"}},{"kind":"Field","name":{"kind":"Name","value":"startedAt"}},{"kind":"Field","name":{"kind":"Name","value":"cardId"}},{"kind":"Field","name":{"kind":"Name","value":"taskId"}},{"kind":"Field","name":{"kind":"Name","value":"agent"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"lane"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"card"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"title"}}]}},{"kind":"Field","name":{"kind":"Name","value":"task"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"title"}}]}}]}}]}}]} as unknown as DocumentNode<ProjectIssuesQuery, ProjectIssuesQueryVariables>;
@@ -6738,9 +6382,9 @@ export const CreateTaskDocument = {"kind":"Document","definitions":[{"kind":"Ope
 export const RefineTaskDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"RefineTask"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"taskId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"message"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"refineTask"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"taskId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"taskId"}}},{"kind":"Argument","name":{"kind":"Name","value":"message"},"value":{"kind":"Variable","name":{"kind":"Name","value":"message"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"error"}}]}}]}}]} as unknown as DocumentNode<RefineTaskMutation, RefineTaskMutationVariables>;
 export const MakeCardDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"MakeCard"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"taskId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"makeCard"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"taskId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"taskId"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"laneId"}}]}}]}}]} as unknown as DocumentNode<MakeCardMutation, MakeCardMutationVariables>;
 export const SubmitCardDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SubmitCard"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"projectId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"title"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"body"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"submitCard"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"projectId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"projectId"}}},{"kind":"Argument","name":{"kind":"Name","value":"title"},"value":{"kind":"Variable","name":{"kind":"Name","value":"title"}}},{"kind":"Argument","name":{"kind":"Name","value":"body"},"value":{"kind":"Variable","name":{"kind":"Name","value":"body"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"laneId"}}]}}]}}]} as unknown as DocumentNode<SubmitCardMutation, SubmitCardMutationVariables>;
-export const DeleteTaskDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"DeleteTask"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deleteTaskSingle"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"id"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<DeleteTaskMutation, DeleteTaskMutationVariables>;
+export const DeleteTaskDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"DeleteTask"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deleteTask"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"id"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<DeleteTaskMutation, DeleteTaskMutationVariables>;
 export const StopTaskDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"StopTask"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"taskId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"stopTask"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"taskId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"taskId"}}}]}]}}]} as unknown as DocumentNode<StopTaskMutation, StopTaskMutationVariables>;
 export const BoardTemplatesDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"BoardTemplates"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"boardTemplates"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"orderBy"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"name"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"direction"},"value":{"kind":"EnumValue","value":"asc"}},{"kind":"ObjectField","name":{"kind":"Name","value":"priority"},"value":{"kind":"IntValue","value":"1"}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"lanes"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}}]}}]} as unknown as DocumentNode<BoardTemplatesQuery, BoardTemplatesQueryVariables>;
 export const SaveBoardTemplateDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SaveBoardTemplate"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"projectId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"name"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"description"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"saveBoardTemplate"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"projectId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"projectId"}}},{"kind":"Argument","name":{"kind":"Name","value":"name"},"value":{"kind":"Variable","name":{"kind":"Name","value":"name"}}},{"kind":"Argument","name":{"kind":"Name","value":"description"},"value":{"kind":"Variable","name":{"kind":"Name","value":"description"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}}]} as unknown as DocumentNode<SaveBoardTemplateMutation, SaveBoardTemplateMutationVariables>;
 export const ApplyBoardTemplateDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"ApplyBoardTemplate"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"projectId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"templateId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"applyBoardTemplate"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"projectId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"projectId"}}},{"kind":"Argument","name":{"kind":"Name","value":"templateId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"templateId"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"position"}}]}}]}}]} as unknown as DocumentNode<ApplyBoardTemplateMutation, ApplyBoardTemplateMutationVariables>;
-export const DeleteBoardTemplateDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"DeleteBoardTemplate"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deleteBoardTemplateSingle"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"id"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<DeleteBoardTemplateMutation, DeleteBoardTemplateMutationVariables>;
+export const DeleteBoardTemplateDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"DeleteBoardTemplate"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deleteBoardTemplate"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"id"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<DeleteBoardTemplateMutation, DeleteBoardTemplateMutationVariables>;

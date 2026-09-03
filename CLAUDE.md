@@ -377,9 +377,16 @@ object schema refuses `undefined`.
 recurse between tables, and written out as JSON Schema rather than named as SDL they would make
 the listing enormous — more than a model will read, and it arrives before any call. graphql-mcp
 builds each input type once so the repeats become `$ref`s. `tests/mcp-endpoint.test.ts` holds
-every tool under 150 kB and the listing under 1.2 MB. The bounds sit above the real figure on
+every tool under 100 kB and the listing under 1 MB — ~68 kB and ~835 kB as it stands, down from
+~88 kB and ~1.1 MB before drizzle-graphql 12, which gives each column type only the operators it
+can use rather than one filter shape for every column. The bounds sit above the real figure on
 purpose: it is the driver's to move, and what the test is for is the order of magnitude.
 Anything added here that grows it needs to answer to that test rather than raise the bound.
+
+The same test file reaches a tool's `where` through `$ref`s and null branches rather than
+reading its layout, because that layout is the conversion of the week and has changed under us
+without the surface changing at all — and it asserts the operators a column offers, since a
+timestamp advertising `ilike` is bytes an agent reads past on every column of every tool.
 
 **The LLM call retries only before the model has spoken.** `server/runner/agent.ts` owns the
 retry loop, not the OpenAI SDK, whose own retries are off: once a chunk has arrived the turn

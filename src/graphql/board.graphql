@@ -104,13 +104,13 @@ mutation CreateCard($values: CreateCardInput!) {
 }
 
 mutation UpdateCard($id: String!, $set: UpdateCardInput!) {
-  updateCardSingle(where: { id: { eq: $id } }, set: $set) {
+  updateCard(where: { id: { eq: $id } }, set: $set) {
     id
   }
 }
 
 mutation DeleteCard($id: String!) {
-  deleteCardSingle(where: { id: { eq: $id } }) {
+  deleteCard(where: { id: { eq: $id } }) {
     id
   }
 }
@@ -122,13 +122,13 @@ mutation CreateLane($values: CreateLaneInput!) {
 }
 
 mutation UpdateLane($id: String!, $set: UpdateLaneInput!) {
-  updateLaneSingle(where: { id: { eq: $id } }, set: $set) {
+  updateLane(where: { id: { eq: $id } }, set: $set) {
     id
   }
 }
 
 mutation DeleteLane($id: String!) {
-  deleteLaneSingle(where: { id: { eq: $id } }) {
+  deleteLane(where: { id: { eq: $id } }) {
     id
   }
 }

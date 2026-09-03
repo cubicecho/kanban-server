@@ -159,7 +159,7 @@ test("a moved card comes back to idle, and the client's guess says so too", asyn
   // A card a reviewer rejected: `error`, and waiting for a person.
   await run(
     `mutation Fail($id: String!) {
-       updateCardSingle(where: { id: { eq: $id } }, set: { status: error, error: "rejected" }) { id }
+       updateCard(where: { id: { eq: $id } }, set: { status: error, error: "rejected" }) { id }
      }`,
     { id: failed.id },
   );

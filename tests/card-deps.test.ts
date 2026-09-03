@@ -133,7 +133,7 @@ test("the card's hint names exactly the cards the server is still waiting on", a
   // the middle one is in the way, and the board draws that hint from what it already has in
   // hand rather than asking.
   await run(
-    `mutation Done($id: String!) { updateCardSingle(where: { id: { eq: $id } }, set: { status: done }) { id } }`,
+    `mutation Done($id: String!) { updateCard(where: { id: { eq: $id } }, set: { status: done }) { id } }`,
     { id: id("finished") },
   );
   await run(`mutation Away($cardId: String!) { archiveCard(cardId: $cardId) { id } }`, {
