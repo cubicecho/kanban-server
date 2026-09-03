@@ -55,7 +55,7 @@ export function HomeRoute() {
   return (
     <Page
       title="New task"
-      crumb={project?.name}
+      project={project}
       description="Say what you want. It lands as a card at the front of the board."
     >
       <SetupChecklist />

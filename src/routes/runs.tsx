@@ -127,7 +127,7 @@ export function RunsRoute() {
   return (
     <Page
       title="Runs"
-      crumb={project?.name}
+      project={project}
       description="Every execution, newest first."
       actions={
         <Button variant="outline" onClick={refresh}>

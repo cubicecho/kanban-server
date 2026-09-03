@@ -89,7 +89,7 @@ export function ArchiveRoute() {
   return (
     <Page
       title="Archive"
-      crumb={project?.name}
+      project={project}
       description="Cards taken off the board, most recently archived first."
       actions={
         <Button variant="outline" onClick={refresh}>
