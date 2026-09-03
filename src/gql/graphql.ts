@@ -21,6 +21,7 @@ export type Scalars = {
 
 export type Agent = {
   baseUrl: Scalars['String']['output'];
+  contextLength: Scalars['Int']['output'];
   createdAt: Scalars['DateTime']['output'];
   /** Opaque cursor of this row's position in the query's ordering. Pass it as `after` to resume from here. Only set on rows returned by a list query. */
   cursor?: Maybe<Scalars['String']['output']>;
@@ -100,6 +101,7 @@ export type AgentAggregate = {
 };
 
 export type AgentAvgAggregate = {
+  contextLength?: Maybe<Scalars['Float']['output']>;
   maxRetries?: Maybe<Scalars['Float']['output']>;
   maxTokens?: Maybe<Scalars['Float']['output']>;
   maxToolIterations?: Maybe<Scalars['Float']['output']>;
@@ -108,6 +110,7 @@ export type AgentAvgAggregate = {
 };
 
 export type AgentAvgHaving = {
+  contextLength?: InputMaybe<AggregateNumberFilter>;
   maxRetries?: InputMaybe<AggregateNumberFilter>;
   maxTokens?: InputMaybe<AggregateNumberFilter>;
   maxToolIterations?: InputMaybe<AggregateNumberFilter>;
@@ -117,6 +120,7 @@ export type AgentAvgHaving = {
 
 export type AgentCountDistinctAggregate = {
   baseUrl: Scalars['Int']['output'];
+  contextLength: Scalars['Int']['output'];
   createdAt: Scalars['Int']['output'];
   id: Scalars['Int']['output'];
   maxRetries: Scalars['Int']['output'];
@@ -133,6 +137,7 @@ export type AgentCountDistinctAggregate = {
 
 export type AgentCountDistinctHaving = {
   baseUrl?: InputMaybe<AggregateNumberFilter>;
+  contextLength?: InputMaybe<AggregateNumberFilter>;
   createdAt?: InputMaybe<AggregateNumberFilter>;
   id?: InputMaybe<AggregateNumberFilter>;
   maxRetries?: InputMaybe<AggregateNumberFilter>;
@@ -149,6 +154,7 @@ export type AgentCountDistinctHaving = {
 
 export type AgentCountNonNullAggregate = {
   baseUrl: Scalars['Int']['output'];
+  contextLength: Scalars['Int']['output'];
   createdAt: Scalars['Int']['output'];
   enabled: Scalars['Int']['output'];
   id: Scalars['Int']['output'];
@@ -166,6 +172,7 @@ export type AgentCountNonNullAggregate = {
 
 export type AgentCountNonNullHaving = {
   baseUrl?: InputMaybe<AggregateNumberFilter>;
+  contextLength?: InputMaybe<AggregateNumberFilter>;
   createdAt?: InputMaybe<AggregateNumberFilter>;
   enabled?: InputMaybe<AggregateNumberFilter>;
   id?: InputMaybe<AggregateNumberFilter>;
@@ -184,6 +191,7 @@ export type AgentCountNonNullHaving = {
 /** Columns of Agent that a query can be made distinct on */
 export enum AgentDistinctColumn {
   BaseUrl = 'baseUrl',
+  ContextLength = 'contextLength',
   CreatedAt = 'createdAt',
   Enabled = 'enabled',
   Id = 'id',
@@ -207,6 +215,7 @@ export type AgentFilters = {
   /** At least one branch matches; ANDed with any sibling fields */
   OR?: InputMaybe<Array<AgentFilters>>;
   baseUrl?: InputMaybe<StringFilter>;
+  contextLength?: InputMaybe<IntFilter>;
   createdAt?: InputMaybe<DateTimeFilter>;
   enabled?: InputMaybe<BooleanFilter>;
   id?: InputMaybe<StringFilter>;
@@ -239,6 +248,7 @@ export type AgentGroupBy = {
 /** Columns of Agent that a query can group by */
 export enum AgentGroupByColumn {
   BaseUrl = 'baseUrl',
+  ContextLength = 'contextLength',
   CreatedAt = 'createdAt',
   Enabled = 'enabled',
   Id = 'id',
@@ -257,6 +267,7 @@ export enum AgentGroupByColumn {
 /** The grouped column values of one Agent group. A column the query did not group by is null. */
 export type AgentGroupKeys = {
   baseUrl?: Maybe<Scalars['String']['output']>;
+  contextLength?: Maybe<Scalars['Int']['output']>;
   createdAt?: Maybe<Scalars['DateTime']['output']>;
   enabled?: Maybe<Scalars['Boolean']['output']>;
   id?: Maybe<Scalars['String']['output']>;
@@ -286,6 +297,7 @@ export type AgentHaving = {
 
 export type AgentMaxAggregate = {
   baseUrl?: Maybe<Scalars['String']['output']>;
+  contextLength?: Maybe<Scalars['Int']['output']>;
   createdAt?: Maybe<Scalars['DateTime']['output']>;
   id?: Maybe<Scalars['String']['output']>;
   maxRetries?: Maybe<Scalars['Int']['output']>;
@@ -301,6 +313,7 @@ export type AgentMaxAggregate = {
 };
 
 export type AgentMaxHaving = {
+  contextLength?: InputMaybe<AggregateNumberFilter>;
   maxRetries?: InputMaybe<AggregateNumberFilter>;
   maxTokens?: InputMaybe<AggregateNumberFilter>;
   maxToolIterations?: InputMaybe<AggregateNumberFilter>;
@@ -310,6 +323,7 @@ export type AgentMaxHaving = {
 
 export type AgentMinAggregate = {
   baseUrl?: Maybe<Scalars['String']['output']>;
+  contextLength?: Maybe<Scalars['Int']['output']>;
   createdAt?: Maybe<Scalars['DateTime']['output']>;
   id?: Maybe<Scalars['String']['output']>;
   maxRetries?: Maybe<Scalars['Int']['output']>;
@@ -325,6 +339,7 @@ export type AgentMinAggregate = {
 };
 
 export type AgentMinHaving = {
+  contextLength?: InputMaybe<AggregateNumberFilter>;
   maxRetries?: InputMaybe<AggregateNumberFilter>;
   maxTokens?: InputMaybe<AggregateNumberFilter>;
   maxToolIterations?: InputMaybe<AggregateNumberFilter>;
@@ -334,6 +349,7 @@ export type AgentMinHaving = {
 
 export type AgentOrderBy = {
   baseUrl?: InputMaybe<InnerOrder>;
+  contextLength?: InputMaybe<InnerOrder>;
   createdAt?: InputMaybe<InnerOrder>;
   enabled?: InputMaybe<InnerOrder>;
   id?: InputMaybe<InnerOrder>;
@@ -487,6 +503,7 @@ export type AgentServerOrderBy = {
 };
 
 export type AgentSumAggregate = {
+  contextLength?: Maybe<Scalars['Float']['output']>;
   maxRetries?: Maybe<Scalars['Float']['output']>;
   maxTokens?: Maybe<Scalars['Float']['output']>;
   maxToolIterations?: Maybe<Scalars['Float']['output']>;
@@ -495,6 +512,7 @@ export type AgentSumAggregate = {
 };
 
 export type AgentSumHaving = {
+  contextLength?: InputMaybe<AggregateNumberFilter>;
   maxRetries?: InputMaybe<AggregateNumberFilter>;
   maxTokens?: InputMaybe<AggregateNumberFilter>;
   maxToolIterations?: InputMaybe<AggregateNumberFilter>;
@@ -1958,6 +1976,7 @@ export type CardsStatusEnumFilter = {
 
 export type CreateAgentInput = {
   baseUrl?: InputMaybe<Scalars['String']['input']>;
+  contextLength?: InputMaybe<Scalars['Int']['input']>;
   createdAt?: InputMaybe<Scalars['DateTime']['input']>;
   enabled?: InputMaybe<Scalars['Boolean']['input']>;
   id?: InputMaybe<Scalars['String']['input']>;
@@ -3062,6 +3081,13 @@ export type MessagesRoleEnumFilter = {
   startsWith?: InputMaybe<Scalars['String']['input']>;
 };
 
+/** A model an OpenAI-compatible endpoint offers, and how much of it it will read. */
+export type Model = {
+  /** The context window this endpoint reports for the model, in tokens. Zero means it reported none — the OpenAI listing has no field for it, so only servers that add one of their own say anything. A number here is what the endpoint claims and not necessarily what it is serving: a model built for 256k can be loaded in a window a sixteenth of that and go on being listed as 256k, which is why an agent may override it. */
+  contextLength: Scalars['Int']['output'];
+  id: Scalars['String']['output'];
+};
+
 export type Mutation = {
   /** Writes a note on a card. Everything ever said about a card is a note — the report an agent leaves when it has worked one, the verdict a reviewing station rules, and this, a standing note somebody wants taken into account. Every note on the card is handed to the next agent that works it, under "Notes on this card", so this is how you tell one something the card's body does not say without editing the card out from under whoever wrote it. Reports and verdicts are written by the runner and cannot be written here: a note says who wrote it, and that has to be true. Read them with `card_notes(where: { cardId: { eq: "…" } })`. */
   addCardNote: CardNote;
@@ -4026,8 +4052,8 @@ export type Query = {
   messages: Array<Message>;
   messagesAggregate: MessageAggregate;
   messagesGroupBy: Array<MessageGroupBy>;
-  /** Model ids an OpenAI-compatible server reports. With no `agentId` this asks the endpoint in Settings; with one it asks that agent's own endpoint, which is the list that agent can actually choose from. */
-  models: Array<Scalars['String']['output']>;
+  /** The models an OpenAI-compatible server reports, with the context window it claims for each. With no `agentId` this asks the endpoint in Settings; with one it asks that agent's own endpoint, which is the list that agent can actually choose from. */
+  models: Array<Model>;
   project?: Maybe<Project>;
   projects: Array<Project>;
   projectsAggregate: ProjectAggregate;
@@ -5316,6 +5342,7 @@ export type RunsVerdictEnumFilter = {
 
 export type Setting = {
   baseUrl: Scalars['String']['output'];
+  contextLength: Scalars['Int']['output'];
   /** Opaque cursor of this row's position in the query's ordering. Pass it as `after` to resume from here. Only set on rows returned by a list query. */
   cursor?: Maybe<Scalars['String']['output']>;
   id: Scalars['String']['output'];
@@ -5344,6 +5371,7 @@ export type SettingAggregate = {
 };
 
 export type SettingAvgAggregate = {
+  contextLength?: Maybe<Scalars['Float']['output']>;
   maxRetries?: Maybe<Scalars['Float']['output']>;
   maxTokens?: Maybe<Scalars['Float']['output']>;
   maxToolIterations?: Maybe<Scalars['Float']['output']>;
@@ -5354,6 +5382,7 @@ export type SettingAvgAggregate = {
 };
 
 export type SettingAvgHaving = {
+  contextLength?: InputMaybe<AggregateNumberFilter>;
   maxRetries?: InputMaybe<AggregateNumberFilter>;
   maxTokens?: InputMaybe<AggregateNumberFilter>;
   maxToolIterations?: InputMaybe<AggregateNumberFilter>;
@@ -5365,6 +5394,7 @@ export type SettingAvgHaving = {
 
 export type SettingCountDistinctAggregate = {
   baseUrl: Scalars['Int']['output'];
+  contextLength: Scalars['Int']['output'];
   id: Scalars['Int']['output'];
   maxRetries: Scalars['Int']['output'];
   maxTokens: Scalars['Int']['output'];
@@ -5382,6 +5412,7 @@ export type SettingCountDistinctAggregate = {
 
 export type SettingCountDistinctHaving = {
   baseUrl?: InputMaybe<AggregateNumberFilter>;
+  contextLength?: InputMaybe<AggregateNumberFilter>;
   id?: InputMaybe<AggregateNumberFilter>;
   maxRetries?: InputMaybe<AggregateNumberFilter>;
   maxTokens?: InputMaybe<AggregateNumberFilter>;
@@ -5399,6 +5430,7 @@ export type SettingCountDistinctHaving = {
 
 export type SettingCountNonNullAggregate = {
   baseUrl: Scalars['Int']['output'];
+  contextLength: Scalars['Int']['output'];
   id: Scalars['Int']['output'];
   maxRetries: Scalars['Int']['output'];
   maxTokens: Scalars['Int']['output'];
@@ -5416,6 +5448,7 @@ export type SettingCountNonNullAggregate = {
 
 export type SettingCountNonNullHaving = {
   baseUrl?: InputMaybe<AggregateNumberFilter>;
+  contextLength?: InputMaybe<AggregateNumberFilter>;
   id?: InputMaybe<AggregateNumberFilter>;
   maxRetries?: InputMaybe<AggregateNumberFilter>;
   maxTokens?: InputMaybe<AggregateNumberFilter>;
@@ -5434,6 +5467,7 @@ export type SettingCountNonNullHaving = {
 /** Columns of Setting that a query can be made distinct on */
 export enum SettingDistinctColumn {
   BaseUrl = 'baseUrl',
+  ContextLength = 'contextLength',
   Id = 'id',
   MaxRetries = 'maxRetries',
   MaxTokens = 'maxTokens',
@@ -5457,6 +5491,7 @@ export type SettingFilters = {
   /** At least one branch matches; ANDed with any sibling fields */
   OR?: InputMaybe<Array<SettingFilters>>;
   baseUrl?: InputMaybe<StringFilter>;
+  contextLength?: InputMaybe<IntFilter>;
   id?: InputMaybe<StringFilter>;
   maxRetries?: InputMaybe<IntFilter>;
   maxTokens?: InputMaybe<IntFilter>;
@@ -5486,6 +5521,7 @@ export type SettingGroupBy = {
 /** Columns of Setting that a query can group by */
 export enum SettingGroupByColumn {
   BaseUrl = 'baseUrl',
+  ContextLength = 'contextLength',
   Id = 'id',
   MaxRetries = 'maxRetries',
   MaxTokens = 'maxTokens',
@@ -5504,6 +5540,7 @@ export enum SettingGroupByColumn {
 /** The grouped column values of one Setting group. A column the query did not group by is null. */
 export type SettingGroupKeys = {
   baseUrl?: Maybe<Scalars['String']['output']>;
+  contextLength?: Maybe<Scalars['Int']['output']>;
   id?: Maybe<Scalars['String']['output']>;
   maxRetries?: Maybe<Scalars['Int']['output']>;
   maxTokens?: Maybe<Scalars['Int']['output']>;
@@ -5533,6 +5570,7 @@ export type SettingHaving = {
 
 export type SettingMaxAggregate = {
   baseUrl?: Maybe<Scalars['String']['output']>;
+  contextLength?: Maybe<Scalars['Int']['output']>;
   id?: Maybe<Scalars['String']['output']>;
   maxRetries?: Maybe<Scalars['Int']['output']>;
   maxTokens?: Maybe<Scalars['Int']['output']>;
@@ -5549,6 +5587,7 @@ export type SettingMaxAggregate = {
 };
 
 export type SettingMaxHaving = {
+  contextLength?: InputMaybe<AggregateNumberFilter>;
   maxRetries?: InputMaybe<AggregateNumberFilter>;
   maxTokens?: InputMaybe<AggregateNumberFilter>;
   maxToolIterations?: InputMaybe<AggregateNumberFilter>;
@@ -5560,6 +5599,7 @@ export type SettingMaxHaving = {
 
 export type SettingMinAggregate = {
   baseUrl?: Maybe<Scalars['String']['output']>;
+  contextLength?: Maybe<Scalars['Int']['output']>;
   id?: Maybe<Scalars['String']['output']>;
   maxRetries?: Maybe<Scalars['Int']['output']>;
   maxTokens?: Maybe<Scalars['Int']['output']>;
@@ -5576,6 +5616,7 @@ export type SettingMinAggregate = {
 };
 
 export type SettingMinHaving = {
+  contextLength?: InputMaybe<AggregateNumberFilter>;
   maxRetries?: InputMaybe<AggregateNumberFilter>;
   maxTokens?: InputMaybe<AggregateNumberFilter>;
   maxToolIterations?: InputMaybe<AggregateNumberFilter>;
@@ -5587,6 +5628,7 @@ export type SettingMinHaving = {
 
 export type SettingOrderBy = {
   baseUrl?: InputMaybe<InnerOrder>;
+  contextLength?: InputMaybe<InnerOrder>;
   id?: InputMaybe<InnerOrder>;
   maxRetries?: InputMaybe<InnerOrder>;
   maxTokens?: InputMaybe<InnerOrder>;
@@ -5603,6 +5645,7 @@ export type SettingOrderBy = {
 };
 
 export type SettingSumAggregate = {
+  contextLength?: Maybe<Scalars['Float']['output']>;
   maxRetries?: Maybe<Scalars['Float']['output']>;
   maxTokens?: Maybe<Scalars['Float']['output']>;
   maxToolIterations?: Maybe<Scalars['Float']['output']>;
@@ -5613,6 +5656,7 @@ export type SettingSumAggregate = {
 };
 
 export type SettingSumHaving = {
+  contextLength?: InputMaybe<AggregateNumberFilter>;
   maxRetries?: InputMaybe<AggregateNumberFilter>;
   maxTokens?: InputMaybe<AggregateNumberFilter>;
   maxToolIterations?: InputMaybe<AggregateNumberFilter>;
@@ -5949,6 +5993,7 @@ export type TaskOrderBy = {
 
 export type UpdateAgentInput = {
   baseUrl?: InputMaybe<Scalars['String']['input']>;
+  contextLength?: InputMaybe<Scalars['Int']['input']>;
   createdAt?: InputMaybe<Scalars['DateTime']['input']>;
   enabled?: InputMaybe<Scalars['Boolean']['input']>;
   id?: InputMaybe<Scalars['String']['input']>;
@@ -6118,6 +6163,7 @@ export type UpdateRoleManyInput = {
 
 export type UpdateSettingInput = {
   baseUrl?: InputMaybe<Scalars['String']['input']>;
+  contextLength?: InputMaybe<Scalars['Int']['input']>;
   id?: InputMaybe<Scalars['String']['input']>;
   maxRetries?: InputMaybe<Scalars['Int']['input']>;
   maxTokens?: InputMaybe<Scalars['Int']['input']>;
@@ -6159,14 +6205,14 @@ export type UpdateTaskManyInput = {
 export type AgentsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type AgentsQuery = { agents: Array<{ id: string, name: string, enabled: boolean, baseUrl: string, model: string, systemPrompt: string, maxTokens: number, temperature: number, maxToolIterations: number, toolDiscovery: AgentsToolDiscoveryEnum, requestTimeoutSeconds: number, maxRetries: number, servers: Array<{ serverId: string }> }>, mcpServers: Array<{ id: string, slug: string, label: string, enabled: boolean }>, lanes: Array<{ id: string, agentId?: string | null, name: string, project: { name: string } }>, settings: Array<{ baseUrl: string, model: string }> };
+export type AgentsQuery = { agents: Array<{ id: string, name: string, enabled: boolean, baseUrl: string, model: string, systemPrompt: string, maxTokens: number, contextLength: number, temperature: number, maxToolIterations: number, toolDiscovery: AgentsToolDiscoveryEnum, requestTimeoutSeconds: number, maxRetries: number, servers: Array<{ serverId: string }> }>, mcpServers: Array<{ id: string, slug: string, label: string, enabled: boolean }>, lanes: Array<{ id: string, agentId?: string | null, name: string, project: { name: string } }>, settings: Array<{ baseUrl: string, model: string }> };
 
 export type AgentModelsQueryVariables = Exact<{
   agentId?: InputMaybe<Scalars['String']['input']>;
 }>;
 
 
-export type AgentModelsQuery = { models: Array<string> };
+export type AgentModelsQuery = { models: Array<{ id: string, contextLength: number }> };
 
 export type CreateAgentMutationVariables = Exact<{
   values: CreateAgentInput;
@@ -6502,7 +6548,7 @@ export type CardRunsQuery = { runs: Array<{ id: string, status: RunsStatusEnum, 
 export type SettingsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type SettingsQuery = { settings: Array<{ id: string, baseUrl: string, model: string, maxTokens: number, temperature: number, maxToolIterations: number, toolDiscovery: SettingsToolDiscoveryEnum, toolSelectModel: string, requestTimeoutSeconds: number, maxRetries: number, runRetentionDays: number, workerIntervalSeconds: number, refineAgentId?: string | null, refinePrompt: string }> };
+export type SettingsQuery = { settings: Array<{ id: string, baseUrl: string, model: string, maxTokens: number, contextLength: number, temperature: number, maxToolIterations: number, toolDiscovery: SettingsToolDiscoveryEnum, toolSelectModel: string, requestTimeoutSeconds: number, maxRetries: number, runRetentionDays: number, workerIntervalSeconds: number, refineAgentId?: string | null, refinePrompt: string }> };
 
 export type UpdateSettingsMutationVariables = Exact<{
   set: UpdateSettingInput;
@@ -6632,8 +6678,8 @@ export type DeleteBoardTemplateMutationVariables = Exact<{
 export type DeleteBoardTemplateMutation = { deleteBoardTemplateSingle?: { id: string } | null };
 
 
-export const AgentsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"Agents"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"agents"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"orderBy"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"name"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"direction"},"value":{"kind":"EnumValue","value":"asc"}},{"kind":"ObjectField","name":{"kind":"Name","value":"priority"},"value":{"kind":"IntValue","value":"1"}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"enabled"}},{"kind":"Field","name":{"kind":"Name","value":"baseUrl"}},{"kind":"Field","name":{"kind":"Name","value":"model"}},{"kind":"Field","name":{"kind":"Name","value":"systemPrompt"}},{"kind":"Field","name":{"kind":"Name","value":"maxTokens"}},{"kind":"Field","name":{"kind":"Name","value":"temperature"}},{"kind":"Field","name":{"kind":"Name","value":"maxToolIterations"}},{"kind":"Field","name":{"kind":"Name","value":"toolDiscovery"}},{"kind":"Field","name":{"kind":"Name","value":"requestTimeoutSeconds"}},{"kind":"Field","name":{"kind":"Name","value":"maxRetries"}},{"kind":"Field","name":{"kind":"Name","value":"servers"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"serverId"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"mcpServers"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"orderBy"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"slug"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"direction"},"value":{"kind":"EnumValue","value":"asc"}},{"kind":"ObjectField","name":{"kind":"Name","value":"priority"},"value":{"kind":"IntValue","value":"1"}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"slug"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"enabled"}}]}},{"kind":"Field","name":{"kind":"Name","value":"lanes"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"agentId"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"project"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"settings"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"baseUrl"}},{"kind":"Field","name":{"kind":"Name","value":"model"}}]}}]}}]} as unknown as DocumentNode<AgentsQuery, AgentsQueryVariables>;
-export const AgentModelsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"AgentModels"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"agentId"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"models"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"agentId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"agentId"}}}]}]}}]} as unknown as DocumentNode<AgentModelsQuery, AgentModelsQueryVariables>;
+export const AgentsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"Agents"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"agents"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"orderBy"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"name"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"direction"},"value":{"kind":"EnumValue","value":"asc"}},{"kind":"ObjectField","name":{"kind":"Name","value":"priority"},"value":{"kind":"IntValue","value":"1"}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"enabled"}},{"kind":"Field","name":{"kind":"Name","value":"baseUrl"}},{"kind":"Field","name":{"kind":"Name","value":"model"}},{"kind":"Field","name":{"kind":"Name","value":"systemPrompt"}},{"kind":"Field","name":{"kind":"Name","value":"maxTokens"}},{"kind":"Field","name":{"kind":"Name","value":"contextLength"}},{"kind":"Field","name":{"kind":"Name","value":"temperature"}},{"kind":"Field","name":{"kind":"Name","value":"maxToolIterations"}},{"kind":"Field","name":{"kind":"Name","value":"toolDiscovery"}},{"kind":"Field","name":{"kind":"Name","value":"requestTimeoutSeconds"}},{"kind":"Field","name":{"kind":"Name","value":"maxRetries"}},{"kind":"Field","name":{"kind":"Name","value":"servers"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"serverId"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"mcpServers"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"orderBy"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"slug"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"direction"},"value":{"kind":"EnumValue","value":"asc"}},{"kind":"ObjectField","name":{"kind":"Name","value":"priority"},"value":{"kind":"IntValue","value":"1"}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"slug"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"enabled"}}]}},{"kind":"Field","name":{"kind":"Name","value":"lanes"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"agentId"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"project"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"settings"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"baseUrl"}},{"kind":"Field","name":{"kind":"Name","value":"model"}}]}}]}}]} as unknown as DocumentNode<AgentsQuery, AgentsQueryVariables>;
+export const AgentModelsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"AgentModels"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"agentId"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"models"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"agentId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"agentId"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"contextLength"}}]}}]}}]} as unknown as DocumentNode<AgentModelsQuery, AgentModelsQueryVariables>;
 export const CreateAgentDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CreateAgent"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"values"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"CreateAgentInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createAgent"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"values"},"value":{"kind":"Variable","name":{"kind":"Name","value":"values"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<CreateAgentMutation, CreateAgentMutationVariables>;
 export const UpdateAgentDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateAgent"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"set"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UpdateAgentInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateAgentSingle"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"id"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}}]}},{"kind":"Argument","name":{"kind":"Name","value":"set"},"value":{"kind":"Variable","name":{"kind":"Name","value":"set"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<UpdateAgentMutation, UpdateAgentMutationVariables>;
 export const DeleteAgentDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"DeleteAgent"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deleteAgentSingle"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"id"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<DeleteAgentMutation, DeleteAgentMutationVariables>;
@@ -6680,7 +6726,7 @@ export const ActiveRunsDocument = {"kind":"Document","definitions":[{"kind":"Ope
 export const DeleteRunDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"DeleteRun"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"deleteRunSingle"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"id"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<DeleteRunMutation, DeleteRunMutationVariables>;
 export const RunEventsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"subscription","name":{"kind":"Name","value":"RunEvents"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"runId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"runEvents"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"runId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"runId"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"seq"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"text"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"ok"}},{"kind":"Field","name":{"kind":"Name","value":"usage"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"promptTokens"}},{"kind":"Field","name":{"kind":"Name","value":"completionTokens"}},{"kind":"Field","name":{"kind":"Name","value":"totalTokens"}}]}}]}}]}}]} as unknown as DocumentNode<RunEventsSubscription, RunEventsSubscriptionVariables>;
 export const CardRunsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"CardRuns"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"cardId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"runs"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"IntValue","value":"20"}},{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"cardId"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"cardId"}}}]}}]}},{"kind":"Argument","name":{"kind":"Name","value":"orderBy"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"startedAt"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"direction"},"value":{"kind":"EnumValue","value":"desc"}},{"kind":"ObjectField","name":{"kind":"Name","value":"priority"},"value":{"kind":"IntValue","value":"1"}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"verdict"}},{"kind":"Field","name":{"kind":"Name","value":"startedAt"}},{"kind":"Field","name":{"kind":"Name","value":"finishedAt"}},{"kind":"Field","name":{"kind":"Name","value":"output"}},{"kind":"Field","name":{"kind":"Name","value":"error"}},{"kind":"Field","name":{"kind":"Name","value":"totalTokens"}},{"kind":"Field","name":{"kind":"Name","value":"agent"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"lane"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"cardEvents"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"IntValue","value":"50"}},{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"cardId"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"Variable","name":{"kind":"Name","value":"cardId"}}}]}}]}},{"kind":"Argument","name":{"kind":"Name","value":"orderBy"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"createdAt"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"direction"},"value":{"kind":"EnumValue","value":"desc"}},{"kind":"ObjectField","name":{"kind":"Name","value":"priority"},"value":{"kind":"IntValue","value":"1"}}]}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"runId"}},{"kind":"Field","name":{"kind":"Name","value":"note"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"body"}}]}},{"kind":"Field","name":{"kind":"Name","value":"actor"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"fromLane"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"toLane"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}}]}}]} as unknown as DocumentNode<CardRunsQuery, CardRunsQueryVariables>;
-export const SettingsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"Settings"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"settings"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"baseUrl"}},{"kind":"Field","name":{"kind":"Name","value":"model"}},{"kind":"Field","name":{"kind":"Name","value":"maxTokens"}},{"kind":"Field","name":{"kind":"Name","value":"temperature"}},{"kind":"Field","name":{"kind":"Name","value":"maxToolIterations"}},{"kind":"Field","name":{"kind":"Name","value":"toolDiscovery"}},{"kind":"Field","name":{"kind":"Name","value":"toolSelectModel"}},{"kind":"Field","name":{"kind":"Name","value":"requestTimeoutSeconds"}},{"kind":"Field","name":{"kind":"Name","value":"maxRetries"}},{"kind":"Field","name":{"kind":"Name","value":"runRetentionDays"}},{"kind":"Field","name":{"kind":"Name","value":"workerIntervalSeconds"}},{"kind":"Field","name":{"kind":"Name","value":"refineAgentId"}},{"kind":"Field","name":{"kind":"Name","value":"refinePrompt"}}]}}]}}]} as unknown as DocumentNode<SettingsQuery, SettingsQueryVariables>;
+export const SettingsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"Settings"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"settings"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"baseUrl"}},{"kind":"Field","name":{"kind":"Name","value":"model"}},{"kind":"Field","name":{"kind":"Name","value":"maxTokens"}},{"kind":"Field","name":{"kind":"Name","value":"contextLength"}},{"kind":"Field","name":{"kind":"Name","value":"temperature"}},{"kind":"Field","name":{"kind":"Name","value":"maxToolIterations"}},{"kind":"Field","name":{"kind":"Name","value":"toolDiscovery"}},{"kind":"Field","name":{"kind":"Name","value":"toolSelectModel"}},{"kind":"Field","name":{"kind":"Name","value":"requestTimeoutSeconds"}},{"kind":"Field","name":{"kind":"Name","value":"maxRetries"}},{"kind":"Field","name":{"kind":"Name","value":"runRetentionDays"}},{"kind":"Field","name":{"kind":"Name","value":"workerIntervalSeconds"}},{"kind":"Field","name":{"kind":"Name","value":"refineAgentId"}},{"kind":"Field","name":{"kind":"Name","value":"refinePrompt"}}]}}]}}]} as unknown as DocumentNode<SettingsQuery, SettingsQueryVariables>;
 export const UpdateSettingsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateSettings"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"set"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UpdateSettingInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateSettingSingle"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"where"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"id"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"eq"},"value":{"kind":"StringValue","value":"default","block":false}}]}}]}},{"kind":"Argument","name":{"kind":"Name","value":"set"},"value":{"kind":"Variable","name":{"kind":"Name","value":"set"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<UpdateSettingsMutation, UpdateSettingsMutationVariables>;
 export const SetApiKeyDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SetApiKey"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"apiKey"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"setApiKey"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"apiKey"},"value":{"kind":"Variable","name":{"kind":"Name","value":"apiKey"}}}]}]}}]} as unknown as DocumentNode<SetApiKeyMutation, SetApiKeyMutationVariables>;
 export const SpendDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"Spend"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"projectId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"taskId"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"days"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"spend"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"projectId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"projectId"}}},{"kind":"Argument","name":{"kind":"Name","value":"taskId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"taskId"}}},{"kind":"Argument","name":{"kind":"Name","value":"days"},"value":{"kind":"Variable","name":{"kind":"Name","value":"days"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"runs"}},{"kind":"Field","name":{"kind":"Name","value":"promptTokens"}},{"kind":"Field","name":{"kind":"Name","value":"completionTokens"}},{"kind":"Field","name":{"kind":"Name","value":"totalTokens"}},{"kind":"Field","name":{"kind":"Name","value":"days"}},{"kind":"Field","name":{"kind":"Name","value":"from"}},{"kind":"Field","name":{"kind":"Name","value":"retentionDays"}}]}}]}}]} as unknown as DocumentNode<SpendQuery, SpendQueryVariables>;

@@ -385,6 +385,28 @@ has arrived the turn is unrepeatable, so only a failure *before* the model has s
 `requestTimeoutSeconds` is a silence watchdog that rearms on every chunk, not a deadline on the
 request.
 
+### The context window
+
+A card carries more than a chat message does — a system prompt in four layers, the notes and the
+verdicts said about it, and whatever the tools hand back over as many as twenty turns — so a run
+can outgrow the model's window without anybody having written anything long. That used to arrive
+as the endpoint's own complaint, which names a number nobody set:
+
+    request (40368 tokens) exceeds the available context size (16384 tokens)
+
+The window is now read from the model listing, which is where a server that says anything says
+it: `context_length`, `max_context_window`, `max_model_len`, `context_window` or `n_ctx`,
+whichever turns up, cached per endpoint. It shows against each model in the picker, and a request
+that plainly cannot fit is refused before it is sent, with the figure and its source in the
+message.
+
+**Set Settings → Context window, or the agent's, when the endpoint is not to be believed.** It
+usually is not: llama.cpp and Ollama report the window a model was *built* with and serve it in
+whatever `-c` / `num_ctx` they were started with, so a 256k model can be listed as 256k and run
+in 16k. The field is that number, and zero means ask the endpoint. The other half of the fix is
+on the server — `llama-server -c 262144`, or `OLLAMA_CONTEXT_LENGTH=262144` — since a window the
+model is not actually being served in is not one an agent can use.
+
 ## Watching a run
 
 A run row is a before and an after. Everything in between — the thinking, the tool the model

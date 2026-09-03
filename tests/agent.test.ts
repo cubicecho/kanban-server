@@ -58,6 +58,7 @@ const config = (over: Partial<Resolved> = {}): Resolved => ({
   model: "fake",
   systemPrompt: "",
   maxTokens: 256,
+  contextLength: 0,
   temperature: 0,
   maxToolIterations: 3,
   toolDiscovery: "eager",

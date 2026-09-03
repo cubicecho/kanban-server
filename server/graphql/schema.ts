@@ -380,6 +380,23 @@ function generatedType(name: string): GraphQLOutputType {
   return type as GraphQLOutputType;
 }
 
+const ModelType = new GraphQLObjectType({
+  name: "Model",
+  description: "A model an OpenAI-compatible endpoint offers, and how much of it it will read.",
+  fields: {
+    id: { type: new GraphQLNonNull(GraphQLString) },
+    contextLength: {
+      type: new GraphQLNonNull(GraphQLInt),
+      description:
+        "The context window this endpoint reports for the model, in tokens. Zero means it " +
+        "reported none — the OpenAI listing has no field for it, so only servers that add " +
+        "one of their own say anything. A number here is what the endpoint claims and not " +
+        "necessarily what it is serving: a model built for 256k can be loaded in a window a " +
+        "sixteenth of that and go on being listed as 256k, which is why an agent may override it.",
+    },
+  },
+});
+
 const McpToolType = new GraphQLObjectType({
   name: "McpTool",
   fields: {
@@ -636,11 +653,11 @@ export const schema = new GraphQLSchema({
     fields: {
       ...entities.queries,
       models: {
-        type: new GraphQLNonNull(new GraphQLList(new GraphQLNonNull(GraphQLString))),
+        type: new GraphQLNonNull(new GraphQLList(new GraphQLNonNull(ModelType))),
         description:
-          "Model ids an OpenAI-compatible server reports. With no `agentId` this asks the " +
-          "endpoint in Settings; with one it asks that agent's own endpoint, which is the " +
-          "list that agent can actually choose from.",
+          "The models an OpenAI-compatible server reports, with the context window it claims " +
+          "for each. With no `agentId` this asks the endpoint in Settings; with one it asks " +
+          "that agent's own endpoint, which is the list that agent can actually choose from.",
         args: { agentId: { type: GraphQLString } },
         resolve: (_source, args: { agentId?: string | null }) => listModels(args.agentId),
       },

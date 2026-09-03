@@ -7,6 +7,7 @@ query Agents {
     model
     systemPrompt
     maxTokens
+    contextLength
     temperature
     maxToolIterations
     toolDiscovery
@@ -43,7 +44,10 @@ query Agents {
 }
 
 query AgentModels($agentId: String) {
-  models(agentId: $agentId)
+  models(agentId: $agentId) {
+    id
+    contextLength
+  }
 }
 
 mutation CreateAgent($values: CreateAgentInput!) {
