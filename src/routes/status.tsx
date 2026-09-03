@@ -7,6 +7,7 @@ import { ActionButton } from "@/components/action-button";
 import { Page, useCurrentProject } from "@/components/app-shell";
 import { CardDialog } from "@/components/card-dialog";
 import { EmptyState, NoProject } from "@/components/empty-state";
+import { LiveDot } from "@/components/live-dot";
 import { MetaLine } from "@/components/meta-line";
 import { useProjectActions } from "@/components/project-actions";
 import { QueryError } from "@/components/query-error";
@@ -99,7 +100,15 @@ function Tile({
           >
             {count}
           </span>
-          <span className="block text-xs text-muted-foreground">{HEALTH[health].label}</span>
+          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            {/* The two heaps that are true *now* rather than as of the last poll say so the
+                same way, in the same dot: green that work is moving, red that it has stopped
+                and is waiting on somebody. A tile at nought pulses at nobody. */}
+            {count > 0 && (health === "attention" || health === "running") ? (
+              <LiveDot tone={health === "attention" ? "fault" : "running"} className="size-1.5" />
+            ) : null}
+            {HEALTH[health].label}
+          </span>
         </button>
       </TooltipTrigger>
       <TooltipContent>{HEALTH[health].blurb}</TooltipContent>
@@ -489,7 +498,12 @@ export function StatusRoute() {
       {unexplained.length ? (
         <section className="flex flex-col gap-3">
           <div>
-            <h2 className="font-medium">Failures with nothing to show for them</h2>
+            <h2 className="flex items-center gap-2 font-medium">
+              {/* On the heading rather than on every row: five broken runs are one thing to
+                  look at, and five pulsing dots are five. */}
+              <LiveDot tone="fault" />
+              Failures with nothing to show for them
+            </h2>
             <p className="text-sm text-muted-foreground">
               Runs that broke and left no card standing in the way — a refinement that never reached
               the board, or a card somebody has since moved on.
