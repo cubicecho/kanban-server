@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
 import {
+  Activity,
   Archive,
   Bot,
   FolderOpen,
@@ -31,16 +32,21 @@ import { selectProject, useProjectId } from "@/lib/project";
 import { cn } from "@/lib/utils";
 
 /**
- * The five pages that are about the project in the picker above them.
+ * The six pages that are about the project in the picker above them.
  *
  * Split from the four that are about the server because the sidebar was nine flat links in
  * which "Archive" and "Agents" sat one above the other, looking like the same kind of thing —
  * one is this project's discarded cards and the other is every model endpoint on the box. The
  * heading over each group says which the page you are about to open belongs to, and switching
  * projects changes what the first group shows and nothing in the second.
+ *
+ * Status sits second because it is the answer to the question the other pages are the long way
+ * round to: you say what you want on the first page, and the next thing you want to know is
+ * whether it is going anywhere.
  */
 const PROJECT_NAV = [
   { to: "/", label: "New task", icon: MessageSquare },
+  { to: "/status", label: "Status", icon: Activity },
   { to: "/board", label: "Board", icon: KanbanSquare },
   { to: "/tasks", label: "Tasks", icon: ListChecks },
   { to: "/runs", label: "Runs", icon: History },
@@ -180,7 +186,7 @@ export function AppShell() {
   return (
     <ProjectActions>
       <div className="flex h-screen w-screen overflow-hidden bg-background text-foreground">
-        {/* An icon rail under `lg` rather than a hamburger: nine destinations fit in 3.5rem, and
+        {/* An icon rail under `lg` rather than a hamburger: ten destinations fit in 3.5rem, and
             a drawer would put a click in front of every one of them to save 10rem. */}
         <aside className="flex w-14 shrink-0 flex-col overflow-y-auto border-r bg-sidebar lg:w-56">
           <div className="flex items-center gap-2 px-4 py-4 text-sm font-semibold tracking-tight">

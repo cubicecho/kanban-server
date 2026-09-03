@@ -46,6 +46,7 @@ export function CardDialog({
   lanes,
   projectId,
   laneId,
+  tab,
   onClose,
 }: {
   card?: Card;
@@ -56,6 +57,13 @@ export function CardDialog({
   projectId: string;
   /** Which lane a new card lands in. Ignored when editing. */
   laneId: string;
+  /**
+   * Which tab to open on. The board opens a card to edit it, so `details` is right there; the
+   * status page opens one because of something said about it, and landing on the form puts a
+   * click in front of the answer somebody came for. A card that does not exist yet has no
+   * notes and no history, so it opens on `details` whatever is asked for.
+   */
+  tab?: "details" | "deps" | "notes" | "history";
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
@@ -172,7 +180,7 @@ export function CardDialog({
             and what has happened to it. They were one scroll, which meant the deps picker
             appearing when its query landed shoved the history down the page under whoever was
             reading it. */}
-        <Tabs defaultValue="details">
+        <Tabs defaultValue={card ? (tab ?? "details") : "details"}>
           <TabsList>
             <TabsTrigger value="details">Details</TabsTrigger>
             <TabsTrigger value="deps">

@@ -36,7 +36,6 @@ import {
   ActiveRunsDocument,
   AgentsDocument,
   ArchiveCardDocument,
-  BoardDocument,
   type BoardQuery,
   CardsStatusEnum,
   DeleteCardDocument,
@@ -49,23 +48,13 @@ import {
   StopCardDocument,
 } from "@/gql/graphql";
 import { landing, laneOrder, placement } from "@/lib/board-order";
+import { BOARD_LIMIT, boardQuery } from "@/lib/board-query";
 import { request } from "@/lib/gql";
 import { useProjectId } from "@/lib/project";
 import { cn } from "@/lib/utils";
 
 type Lane = BoardQuery["lanes"][number];
 type BoardCard = BoardQuery["cards"][number];
-
-/**
- * How many cards the board will draw.
- *
- * It asks for one more than this and shows the first `LIMIT`, which is how it knows there are
- * others: a board that quietly stopped at five hundred looked exactly like a board with five
- * hundred cards on it. There is no "show more" here because a board is not a list — the cards
- * come back in `position` order across the whole project, so what a higher limit would add is
- * the tail of the longest lanes, and the answer to a board this size is the archive.
- */
-const LIMIT = 500;
 
 /**
  * The whole lane is a drop target, so a card can be put in an empty one.
@@ -186,9 +175,7 @@ export function BoardRoute() {
   const project = useCurrentProject();
 
   const board = useQuery({
-    queryKey: ["board", projectId],
-    queryFn: () => request(BoardDocument, { projectId, limit: LIMIT + 1 }),
-    enabled: Boolean(projectId),
+    ...boardQuery(projectId),
     // A card an agent is working changes without anyone here doing anything — but not while a
     // card is in the air, because a lane that renumbers itself under the cursor is a card
     // dropped somewhere nobody aimed at.
@@ -331,8 +318,8 @@ export function BoardRoute() {
 
   const lanes = board.data?.lanes ?? [];
   const all = board.data?.cards ?? [];
-  const truncated = all.length > LIMIT;
-  const cards = truncated ? all.slice(0, LIMIT) : all;
+  const truncated = all.length > BOARD_LIMIT;
+  const cards = truncated ? all.slice(0, BOARD_LIMIT) : all;
 
   // Title and body, because half of what distinguishes two cards called "Migrate the tables"
   // is in the brief underneath. Nothing here is sent to the server: the board is already in
@@ -470,9 +457,9 @@ export function BoardRoute() {
           above the lanes, with the thing to do about it. */}
       {truncated ? (
         <p className="rounded-md border border-dashed px-3 py-2 text-xs text-muted-foreground">
-          This project has more than {LIMIT} cards on the board and only the first {LIMIT} are drawn
-          — they come back in position order, so what is missing is the tail of the longest lanes.
-          Archive what is finished.
+          This project has more than {BOARD_LIMIT} cards on the board and only the first{" "}
+          {BOARD_LIMIT} are drawn — they come back in position order, so what is missing is the tail
+          of the longest lanes. Archive what is finished.
         </p>
       ) : null}
 

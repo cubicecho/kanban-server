@@ -41,6 +41,60 @@ export const CARD_STATUS_CLASS: Partial<Record<CardsStatusEnum, string>> = {
 export const needsAttention = (status: CardsStatusEnum) =>
   status === CardsStatusEnum.Error || status === CardsStatusEnum.Rejected;
 
+/**
+ * Whether a lane will ever pick a card up. Both halves are needed: the role says what happens
+ * here and the agent says who does it, and a lane naming one without the other never runs.
+ */
+export const isStation = (lane: { roleId?: string | null; agentId?: string | null }) =>
+  Boolean(lane.roleId && lane.agentId);
+
+/**
+ * What is actually becoming of a card, which its status alone does not say.
+ *
+ * `idle` is four different situations wearing one word — a card an agent is about to pick up,
+ * one held behind a dependency, one sitting in a resting place nothing runs from, and, when
+ * the project is not on auto, one waiting on a person to press the button. A board makes that
+ * difference visible by where the card is standing; a count of statuses cannot, and "eleven
+ * idle" is exactly the number that reads as fine when half of it is stuck.
+ */
+export type CardHealth = "attention" | "running" | "blocked" | "waiting" | "parked" | "done";
+
+/** Worst first: what wants somebody now, down to what wants nobody ever. */
+export const CARD_HEALTH: readonly CardHealth[] = [
+  "attention",
+  "running",
+  "blocked",
+  "waiting",
+  "parked",
+  "done",
+] as const;
+
+/**
+ * Where one card stands, given the lane it is in and the board around it.
+ *
+ * The dependency half is `blockers` as the server works it out, against the cards this board
+ * already has: a dependency that is not among them has been archived, and an archived
+ * dependency is not in the way — taking a card off the board is a decision that it does not
+ * have to happen. The one case the two can differ on is a board truncated at `BOARD_LIMIT`,
+ * where the missing rows are the tail of the longest lanes; the page says when it is drawing
+ * a board that big.
+ */
+export function cardHealth(
+  card: { status: CardsStatusEnum; deps: readonly { dependsOnCardId: string }[] },
+  lane: { roleId?: string | null; agentId?: string | null } | undefined,
+  onBoard: ReadonlyMap<string, { status: CardsStatusEnum }>,
+): CardHealth {
+  if (needsAttention(card.status)) return "attention";
+  if (card.status === CardsStatusEnum.Running) return "running";
+  if (card.status === CardsStatusEnum.Done) return "done";
+  if (!lane || !isStation(lane)) return "parked";
+  const waiting = card.deps.some((dep) => {
+    const on = onBoard.get(dep.dependsOnCardId);
+    return Boolean(on) && on?.status !== CardsStatusEnum.Done;
+  });
+  return waiting ? "blocked" : "waiting";
+}
+
 /** The board's dependency edges: each row is one card waiting on one other. */
 export type DepGraph = { cardId: string; dependsOnCardId: string }[];
 
