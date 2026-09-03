@@ -36,6 +36,7 @@ import {
 import { useDirty } from "@/lib/dirty";
 import { request } from "@/lib/gql";
 import { parseJson, parseMcpJson } from "@/lib/mcp-config";
+import { toastError } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 
 type McpServer = McpServersQuery["mcpServers"][number];
@@ -116,7 +117,7 @@ export function McpDialog({
       return testMcpServer;
     },
     onSuccess: (result) => setProbe(result),
-    onError: (error: Error) => toast.error(error.message),
+    onError: toastError,
   });
 
   const save = useMutation({
@@ -136,7 +137,7 @@ export function McpDialog({
       onSaved();
       onClose();
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: toastError,
   });
 
   const applyPaste = () => {

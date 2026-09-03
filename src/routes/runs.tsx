@@ -8,8 +8,7 @@ import { ConfirmButton } from "@/components/confirm-button";
 import { DisclosureRow } from "@/components/disclosure-row";
 import { EmptyState, NoProject } from "@/components/empty-state";
 import { MetaLine } from "@/components/meta-line";
-import { QueryError } from "@/components/query-error";
-import { RowSkeleton } from "@/components/row-skeleton";
+import { QueryState } from "@/components/query-state";
 import { RunStream } from "@/components/run-stream";
 import { ShowMore } from "@/components/show-more";
 import { RunStatusBadge } from "@/components/status-badge";
@@ -26,6 +25,7 @@ import {
 import { request } from "@/lib/gql";
 import { useProjectId } from "@/lib/project";
 import { compactTokens, duration } from "@/lib/runs";
+import { toastError } from "@/lib/toast";
 
 type Run = RunsQuery["runs"][number];
 
@@ -92,12 +92,11 @@ export function RunsRoute() {
     queryClient.invalidateQueries({ queryKey: ["board", projectId] });
     queryClient.invalidateQueries({ queryKey: ["tasks", projectId] });
   };
-  const onError = (error: Error) => toast.error(error.message);
 
   const remove = useMutation({
     mutationFn: (id: string) => request(DeleteRunDocument, { id }),
     onSuccess: refresh,
-    onError,
+    onError: toastError,
   });
 
   const stop = useMutation({
@@ -110,7 +109,7 @@ export function RunsRoute() {
       if (stopped) toast.success("Stopping…");
       refresh();
     },
-    onError,
+    onError: toastError,
   });
 
   const rows = runs.data?.runs ?? [];
@@ -137,17 +136,19 @@ export function RunsRoute() {
         </Button>
       }
     >
-      {runs.isError ? (
-        <QueryError error={runs.error} onRetry={() => runs.refetch()} what="these runs" />
-      ) : null}
-      {runs.isPending ? <RowSkeleton rows={3} /> : null}
-      {shown.length === 0 && !runs.isPending && !runs.isError ? (
-        <EmptyState
-          icon={History}
-          title="Nothing has run yet"
-          description="Every time an agent is asked to do anything — refine a task, or work a card — it shows up here."
-        />
-      ) : null}
+      <QueryState
+        query={runs}
+        what="these runs"
+        rows={3}
+        count={shown.length}
+        empty={
+          <EmptyState
+            icon={History}
+            title="Nothing has run yet"
+            description="Every time an agent is asked to do anything — refine a task, or work a card — it shows up here."
+          />
+        }
+      />
 
       {shown.map((run) => {
         const running = run.status === "running";

@@ -1,6 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { toast } from "sonner";
 import { useDiscardGuard } from "@/components/discard-guard";
 import { useFieldError } from "@/components/field-error";
 import { Button } from "@/components/ui/button";
@@ -30,6 +29,7 @@ import {
 } from "@/gql/graphql";
 import { useDirty } from "@/lib/dirty";
 import { request } from "@/lib/gql";
+import { toastError } from "@/lib/toast";
 
 type Role = RolesQuery["roles"][number];
 
@@ -88,7 +88,7 @@ export function RoleDialog({ role, onClose }: { role?: Role; onClose: () => void
       queryClient.invalidateQueries({ queryKey: ["roles"] });
       onClose();
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: toastError,
   });
 
   const chosen = CONTRACTS.find((row) => row.value === contract);

@@ -420,6 +420,18 @@ stray `·` wherever the middle of it was empty. There is one tone vocabulary —
 colours — in `status-badge.tsx`, and a page picks a tone rather than a Tailwind class. Anything
 drawn in two places belongs here; anything drawn once belongs where it is drawn.
 
+`row-card.tsx` is `disclosure-row.tsx` with nothing to open, which is what Agents, Roles and MCP
+are lists of, and `query-state.tsx` is the ladder every one of those pages climbs before it draws
+a row: failed, loading, empty. That last rung is why it is a component rather than three — six
+pages wrote the empty check two different ways, `data?.roles.length === 0` where the query is read
+straight and `shown.length === 0 && !isPending && !isError` where the list was already defaulted to
+`[]`, and both being correct is exactly what stops anybody fixing it. `enable-switch.tsx` is the
+on/off toggle Agents and MCP share, along with the two things about it worth remembering: a Radix
+switch needs its name said outright, and the label names the action rather than the state.
+`toastError` in `src/lib/toast.ts` is how a failed write is said — one line that was written
+twenty-five times, seven of those as the same local `const onError` — and `nameList` in
+`src/lib/text.ts` is the "and 2 more" that trails a list of what a delete is about to take.
+
 ## Code style
 
 - Biome-enforced: double quotes, semicolons, trailing commas, 2-space indent, 100 line width,

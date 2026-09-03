@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Pencil, Trash2, X } from "lucide-react";
 import { useState } from "react";
-import { toast } from "sonner";
 import { ActionButton } from "@/components/action-button";
 import { ConfirmButton } from "@/components/confirm-button";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +16,7 @@ import {
   UpdateCardNoteDocument,
 } from "@/gql/graphql";
 import { request } from "@/lib/gql";
+import { toastError } from "@/lib/toast";
 
 type Note = CardNotesQuery["cardNotes"][number];
 
@@ -52,7 +52,6 @@ export function CardNotes({ cardId }: { cardId: string }) {
   });
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["card-notes", cardId] });
-  const onError = (error: Error) => toast.error(error.message);
 
   const add = useMutation({
     mutationFn: (body: string) => request(AddCardNoteDocument, { cardId, body }),
@@ -60,7 +59,7 @@ export function CardNotes({ cardId }: { cardId: string }) {
       setDraft("");
       refresh();
     },
-    onError,
+    onError: toastError,
   });
 
   const update = useMutation({
@@ -69,13 +68,13 @@ export function CardNotes({ cardId }: { cardId: string }) {
       setEditing(null);
       refresh();
     },
-    onError,
+    onError: toastError,
   });
 
   const remove = useMutation({
     mutationFn: (id: string) => request(DeleteCardNoteDocument, { id }),
     onSuccess: refresh,
-    onError,
+    onError: toastError,
   });
 
   const rows = notes.data?.cardNotes ?? [];

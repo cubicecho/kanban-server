@@ -56,6 +56,7 @@ import { blockingDeps } from "@/lib/cards";
 import { request } from "@/lib/gql";
 import { useProjectId } from "@/lib/project";
 import { plural } from "@/lib/text";
+import { toastError } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 
 type Lane = BoardQuery["lanes"][number];
@@ -297,7 +298,6 @@ export function BoardRoute() {
     // A run that ruled on a card wrote the verdict the board now draws on its face.
     queryClient.invalidateQueries({ queryKey: ["card-marks", projectId] });
   };
-  const onError = (error: Error) => toast.error(error.message);
 
   // Optimistic, because a dropped card that jumps back for a moment reads as broken. The cache
   // is rewritten with the same arithmetic the server does, the refetch reconciles it, and a
@@ -315,7 +315,7 @@ export function BoardRoute() {
     },
     onError: (error: Error, _variables, context) => {
       if (context?.previous) queryClient.setQueryData(["board", projectId], context.previous);
-      onError(error);
+      toastError(error);
     },
     onSettled: refresh,
   });
@@ -326,7 +326,7 @@ export function BoardRoute() {
       if (result.runCard.status !== "ok") toast.error(result.runCard.error || "The agent failed.");
       refresh();
     },
-    onError,
+    onError: toastError,
   });
 
   const stop = useMutation({
@@ -335,7 +335,7 @@ export function BoardRoute() {
       if (result.stopCard) toast.success("Stopping…");
       refresh();
     },
-    onError,
+    onError: toastError,
   });
 
   // A card a reviewer rejected sits in `error` on purpose, and nothing but a person gets it
@@ -344,7 +344,7 @@ export function BoardRoute() {
   const retry = useMutation({
     mutationFn: (cardId: string) => request(RetryCardDocument, { cardId }),
     onSuccess: refresh,
-    onError,
+    onError: toastError,
   });
 
   const restore = useMutation({
@@ -354,7 +354,7 @@ export function BoardRoute() {
       queryClient.invalidateQueries({ queryKey: ["archived-lanes", projectId] });
       refresh();
     },
-    onError,
+    onError: toastError,
   });
 
   // Off the board rather than gone: the Done pile that has served its purpose, and the card
@@ -374,19 +374,19 @@ export function BoardRoute() {
       queryClient.invalidateQueries({ queryKey: ["archived-lanes", projectId] });
       refresh();
     },
-    onError,
+    onError: toastError,
   });
 
   const removeCard = useMutation({
     mutationFn: (id: string) => request(DeleteCardDocument, { id }),
     onSuccess: refresh,
-    onError,
+    onError: toastError,
   });
 
   const removeLane = useMutation({
     mutationFn: (id: string) => request(DeleteLaneDocument, { id }),
     onSuccess: refresh,
-    onError,
+    onError: toastError,
   });
 
   const lanes = board.data?.lanes ?? [];

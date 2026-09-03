@@ -31,6 +31,7 @@ import {
 import { request } from "@/lib/gql";
 import { useProjectId } from "@/lib/project";
 import { plural } from "@/lib/text";
+import { toastError } from "@/lib/toast";
 
 type Task = TaskQuery["tasks"][number];
 type Project = ProjectsQuery["projects"][number];
@@ -125,7 +126,7 @@ function TaskComposer({ project }: { project: Project }) {
       // False means the turn had already finished on its own, and the answer is on its way.
       if (data.stopTask) toast.success("Stopping…");
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: toastError,
   });
 
   // Arriving here from a Continue link while this page is already mounted changes the search
@@ -151,7 +152,7 @@ function TaskComposer({ project }: { project: Project }) {
       if (run.refineTask.status !== "ok") toast.error(run.refineTask.error || "The agent failed.");
       refresh();
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: toastError,
   });
 
   // Ending the conversation is a write, not a run: one card in intake, and nothing to wait for.
@@ -164,7 +165,7 @@ function TaskComposer({ project }: { project: Project }) {
       refresh();
       navigate({ to: "/board" });
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: toastError,
   });
 
   const submit = useMutation({
@@ -176,7 +177,7 @@ function TaskComposer({ project }: { project: Project }) {
       refresh();
       navigate({ to: "/board" });
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: toastError,
   });
 
   const working = say.isPending || make.isPending || submit.isPending;

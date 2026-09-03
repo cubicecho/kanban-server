@@ -8,8 +8,7 @@ import { ConfirmButton } from "@/components/confirm-button";
 import { DisclosureRow } from "@/components/disclosure-row";
 import { EmptyState, NoProject } from "@/components/empty-state";
 import { MetaLine } from "@/components/meta-line";
-import { QueryError } from "@/components/query-error";
-import { RowSkeleton } from "@/components/row-skeleton";
+import { QueryState } from "@/components/query-state";
 import { ShowMore } from "@/components/show-more";
 import { CardStatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
@@ -21,6 +20,7 @@ import {
 } from "@/gql/graphql";
 import { request } from "@/lib/gql";
 import { useProjectId } from "@/lib/project";
+import { toastError } from "@/lib/toast";
 
 type Archived = ArchiveQuery["cards"][number];
 
@@ -57,7 +57,6 @@ export function ArchiveRoute() {
     // A restored card reappears on the board, and a deleted one stops being a dependency there.
     queryClient.invalidateQueries({ queryKey: ["board", projectId] });
   };
-  const onError = (error: Error) => toast.error(error.message);
 
   const restore = useMutation({
     mutationFn: (cardId: string) => request(RestoreCardDocument, { cardId }),
@@ -66,13 +65,13 @@ export function ArchiveRoute() {
       toast.success(lane ? `Back at the end of ${lane}.` : "Back on the board.");
       refresh();
     },
-    onError,
+    onError: toastError,
   });
 
   const remove = useMutation({
     mutationFn: (id: string) => request(DeleteCardDocument, { id }),
     onSuccess: refresh,
-    onError,
+    onError: toastError,
   });
 
   if (!projectId) {
@@ -99,17 +98,19 @@ export function ArchiveRoute() {
         </Button>
       }
     >
-      {archive.isError ? (
-        <QueryError error={archive.error} onRetry={() => archive.refetch()} what="the archive" />
-      ) : null}
-      {archive.isPending ? <RowSkeleton rows={3} /> : null}
-      {cards.length === 0 && !archive.isPending && !archive.isError ? (
-        <EmptyState
-          icon={ArchiveIcon}
-          title="Nothing is archived"
-          description="Archiving a card takes it off the board without deleting it — the Done pile, once it is long enough to be in the way."
-        />
-      ) : null}
+      <QueryState
+        query={archive}
+        what="the archive"
+        rows={3}
+        count={cards.length}
+        empty={
+          <EmptyState
+            icon={ArchiveIcon}
+            title="Nothing is archived"
+            description="Archiving a card takes it off the board without deleting it — the Done pile, once it is long enough to be in the way."
+          />
+        }
+      />
 
       {cards.map((card: Archived) => (
         <DisclosureRow

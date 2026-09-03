@@ -31,6 +31,7 @@ import { blockingDeps, CARD_HEALTH, type CardHealth, cardHealth, isStation } fro
 import { request } from "@/lib/gql";
 import { useProjectId } from "@/lib/project";
 import { plural } from "@/lib/text";
+import { toastError } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 
 type BoardCard = BoardQuery["cards"][number];
@@ -208,7 +209,6 @@ export function StatusRoute() {
     queryClient.invalidateQueries({ queryKey: ["project-issues", projectId] });
     queryClient.invalidateQueries({ queryKey: ["spend"] });
   };
-  const onError = (error: Error) => toast.error(error.message);
 
   const retry = useMutation({
     mutationFn: (cardId: string) => request(RetryCardDocument, { cardId }),
@@ -216,7 +216,7 @@ export function StatusRoute() {
       toast.success("Back in play");
       refresh();
     },
-    onError,
+    onError: toastError,
   });
 
   const run = useMutation({
@@ -225,7 +225,7 @@ export function StatusRoute() {
       if (result.runCard.status !== "ok") toast.error(result.runCard.error || "The agent failed.");
       refresh();
     },
-    onError,
+    onError: toastError,
   });
 
   const lanes = useMemo(() => board.data?.lanes ?? [], [board.data]);

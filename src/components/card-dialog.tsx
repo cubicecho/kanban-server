@@ -1,6 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { toast } from "sonner";
 import { CardDepsField, type DepCard } from "@/components/card-deps-field";
 import { CardHistory } from "@/components/card-history";
 import { CardNotes } from "@/components/card-notes";
@@ -30,6 +29,7 @@ import {
 import type { DepGraph } from "@/lib/cards";
 import { useDirty } from "@/lib/dirty";
 import { request } from "@/lib/gql";
+import { toastError } from "@/lib/toast";
 
 type Card = BoardQuery["cards"][number];
 type Lane = BoardQuery["lanes"][number];
@@ -163,7 +163,7 @@ export function CardDialog({
       queryClient.invalidateQueries({ queryKey: ["card-deps", card?.id] });
       onClose();
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: toastError,
   });
 
   return (

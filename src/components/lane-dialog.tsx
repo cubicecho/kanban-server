@@ -1,6 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { toast } from "sonner";
 import { useDiscardGuard } from "@/components/discard-guard";
 import { useFieldError } from "@/components/field-error";
 import { Button } from "@/components/ui/button";
@@ -33,6 +32,7 @@ import {
 } from "@/gql/graphql";
 import { useDirty } from "@/lib/dirty";
 import { request } from "@/lib/gql";
+import { toastError } from "@/lib/toast";
 
 type Lane = BoardQuery["lanes"][number];
 
@@ -130,7 +130,7 @@ export function LaneDialog({
       queryClient.invalidateQueries({ queryKey: ["board", projectId] });
       onClose();
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: toastError,
   });
 
   // Picking a kind for a lane nobody has named yet names it: a board is assembled out of known

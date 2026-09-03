@@ -1,6 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { toast } from "sonner";
 import { useDiscardGuard } from "@/components/discard-guard";
 import { useFieldError } from "@/components/field-error";
 import { ModelSelect } from "@/components/model-select";
@@ -34,6 +33,7 @@ import {
 } from "@/gql/graphql";
 import { useDirty } from "@/lib/dirty";
 import { request } from "@/lib/gql";
+import { toastError } from "@/lib/toast";
 
 type Agent = AgentsQuery["agents"][number];
 type McpServer = AgentsQuery["mcpServers"][number];
@@ -130,7 +130,7 @@ export function AgentDialog({
       queryClient.invalidateQueries({ queryKey: ["agents"] });
       onClose();
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: toastError,
   });
 
   const toggleServer = (id: string) =>

@@ -44,6 +44,7 @@ import {
 import { useDirty } from "@/lib/dirty";
 import { request } from "@/lib/gql";
 import { selectProject } from "@/lib/project";
+import { toastError } from "@/lib/toast";
 
 type Project = ProjectsQuery["projects"][number];
 
@@ -135,7 +136,7 @@ export function ProjectDialog({
       queryClient.invalidateQueries({ queryKey: ["projects"] });
       onClose();
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: toastError,
   });
 
   // The one delete in this app that takes a whole body of work with it, and until now the only
@@ -154,7 +155,7 @@ export function ProjectDialog({
       toast.success("Project deleted");
       onClose();
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: toastError,
   });
 
   return (

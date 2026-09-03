@@ -9,8 +9,7 @@ import { ConfirmButton } from "@/components/confirm-button";
 import { DisclosureRow } from "@/components/disclosure-row";
 import { EmptyState, NoProject } from "@/components/empty-state";
 import { MetaLine } from "@/components/meta-line";
-import { QueryError } from "@/components/query-error";
-import { RowSkeleton } from "@/components/row-skeleton";
+import { QueryState } from "@/components/query-state";
 import { ShowMore } from "@/components/show-more";
 import { Spend } from "@/components/spend";
 import { CardStatusBadge } from "@/components/status-badge";
@@ -20,6 +19,7 @@ import { DeleteTaskDocument, MakeCardDocument, TasksDocument } from "@/gql/graph
 import { request } from "@/lib/gql";
 import { useProjectId } from "@/lib/project";
 import { plural } from "@/lib/text";
+import { toastError } from "@/lib/toast";
 
 /**
  * How many conversations are asked for at a time — one more than is drawn, as on Runs and in the
@@ -60,7 +60,6 @@ export function TasksRoute() {
     queryClient.invalidateQueries({ queryKey: ["board", projectId] });
     queryClient.invalidateQueries({ queryKey: ["spend"] });
   };
-  const onError = (error: Error) => toast.error(error.message);
 
   // One card, at the front door. What happens to it next is the board's business: land it in
   // a lane that expands and it becomes the cards that carry the work out.
@@ -70,13 +69,13 @@ export function TasksRoute() {
       toast.success("On the board");
       refresh();
     },
-    onError,
+    onError: toastError,
   });
 
   const remove = useMutation({
     mutationFn: (id: string) => request(DeleteTaskDocument, { id }),
     onSuccess: refresh,
-    onError,
+    onError: toastError,
   });
 
   if (!projectId) {
@@ -97,22 +96,24 @@ export function TasksRoute() {
       crumb={project?.name}
       description="What was asked for, and the cards it became."
     >
-      {tasks.isError ? (
-        <QueryError error={tasks.error} onRetry={() => tasks.refetch()} what="these tasks" />
-      ) : null}
-      {tasks.isPending ? <RowSkeleton rows={3} /> : null}
-      {shown.length === 0 && !tasks.isPending && !tasks.isError ? (
-        <EmptyState
-          icon={ListChecks}
-          title="Nothing asked for yet"
-          description="Describe something on the New task page and it lands here, along with whatever cards it became."
-          action={
-            <Button asChild>
-              <Link to="/">New task</Link>
-            </Button>
-          }
-        />
-      ) : null}
+      <QueryState
+        query={tasks}
+        what="these tasks"
+        rows={3}
+        count={shown.length}
+        empty={
+          <EmptyState
+            icon={ListChecks}
+            title="Nothing asked for yet"
+            description="Describe something on the New task page and it lands here, along with whatever cards it became."
+            action={
+              <Button asChild>
+                <Link to="/">New task</Link>
+              </Button>
+            }
+          />
+        }
+      />
 
       {shown.map((task) => {
         // Where "on the board" actually goes: a card that is still on it. All of them archived
