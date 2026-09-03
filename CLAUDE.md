@@ -325,7 +325,11 @@ that passes one gets `ProjectBar` under its heading — the auto-run switch, wha
 what the board has spent. Settings is for what is decided once, and stopping a board that has got
 the wrong end of the stick is not that. The strip is outside the scroll container with the
 heading, so the way to stop a board is on screen at the bottom of five hundred cards as well as
-at the top.
+at the top. The switch wears its state in the badge tones — green and pulsing on auto, amber and
+paused — rather than in a grey `text-xs` word on a grey strip, and `toneSurface` in
+`status-badge.tsx` is where it gets those two colours from, a control not being something a
+`h-5 overflow-hidden` badge can hold. Amber for paused on purpose: a stopped board is the state
+worth noticing, being the one where nothing will happen until somebody says so.
 
 **Hand-written GraphQL fields go in `server/graphql/`**, beside the generated entities:
 `models`, `mcpStatus`, `runEvents`, `blockers`, `spend` on the query side; `refineTask`,

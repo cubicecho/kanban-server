@@ -1,5 +1,8 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { PauseCircle } from "lucide-react";
 import { toast } from "sonner";
+import { LiveDot } from "@/components/live-dot";
+import { toneSurface } from "@/components/status-badge";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -21,6 +24,14 @@ type Project = ProjectsQuery["projects"][number];
  * The update is optimistic because a switch that does not move until a round trip lands reads as
  * a switch that did not work. Everything that shows `autoRun` reads this same query, so they all
  * turn over together.
+ *
+ * It is drawn as a pill in the status tones rather than as a bare switch and a grey `text-xs`
+ * word. The strip it sits on is `bg-muted/40`, so a muted label on it was one step of lightness
+ * against the background — and the state it drew faintest was `Paused`, which is the one worth
+ * noticing: a board that is not going to do anything until somebody says so. So paused takes the
+ * amber the badges use for "this is waiting on you" and says it with an icon as well as a word,
+ * and running takes the green and the pulse a run wears everywhere else. Two tones and no more,
+ * for the reason the badges have two.
  */
 export function AutoRunSwitch({ project }: { project: Project }) {
   const queryClient = useQueryClient();
@@ -58,26 +69,35 @@ export function AutoRunSwitch({ project }: { project: Project }) {
   const on = project.autoRun;
 
   return (
-    <div className="flex items-center gap-2">
-      <Tooltip>
-        <TooltipTrigger asChild>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div
+          className={cn(
+            "flex items-center gap-2 rounded-full border py-1 pr-1.5 pl-2.5",
+            toneSurface(on ? "running" : "attention"),
+          )}
+        >
+          {on ? <LiveDot /> : <PauseCircle className="size-3.5" aria-hidden />}
+          <Label htmlFor="auto-run" className="font-medium text-sm">
+            {on ? "Auto-run" : "Paused"}
+          </Label>
           <Switch
             id="auto-run"
             checked={on}
             onCheckedChange={(next) => toggle.mutate(next)}
+            // The track's own off colour is `bg-input`, which on a tinted pill is barely a
+            // shape. Off is the state this control most has to be readable in.
+            className="data-unchecked:bg-status-rejected-foreground/50 dark:data-unchecked:bg-status-rejected-foreground/40"
             // Naming the action rather than the state, which is the switch's own job to say.
             aria-label={on ? `Pause ${project.name}` : `Let ${project.name} run itself`}
           />
-        </TooltipTrigger>
-        <TooltipContent>
-          {on
-            ? "Cards in a lane with an agent are picked up on their own. Pause to stop that."
-            : "Cards sit where they are put and run when you ask. Switch on to work the board."}
-        </TooltipContent>
-      </Tooltip>
-      <Label htmlFor="auto-run" className={cn("text-xs", !on && "text-muted-foreground")}>
-        {on ? "Auto-run" : "Paused"}
-      </Label>
-    </div>
+        </div>
+      </TooltipTrigger>
+      <TooltipContent>
+        {on
+          ? "Cards in a lane with an agent are picked up on their own. Pause to stop that."
+          : "Cards sit where they are put and run when you ask. Switch on to work the board."}
+      </TooltipContent>
+    </Tooltip>
   );
 }

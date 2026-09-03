@@ -23,18 +23,27 @@ export type StatusTone = "running" | "attention" | "fault" | "settled" | "plain"
  * The hues are `--status-*` tokens rather than `emerald-*`/`amber-*` utilities, because a green
  * that reads on a near-black card is not the green that reads on a white one.
  */
+const SURFACE = {
+  running: "border-status-running/30 bg-status-running/15 text-status-running-foreground",
+  attention: "border-status-rejected/30 bg-status-rejected/15 text-status-rejected-foreground",
+};
+
+/**
+ * The two coloured tones, for the thing that wears one without being a badge.
+ *
+ * A badge is a `h-5 overflow-hidden` span, which is right for a word and wrong for a control —
+ * the auto-run switch is a pill with a switch in it and would have its focus ring clipped. It
+ * still has to be the same green and the same amber as everything else saying the same thing,
+ * so it asks for a tone here rather than writing the classes out again.
+ */
+export const toneSurface = (tone: "running" | "attention") => SURFACE[tone];
+
 const TONE: Record<
   StatusTone,
   { variant: "destructive" | "outline" | "secondary"; className?: string }
 > = {
-  running: {
-    variant: "outline",
-    className: "border-status-running/30 bg-status-running/15 text-status-running-foreground",
-  },
-  attention: {
-    variant: "outline",
-    className: "border-status-rejected/30 bg-status-rejected/15 text-status-rejected-foreground",
-  },
+  running: { variant: "outline", className: SURFACE.running },
+  attention: { variant: "outline", className: SURFACE.attention },
   fault: { variant: "destructive" },
   settled: { variant: "secondary" },
   plain: { variant: "outline" },
