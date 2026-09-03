@@ -322,6 +322,13 @@ the interval to `0` to stop it entirely.
 
 Runs are started but not awaited, so one slow agent does not hold up every other board.
 
+The switch is in the frame rather than in project settings, on a strip under the heading of every
+page that is about a project. Whether a board runs itself is a thing decided once and settings is
+where those belong — but a board working on the wrong understanding of what you asked for is
+stopped in a hurry, and it is noticed from whatever page you happened to be on. Pausing stops the
+next card being picked up and does nothing to the runs already going, so the strip says how many
+of those there are beside the switch that will not stop them.
+
 Nothing survives the process that started it: an agent runs in memory, so a server killed
 mid-run leaves rows saying `running` with nothing left alive to finish them — a run retention
 will not prune and spend keeps counting, and a card holding a place under its lane's WIP limit
@@ -443,8 +450,9 @@ where the last thing to happen is the thing being looked for.
 ## What it has cost
 
 `spend(projectId:)` adds up the tokens on a project's runs — `spend(taskId:)` narrows it to one
-task, which is the conversation and every run of every card it became. It shows
-on the board beside the lane button, and on a task beside its cards.
+task, which is the conversation and every run of every card it became. It shows on the project
+strip, so it is on every page the board is — including Runs, which is where you go to see what
+the number was spent on — and on a task beside its cards.
 
 The total is read from the run rows every time it is asked for rather than kept in a counter,
 because `runRetentionDays` deletes runs: a counter would go on reporting money spent on runs

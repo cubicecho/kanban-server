@@ -20,6 +20,7 @@ import { useEffect, useMemo } from "react";
 import { ActionButton } from "@/components/action-button";
 import { LiveDot } from "@/components/live-dot";
 import { ProjectActions, useProjectActions } from "@/components/project-actions";
+import { ProjectBar, useRunningCount } from "@/components/project-bar";
 import { ThemeToggle } from "@/components/theme-toggle";
 import {
   Select,
@@ -29,7 +30,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { ActiveRunsDocument, ProjectsDocument } from "@/gql/graphql";
+import { ProjectsDocument, type ProjectsQuery } from "@/gql/graphql";
 import { request } from "@/lib/gql";
 import { selectProject, useProjectId } from "@/lib/project";
 import { cn } from "@/lib/utils";
@@ -230,25 +231,6 @@ function ProjectPicker() {
   );
 }
 
-/**
- * How much of this project is in flight, for the badge on Runs.
- *
- * A run started by the worker, or by an agent over MCP, is the one thing that happens on this
- * server without anybody here asking for it — and nothing outside the board and the composer
- * said so. It is the query both of those already keep, so a page that is watching a run pays
- * nothing for this, and it stops polling the moment there is nothing to count.
- */
-function useRunningCount() {
-  const projectId = useProjectId();
-  const active = useQuery({
-    queryKey: ["active-runs", projectId],
-    queryFn: () => request(ActiveRunsDocument, { projectId }),
-    enabled: Boolean(projectId),
-    refetchInterval: 5000,
-  });
-  return active.data?.runs.length ?? 0;
-}
-
 export function AppShell() {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const running = useRunningCount();
@@ -299,15 +281,19 @@ export function useCurrentProject() {
 
 export function Page({
   title,
-  crumb,
+  project,
   description,
   actions,
   wide,
   children,
 }: {
   title: string;
-  /** Where this is — the project, on the pages whose rows all belong to one. */
-  crumb?: string;
+  /**
+   * The board this page is about, on the six that are about one. It names the page in the
+   * breadcrumb and the tab, and it is what puts the strip of project facts under the heading —
+   * a page passing it is a page from which the board can be paused.
+   */
+  project?: ProjectsQuery["projects"][number];
   description?: string;
   actions?: React.ReactNode;
   /** For pages that go sideways — the board is as wide as the lanes it has. */
@@ -316,13 +302,14 @@ export function Page({
 }) {
   // The tab said "kanban-server" on all nine pages, which is no help at all to somebody with
   // three of them open. Here rather than in each route: one heading, one title, no drift.
+  const crumb = project?.name;
   useEffect(() => {
     document.title = crumb ? `${title} · ${crumb} · kanban` : `${title} · kanban`;
   }, [title, crumb]);
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      {/* Wrapping, because the actions on these headers are a Spend readout and two buttons,
+      {/* Wrapping, because the actions on these headers run to a search field and two buttons,
           and below about 1100px they were squeezing the title rather than moving under it. */}
       <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b px-6 py-4">
         <div className="min-w-0">
@@ -332,6 +319,9 @@ export function Page({
         </div>
         {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
       </header>
+      {/* Outside the scroller with the heading, so the way to stop a board is on screen at the
+          bottom of a long list of cards as much as at the top. */}
+      {project ? <ProjectBar project={project} /> : null}
       <div className="min-h-0 flex-1 overflow-y-auto p-6">
         <div className={cn("mx-auto flex flex-col gap-4", wide ? "max-w-none" : "max-w-3xl")}>
           {children}

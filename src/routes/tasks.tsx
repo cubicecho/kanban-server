@@ -93,7 +93,7 @@ export function TasksRoute() {
   return (
     <Page
       title="Tasks"
-      crumb={project?.name}
+      project={project}
       description="What was asked for, and the cards it became."
     >
       <QueryState

@@ -319,7 +319,13 @@ agent beyond which endpoint it is.
 
 **Automation is opt-in per project.** `projects.autoRun` gates the worker; `server/worker/loop.ts`
 polls rather than waking on writes, because the things that make a card runnable are not all
-writes — a dependency finishing, an agent switched back on, a run stopped.
+writes — a dependency finishing, an agent switched back on, a run stopped. The switch is in the
+frame, not in project settings: `Page` takes the project rather than a `crumb` string, and a page
+that passes one gets `ProjectBar` under its heading — the auto-run switch, what is in flight, and
+what the board has spent. Settings is for what is decided once, and stopping a board that has got
+the wrong end of the stick is not that. The strip is outside the scroll container with the
+heading, so the way to stop a board is on screen at the bottom of five hundred cards as well as
+at the top.
 
 **Hand-written GraphQL fields go in `server/graphql/`**, beside the generated entities:
 `models`, `mcpStatus`, `runEvents`, `blockers`, `spend` on the query side; `refineTask`,

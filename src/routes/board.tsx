@@ -29,7 +29,6 @@ import { EmptyState, NoProject } from "@/components/empty-state";
 import { LaneDialog } from "@/components/lane-dialog";
 import { QueryError } from "@/components/query-error";
 import { SaveTemplateDialog } from "@/components/save-template-dialog";
-import { Spend } from "@/components/spend";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -488,18 +487,11 @@ export function BoardRoute() {
   return (
     <Page
       title="Board"
-      crumb={project?.name}
-      description={
-        project?.autoRun
-          ? "On auto — cards are picked up as they land."
-          : "Manual — cards run when you ask them to."
-      }
+      project={project}
+      description="Drag a card to move it. A lane that names an agent works whatever lands in it."
       wide
       actions={
         <div className="flex flex-wrap items-center gap-3">
-          {/* Beside the project's own controls, because turning `autoRun` on is the decision
-              this number is about. */}
-          <Spend projectId={projectId} />
           <div className="relative">
             <Search
               className="pointer-events-none absolute top-1/2 left-2 size-4 -translate-y-1/2 text-muted-foreground"

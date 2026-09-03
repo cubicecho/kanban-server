@@ -12,7 +12,6 @@ import { MetaLine } from "@/components/meta-line";
 import { useProjectActions } from "@/components/project-actions";
 import { QueryError } from "@/components/query-error";
 import { RowSkeleton } from "@/components/row-skeleton";
-import { Spend } from "@/components/spend";
 import { CardStatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -327,11 +326,10 @@ export function StatusRoute() {
   return (
     <Page
       title="Status"
-      crumb={project?.name}
+      project={project}
       description="Where the work stands, and what is waiting on you."
       actions={
         <div className="flex flex-wrap items-center gap-3">
-          <Spend projectId={projectId} />
           <Button variant="outline" onClick={refresh}>
             <RefreshCw className="size-4" />
             Refresh
