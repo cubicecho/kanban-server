@@ -59,7 +59,9 @@ export function CardDialog({
   laneId: string;
   /**
    * Which face to open on. The board's note marker opens the notes, because a person who
-   * clicked "2 notes" has said what they came to read.
+   * clicked "2 notes" has said what they came to read; so does every row on the status page,
+   * each of which is a card opened because of something said about it. A card that does not
+   * exist yet has neither notes nor a history, so it opens on `details` whatever is asked for.
    */
   tab?: "details" | "deps" | "notes" | "history";
   onClose: () => void;
@@ -178,7 +180,7 @@ export function CardDialog({
             and what has happened to it. They were one scroll, which meant the deps picker
             appearing when its query landed shoved the history down the page under whoever was
             reading it. */}
-        <Tabs defaultValue={tab ?? "details"}>
+        <Tabs defaultValue={card ? (tab ?? "details") : "details"}>
           <TabsList>
             <TabsTrigger value="details">Details</TabsTrigger>
             <TabsTrigger value="deps">

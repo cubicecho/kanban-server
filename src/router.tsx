@@ -50,6 +50,12 @@ const boardRoute = createRoute({
   component: lazyRouteComponent(() => import("@/routes/board"), "BoardRoute"),
 });
 
+const statusRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/status",
+  component: lazyRouteComponent(() => import("@/routes/status"), "StatusRoute"),
+});
+
 const tasksRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/tasks",
@@ -97,6 +103,7 @@ const settingsRoute = createRoute({
 export const router = createRouter({
   routeTree: rootRoute.addChildren([
     indexRoute,
+    statusRoute,
     boardRoute,
     tasksRoute,
     agentsRoute,

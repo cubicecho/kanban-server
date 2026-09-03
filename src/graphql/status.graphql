@@ -1,0 +1,57 @@
+# Why the cards that are waiting on a person are waiting.
+#
+# The board carries a card's `error`, which holds faults and only faults — a rejection's reason
+# is the verdict note the move points at, and a page that can only say "rejected" is a page that
+# sends you somewhere else to find out. Asked for the whole board at once rather than a card at
+# a time: this is the one question the status page exists to answer, and it is one query.
+#
+# Newest first, and the first one seen for a card is the ruling that stopped it: the older ones
+# are earlier trips round the same loop, and the card's own history is where those are read.
+query ProjectIssues($projectId: String!) {
+  verdicts: cardNotes(
+    limit: 200
+    where: {
+      kind: { eq: verdict }
+      card: {
+        projectId: { eq: $projectId }
+        archivedAt: { isNull: true }
+        status: { eq: rejected }
+      }
+    }
+    orderBy: { createdAt: { direction: desc, priority: 1 } }
+  ) {
+    id
+    cardId
+    body
+    createdAt
+  }
+
+  # The failures that left no card behind to say so: a refinement that never reached the board,
+  # and a card that has since been moved on by hand. A card still standing in `error` says its
+  # own fault on itself, so those are dropped where this is drawn rather than in the query —
+  # which of them is still stuck is a question about the board, not about the runs.
+  failures: runs(
+    limit: 20
+    where: { projectId: { eq: $projectId }, status: { eq: error } }
+    orderBy: { startedAt: { direction: desc, priority: 1 } }
+  ) {
+    id
+    kind
+    error
+    startedAt
+    cardId
+    taskId
+    agent {
+      name
+    }
+    lane {
+      name
+    }
+    card {
+      title
+    }
+    task {
+      title
+    }
+  }
+}
