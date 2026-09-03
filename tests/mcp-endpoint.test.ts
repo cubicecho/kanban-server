@@ -8,6 +8,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import express from "express";
 import { afterAll, beforeAll, expect, test } from "vitest";
+import { stop } from "./fixtures/teardown.ts";
 
 // The endpoint serves the real schema, which is built against the live tables.
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "kanban-server-mcp-"));
@@ -36,8 +37,8 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await client.close();
-  await new Promise((resolve) => server.close(resolve));
+  await client?.close();
+  await stop(server);
   fs.rmSync(dir, { recursive: true, force: true });
 });
 

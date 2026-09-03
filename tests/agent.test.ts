@@ -6,6 +6,7 @@ import { afterAll, beforeAll, expect, test } from "vitest";
 import type { RunUsage } from "../server/runner/events.ts";
 import type { Resolved } from "../server/runner/llm.ts";
 import { replyWith } from "./fixtures/sse.ts";
+import { stop } from "./fixtures/teardown.ts";
 
 // Loading the runner pulls in the database module, so give it somewhere disposable first.
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "kanban-server-agent-"));
@@ -46,7 +47,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await new Promise((resolve) => server.close(resolve));
+  await stop(server);
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
