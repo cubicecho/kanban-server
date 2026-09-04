@@ -174,6 +174,13 @@ export function AgentDialog({
           }
         />
 
+        {/*
+          A text field followed by a `type="password"` one is the browser's definition of a sign-in
+          form, so Chrome was offering saved credentials here and filling the endpoint with somebody's
+          email address. `off` is ignored on a password box by design — `new-password` is the value
+          that means "not the one you have stored", and it is what stops the pair being read as a
+          login at all.
+        */}
         <FormField
           label="Base URL"
           control={
@@ -181,6 +188,7 @@ export function AgentDialog({
               value={draft.baseUrl}
               onChange={(event) => set({ baseUrl: event.target.value })}
               placeholder="empty — use the endpoint in Settings"
+              autoComplete="off"
             />
           }
         />
@@ -191,6 +199,7 @@ export function AgentDialog({
           control={
             <Input
               type="password"
+              autoComplete="new-password"
               value={apiKey}
               onChange={(event) => setApiKey(event.target.value)}
               placeholder="unchanged — leave blank to keep the stored key"

@@ -266,15 +266,18 @@ export function SettingsRoute() {
                   value={form.baseUrl}
                   onChange={(event) => field("baseUrl", event.target.value)}
                   placeholder="http://localhost:11434/v1"
+                  autoComplete="off"
                 />
               }
             />
 
+            {/* `new-password` rather than `off`, which a password box ignores: see the agent dialog. */}
             <FormField
               label="API key"
               control={
                 <Input
                   type="password"
+                  autoComplete="new-password"
                   value={apiKey}
                   onChange={(event) => setApiKey(event.target.value)}
                   placeholder="unchanged — leave blank to keep the stored key"
