@@ -3,8 +3,8 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { BoardTemplatesDocument, SaveBoardTemplateDocument } from "@/__generated__/graphql";
 import { FormDialog } from "@/components/form-dialog";
+import { FormField } from "@/components/form-field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useDirty } from "@/lib/dirty";
 import { request } from "@/lib/gql";
 import { toastError } from "@/lib/toast";
@@ -63,29 +63,28 @@ export function SaveTemplateDialog({
       saveLabel={taken ? "Replace" : "Save"}
     >
       <div className="flex flex-col gap-4">
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="template-name">Name</Label>
-          <Input
-            id="template-name"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            placeholder="Review-heavy"
-          />
-          {taken && (
-            <p className="text-xs text-muted-foreground">
-              A template is already called that. Saving replaces it.
-            </p>
-          )}
-        </div>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="template-description">Description</Label>
-          <Input
-            id="template-description"
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-            placeholder="One line, for whoever picks it later."
-          />
-        </div>
+        <FormField
+          label="Name"
+          required
+          description={taken ? "A template is already called that. Saving replaces it." : undefined}
+          control={
+            <Input
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="Review-heavy"
+            />
+          }
+        />
+        <FormField
+          label="Description"
+          control={
+            <Input
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              placeholder="One line, for whoever picks it later."
+            />
+          }
+        />
       </div>
     </FormDialog>
   );

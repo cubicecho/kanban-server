@@ -18,6 +18,7 @@ import {
 } from "@/__generated__/graphql";
 import { Page } from "@/components/app-shell";
 import { EmptyState } from "@/components/empty-state";
+import { FormField } from "@/components/form-field";
 import { useProjectActions } from "@/components/project-actions";
 import { RunStream } from "@/components/run-stream";
 import { SetupChecklist } from "@/components/setup-checklist";
@@ -25,7 +26,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { request } from "@/lib/gql";
@@ -328,25 +328,27 @@ function TaskComposer({ project }: { project: Project }) {
 
       <TabsContent value="straight" className="flex flex-col gap-4">
         <Card className="gap-4 p-4">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="title">Title</Label>
-            <Input
-              id="title"
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              placeholder="Migrate the billing tables"
-            />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="brief">Brief</Label>
-            <Textarea
-              id="brief"
-              rows={8}
-              value={brief}
-              onChange={(event) => setBrief(event.target.value)}
-              placeholder="Everything the first agent should know. It gets this and the project's context, and nothing else."
-            />
-          </div>
+          <FormField
+            label="Title"
+            control={
+              <Input
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                placeholder="Migrate the billing tables"
+              />
+            }
+          />
+          <FormField
+            label="Brief"
+            control={
+              <Textarea
+                rows={8}
+                value={brief}
+                onChange={(event) => setBrief(event.target.value)}
+                placeholder="Everything the first agent should know. It gets this and the project's context, and nothing else."
+              />
+            }
+          />
           <Button
             className="self-start"
             disabled={working || !title.trim() || !brief.trim()}

@@ -19,7 +19,9 @@ import {
 import { useEffect, useMemo } from "react";
 import { ProjectsDocument, type ProjectsQuery } from "@/__generated__/graphql";
 import { ActionButton } from "@/components/action-button";
+import { StickyHeaderContentFooter } from "@/components/header-content-footer";
 import { LiveDot } from "@/components/live-dot";
+import { PageHeader } from "@/components/page-header";
 import { ProjectActions, useProjectActions } from "@/components/project-actions";
 import { ProjectBar, useRunningCount } from "@/components/project-bar";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -308,25 +310,31 @@ export function Page({
   }, [title, crumb]);
 
   return (
-    <div className="flex h-full flex-col overflow-hidden">
-      {/* Wrapping, because the actions on these headers run to a search field and two buttons,
-          and below about 1100px they were squeezing the title rather than moving under it. */}
-      <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b px-6 py-4">
-        <div className="min-w-0">
-          {crumb ? <p className="text-xs text-muted-foreground">{crumb}</p> : null}
-          <h1 className="text-lg font-semibold tracking-tight">{title}</h1>
-          {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
-        </div>
-        {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
-      </header>
-      {/* Outside the scroller with the heading, so the way to stop a board is on screen at the
-          bottom of a long list of cards as much as at the top. */}
-      {project ? <ProjectBar project={project} /> : null}
-      <div className="min-h-0 flex-1 overflow-y-auto p-6">
+    <StickyHeaderContentFooter
+      // `width="full"`, and the reading column stays on the body below: the chrome on these
+      // pages is full-bleed bars — the header's rule and the project strip both run to the pane
+      // edge — and a capped header would draw two of them ending in mid-air. The seam the
+      // chassis owns is the inset, and `px-6` is this app's.
+      header={
+        <>
+          <PageHeader
+            title={title}
+            description={description}
+            action={actions}
+            breadcrumbs={crumb ? <p className="text-muted-foreground text-xs">{crumb}</p> : null}
+            className="px-6"
+          />
+          {/* Outside the scroller with the heading, so the way to stop a board is on screen at
+              the bottom of a long list of cards as much as at the top. */}
+          {project ? <ProjectBar project={project} /> : null}
+        </>
+      }
+      contentClassName="p-6"
+      content={
         <div className={cn("mx-auto flex flex-col gap-4", wide ? "max-w-none" : "max-w-3xl")}>
           {children}
         </div>
-      </div>
-    </div>
+      }
+    />
   );
 }

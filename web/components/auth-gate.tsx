@@ -1,9 +1,9 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { FormField } from "@/components/form-field";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 
 interface Auth {
   /** Whether this server was started with a token at all. */
@@ -80,16 +80,17 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
           </p>
         </div>
         <form className="flex flex-col gap-3" onSubmit={submit}>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="token">Token</Label>
-            <Input
-              id="token"
-              type="password"
-              autoComplete="current-password"
-              value={token}
-              onChange={(event) => setToken(event.target.value)}
-            />
-          </div>
+          <FormField
+            label="Token"
+            control={
+              <Input
+                type="password"
+                autoComplete="current-password"
+                value={token}
+                onChange={(event) => setToken(event.target.value)}
+              />
+            }
+          />
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
           <Button type="submit" disabled={sending || !token}>
             {sending ? "Checking…" : "Unlock"}

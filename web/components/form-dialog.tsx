@@ -1,14 +1,6 @@
+import { DialogLayout } from "@/components/dialog-layout";
 import { useDiscardGuard } from "@/components/discard-guard";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { cn } from "@/lib/utils";
 
 /** How wide the form wants to be. Undefined is the primitive's own width. */
 const WIDTH = {
@@ -30,6 +22,14 @@ const WIDTH = {
  *
  * `dirty` is asked for rather than worked out here, because only the caller knows what its
  * fields are — pass `useDirty({ ...the state })`.
+ *
+ * The chassis is cubeui's `DialogLayout`, which is where the header and the footer stay put
+ * while the body scrolls between them — this had `overflow-y-auto` on the whole dialog, so a
+ * long form took its own title off the screen before its Save button. The guard stays here
+ * rather than moving to the shell's `hasUnsavedChanges`, because that prop covers the three
+ * doors Radix owns and not the Cancel button, which is the most-clicked way out of these seven
+ * (cubicecho/cubeui#2). One guard over all four doors is the property worth keeping; when the
+ * shell can cover Cancel this file is a `DialogLayout` call and nothing else.
  */
 export function FormDialog({
   title,
@@ -66,38 +66,28 @@ export function FormDialog({
 }) {
   const { close, guard } = useDiscardGuard(dirty, onClose);
 
-  const buttons = (
-    <>
-      <Button variant="ghost" onClick={close}>
-        Cancel
-      </Button>
-      <Button onClick={onSave} disabled={!canSave || saving}>
-        {saving ? savingLabel : saveLabel}
-      </Button>
-    </>
-  );
-
   return (
-    <Dialog open onOpenChange={(open) => !open && close()}>
-      <DialogContent className={cn("max-h-[90vh] overflow-y-auto", width && WIDTH[width])}>
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>{description}</DialogDescription>
-        </DialogHeader>
-
-        {children}
-
-        {aside ? (
-          <DialogFooter className="sm:justify-between">
-            {aside}
-            <div className="flex gap-2">{buttons}</div>
-          </DialogFooter>
-        ) : (
-          <DialogFooter>{buttons}</DialogFooter>
-        )}
-
-        {guard}
-      </DialogContent>
-    </Dialog>
+    <>
+      <DialogLayout
+        open
+        onOpenChange={(open) => !open && close()}
+        title={title}
+        description={description}
+        className={width && WIDTH[width]}
+        content={children}
+        footer={aside}
+        footerActions={
+          <>
+            <Button variant="ghost" onClick={close}>
+              Cancel
+            </Button>
+            <Button onClick={onSave} disabled={!canSave || saving}>
+              {saving ? savingLabel : saveLabel}
+            </Button>
+          </>
+        }
+      />
+      {guard}
+    </>
   );
 }

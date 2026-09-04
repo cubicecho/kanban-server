@@ -11,9 +11,9 @@ import {
 } from "@/__generated__/graphql";
 import { ActionButton } from "@/components/action-button";
 import { ConfirmButton } from "@/components/confirm-button";
+import { FormField } from "@/components/form-field";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { request } from "@/lib/gql";
 import { toastError } from "@/lib/toast";
@@ -81,30 +81,27 @@ export function CardNotes({ cardId }: { cardId: string }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="card-note">Add a note</Label>
-        <Textarea
-          id="card-note"
-          rows={3}
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          placeholder="Something the next agent to work this card should take into account."
-        />
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-xs text-muted-foreground">
-            Every note here is handed to the next agent that works this card. Reports and verdicts
-            are what has already been said about it.
-          </p>
+      <FormField
+        label="Add a note"
+        description="Every note here is handed to the next agent that works this card. Reports and verdicts are what has already been said about it."
+        action={
           <Button
             size="sm"
-            className="shrink-0"
             disabled={!draft.trim() || add.isPending}
             onClick={() => add.mutate(draft.trim())}
           >
             {add.isPending ? "Adding…" : "Add note"}
           </Button>
-        </div>
-      </div>
+        }
+        control={
+          <Textarea
+            rows={3}
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            placeholder="Something the next agent to work this card should take into account."
+          />
+        }
+      />
 
       {rows.length ? (
         <div className="flex flex-col gap-3 border-t pt-3">

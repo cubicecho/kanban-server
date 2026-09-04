@@ -12,9 +12,9 @@ import { CardHistory } from "@/components/card-history";
 import { CardNotes } from "@/components/card-notes";
 import { useFieldError } from "@/components/field-error";
 import { FormDialog } from "@/components/form-dialog";
+import { FormField } from "@/components/form-field";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import type { DepGraph } from "@/lib/cards";
@@ -120,7 +120,7 @@ export function CardDialog({
     { title, body, acceptance, dependsOn: dependsOn && [...dependsOn].sort() },
     dependsOn !== null,
   );
-  const titleError = useFieldError("card-title", title.trim() ? "" : "A card needs a title.");
+  const titleError = useFieldError(title.trim() ? "" : "A card needs a title.");
 
   const save = useMutation({
     mutationFn: async () => {
@@ -185,37 +185,41 @@ export function CardDialog({
         </TabsList>
 
         <TabsContent value="details" className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="card-title">Title</Label>
-            <Input
-              id="card-title"
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              placeholder="One thing an agent can finish"
-              {...titleError.field}
-            />
-            {titleError.error}
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="card-body">Body</Label>
-            <Textarea
-              id="card-body"
-              rows={6}
-              value={body}
-              onChange={(event) => setBody(event.target.value)}
-              placeholder="What to do, in enough detail that the agent does not have to guess."
-            />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="card-acceptance">Acceptance</Label>
-            <Textarea
-              id="card-acceptance"
-              rows={3}
-              value={acceptance}
-              onChange={(event) => setAcceptance(event.target.value)}
-              placeholder="What a reviewer checks against. Kept apart from the body so it does not get skipped."
-            />
-          </div>
+          <FormField
+            label="Title"
+            required
+            error={titleError.error}
+            control={
+              <Input
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                placeholder="One thing an agent can finish"
+                {...titleError.field}
+              />
+            }
+          />
+          <FormField
+            label="Body"
+            control={
+              <Textarea
+                rows={6}
+                value={body}
+                onChange={(event) => setBody(event.target.value)}
+                placeholder="What to do, in enough detail that the agent does not have to guess."
+              />
+            }
+          />
+          <FormField
+            label="Acceptance"
+            control={
+              <Textarea
+                rows={3}
+                value={acceptance}
+                onChange={(event) => setAcceptance(event.target.value)}
+                placeholder="What a reviewer checks against. Kept apart from the body so it does not get skipped."
+              />
+            }
+          />
         </TabsContent>
 
         <TabsContent value="deps" className="flex flex-col gap-4">
@@ -237,20 +241,22 @@ export function CardDialog({
           )}
 
           {blocking.length ? (
-            <div className="flex flex-col gap-2">
-              <Label>Holding up</Label>
-              <div className="flex flex-wrap gap-1">
-                {blocking.map((link) => (
-                  <Badge key={link.cardId} variant="outline">
-                    {link.card.title || "Untitled"}
-                  </Badge>
-                ))}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                These wait on this card. Change that from their own dialogs — a card that edited
-                other cards' dependencies would be a change with no visible cause.
-              </p>
-            </div>
+            <FormField
+              // A row of badges is not a control a `<label>` may name, so the heading is drawn as
+              // a title the group points back at instead of a `for` that resolves to nothing.
+              asGroup
+              label="Holding up"
+              description="These wait on this card. Change that from their own dialogs — a card that edited other cards' dependencies would be a change with no visible cause."
+              control={(props) => (
+                <div {...props} className="flex flex-wrap gap-1">
+                  {blocking.map((link) => (
+                    <Badge key={link.cardId} variant="outline">
+                      {link.card.title || "Untitled"}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            />
           ) : null}
         </TabsContent>
 
