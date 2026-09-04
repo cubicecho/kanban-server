@@ -11,6 +11,7 @@ import {
   UpdateSettingsDocument,
 } from "@/__generated__/graphql";
 import { Page } from "@/components/app-shell";
+import { FormField } from "@/components/form-field";
 import { useLeaveGuard } from "@/components/leave-guard";
 import { ModelSelect } from "@/components/model-select";
 import { QueryError } from "@/components/query-error";
@@ -18,7 +19,6 @@ import { RowSkeleton } from "@/components/row-skeleton";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -87,18 +87,23 @@ function Snippet({ label, text }: { label: string; text: string }) {
   };
 
   return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex items-center justify-between">
-        <Label>{label}</Label>
+    <FormField
+      // A block of text to copy, not a control: the heading names the region, and the Copy
+      // button is what the label row's far end is for.
+      asGroup
+      label={label}
+      action={
         <Button variant="ghost" size="xs" onClick={copy}>
           {copied ? <Check /> : <Copy />}
           {copied ? "Copied" : "Copy"}
         </Button>
-      </div>
-      <pre className="overflow-x-auto rounded-md border bg-muted/30 p-3 text-xs">
-        <code>{text}</code>
-      </pre>
-    </div>
+      }
+      control={(props) => (
+        <pre {...props} className="overflow-x-auto rounded-md border bg-muted/30 p-3 text-xs">
+          <code>{text}</code>
+        </pre>
+      )}
+    />
   );
 }
 
@@ -248,133 +253,134 @@ export function SettingsRoute() {
         <h2 className="font-medium">Model</h2>
         {form ? (
           <>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="baseUrl">Base URL</Label>
-              <Input
-                id="baseUrl"
-                value={form.baseUrl}
-                onChange={(event) => field("baseUrl", event.target.value)}
-                placeholder="http://localhost:11434/v1"
-              />
-              <p className="text-xs text-muted-foreground">
-                Any OpenAI-compatible server: Ollama <code>:11434/v1</code>, LM Studio{" "}
-                <code>:1234/v1</code>, OpenAI, OpenRouter.
-              </p>
-            </div>
+            <FormField
+              label="Base URL"
+              description={
+                <>
+                  Any OpenAI-compatible server: Ollama <code>:11434/v1</code>, LM Studio{" "}
+                  <code>:1234/v1</code>, OpenAI, OpenRouter.
+                </>
+              }
+              control={
+                <Input
+                  value={form.baseUrl}
+                  onChange={(event) => field("baseUrl", event.target.value)}
+                  placeholder="http://localhost:11434/v1"
+                />
+              }
+            />
 
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="apiKey">API key</Label>
-              <Input
-                id="apiKey"
-                type="password"
-                value={apiKey}
-                onChange={(event) => setApiKey(event.target.value)}
-                placeholder="unchanged — leave blank to keep the stored key"
-              />
-            </div>
+            <FormField
+              label="API key"
+              control={
+                <Input
+                  type="password"
+                  value={apiKey}
+                  onChange={(event) => setApiKey(event.target.value)}
+                  placeholder="unchanged — leave blank to keep the stored key"
+                />
+              }
+            />
 
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="model">Model</Label>
-              <ModelSelect
-                id="model"
-                value={form.model}
-                onChange={(model) => field("model", model)}
-              />
-              <p className="text-xs text-muted-foreground">
-                Opening the list asks the server above for its models, so save a new base URL first.
-              </p>
-            </div>
+            <FormField
+              label="Model"
+              description="Opening the list asks the server above for its models, so save a new base URL first."
+              control={(props) => (
+                <ModelSelect
+                  {...props}
+                  value={form.model}
+                  onChange={(model) => field("model", model)}
+                />
+              )}
+            />
 
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="maxTokens">Max tokens</Label>
-                <Input
-                  id="maxTokens"
-                  type="number"
-                  value={form.maxTokens}
-                  onChange={(event) => field("maxTokens", Number(event.target.value))}
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="contextLength">Context window</Label>
-                <Input
-                  id="contextLength"
-                  type="number"
-                  value={form.contextLength}
-                  onChange={(event) => field("contextLength", Number(event.target.value))}
-                />
-                <p className="text-xs text-muted-foreground">
-                  0 asks the endpoint. Set it when the endpoint reports a window it is not actually
-                  serving the model in.
-                </p>
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="temperature">Temperature</Label>
-                <Input
-                  id="temperature"
-                  type="number"
-                  step="0.1"
-                  value={form.temperature}
-                  onChange={(event) => field("temperature", Number(event.target.value))}
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="iterations">Max tool steps</Label>
-                <Input
-                  id="iterations"
-                  type="number"
-                  value={form.maxToolIterations}
-                  onChange={(event) => field("maxToolIterations", Number(event.target.value))}
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="requestTimeoutSeconds">Silence before giving up (s)</Label>
-                <Input
-                  id="requestTimeoutSeconds"
-                  type="number"
-                  value={form.requestTimeoutSeconds}
-                  onChange={(event) => field("requestTimeoutSeconds", Number(event.target.value))}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Resets on every token, so a long answer is never cut off. 0 waits forever.
-                </p>
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="maxRetries">Retries</Label>
-                <Input
-                  id="maxRetries"
-                  type="number"
-                  value={form.maxRetries}
-                  onChange={(event) => field("maxRetries", Number(event.target.value))}
-                />
-                <p className="text-xs text-muted-foreground">
-                  For a request that failed before the model said anything.
-                </p>
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="runRetentionDays">Keep runs for (days)</Label>
-                <Input
-                  id="runRetentionDays"
-                  type="number"
-                  value={form.runRetentionDays}
-                  onChange={(event) => field("runRetentionDays", Number(event.target.value))}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Older runs are deleted hourly. 0 keeps every run forever.
-                </p>
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="workerIntervalSeconds">Look for work every (s)</Label>
-                <Input
-                  id="workerIntervalSeconds"
-                  type="number"
-                  value={form.workerIntervalSeconds}
-                  onChange={(event) => field("workerIntervalSeconds", Number(event.target.value))}
-                />
-                <p className="text-xs text-muted-foreground">
-                  How often boards on auto are checked for cards to pick up. 0 stops the worker.
-                </p>
-              </div>
+              <FormField
+                label="Max tokens"
+                control={
+                  <Input
+                    type="number"
+                    value={form.maxTokens}
+                    onChange={(event) => field("maxTokens", Number(event.target.value))}
+                  />
+                }
+              />
+              <FormField
+                label="Context window"
+                description="0 asks the endpoint. Set it when the endpoint reports a window it is not actually serving the model in."
+                control={
+                  <Input
+                    type="number"
+                    value={form.contextLength}
+                    onChange={(event) => field("contextLength", Number(event.target.value))}
+                  />
+                }
+              />
+              <FormField
+                label="Temperature"
+                control={
+                  <Input
+                    type="number"
+                    step="0.1"
+                    value={form.temperature}
+                    onChange={(event) => field("temperature", Number(event.target.value))}
+                  />
+                }
+              />
+              <FormField
+                label="Max tool steps"
+                control={
+                  <Input
+                    type="number"
+                    value={form.maxToolIterations}
+                    onChange={(event) => field("maxToolIterations", Number(event.target.value))}
+                  />
+                }
+              />
+              <FormField
+                label="Silence before giving up (s)"
+                description="Resets on every token, so a long answer is never cut off. 0 waits forever."
+                control={
+                  <Input
+                    type="number"
+                    value={form.requestTimeoutSeconds}
+                    onChange={(event) => field("requestTimeoutSeconds", Number(event.target.value))}
+                  />
+                }
+              />
+              <FormField
+                label="Retries"
+                description="For a request that failed before the model said anything."
+                control={
+                  <Input
+                    type="number"
+                    value={form.maxRetries}
+                    onChange={(event) => field("maxRetries", Number(event.target.value))}
+                  />
+                }
+              />
+              <FormField
+                label="Keep runs for (days)"
+                description="Older runs are deleted hourly. 0 keeps every run forever."
+                control={
+                  <Input
+                    type="number"
+                    value={form.runRetentionDays}
+                    onChange={(event) => field("runRetentionDays", Number(event.target.value))}
+                  />
+                }
+              />
+              <FormField
+                label="Look for work every (s)"
+                description="How often boards on auto are checked for cards to pick up. 0 stops the worker."
+                control={
+                  <Input
+                    type="number"
+                    value={form.workerIntervalSeconds}
+                    onChange={(event) => field("workerIntervalSeconds", Number(event.target.value))}
+                  />
+                }
+              />
             </div>
           </>
         ) : settings.isError ? null : (
@@ -386,45 +392,43 @@ export function SettingsRoute() {
         <Card className="gap-4 p-4">
           <h2 className="font-medium">MCP tools</h2>
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="toolDiscovery">Discovery</Label>
-            <Select
-              value={form.toolDiscovery}
-              onValueChange={(value) => field("toolDiscovery", value as SettingsToolDiscoveryEnum)}
-            >
-              <SelectTrigger id="toolDiscovery" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={SettingsToolDiscoveryEnum.Eager}>
-                  Eager — send every definition every time
-                </SelectItem>
-                <SelectItem value={SettingsToolDiscoveryEnum.Ondemand}>
-                  On demand — load definitions as needed
-                </SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              On demand puts a name-only catalogue in the system prompt and lets the model pull in
-              the schemas it needs mid-run. Much cheaper with many tools; costs one extra round trip
-              on the runs that use them.
-            </p>
-          </div>
+          <FormField
+            label="Discovery"
+            description="On demand puts a name-only catalogue in the system prompt and lets the model pull in the schemas it needs mid-run. Much cheaper with many tools; costs one extra round trip on the runs that use them."
+            control={(props) => (
+              <Select
+                value={form.toolDiscovery}
+                onValueChange={(value) =>
+                  field("toolDiscovery", value as SettingsToolDiscoveryEnum)
+                }
+              >
+                <SelectTrigger {...props} className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={SettingsToolDiscoveryEnum.Eager}>
+                    Eager — send every definition every time
+                  </SelectItem>
+                  <SelectItem value={SettingsToolDiscoveryEnum.Ondemand}>
+                    On demand — load definitions as needed
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            )}
+          />
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="toolSelectModel">Tool-picking model</Label>
-            <ModelSelect
-              id="toolSelectModel"
-              value={form.toolSelectModel}
-              onChange={(model) => field("toolSelectModel", model)}
-              defaultLabel="Same model as the agent"
-            />
-            <p className="text-xs text-muted-foreground">
-              Guesses which tools a run needs before it starts, so on-demand loading usually costs
-              no round trip at all. A small fast model is enough. Unused unless discovery is on
-              demand.
-            </p>
-          </div>
+          <FormField
+            label="Tool-picking model"
+            description="Guesses which tools a run needs before it starts, so on-demand loading usually costs no round trip at all. A small fast model is enough. Unused unless discovery is on demand."
+            control={(props) => (
+              <ModelSelect
+                {...props}
+                value={form.toolSelectModel}
+                onChange={(model) => field("toolSelectModel", model)}
+                defaultLabel="Same model as the agent"
+              />
+            )}
+          />
         </Card>
       ) : null}
 
@@ -440,41 +444,41 @@ export function SettingsRoute() {
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="refineAgent">Refining agent</Label>
-              <Select
-                value={form.refineAgentId || ANY}
-                onValueChange={(value) => field("refineAgentId", value === ANY ? "" : value)}
-              >
-                <SelectTrigger id="refineAgent" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ANY}>The first enabled agent</SelectItem>
-                  {enabled.map((agent) => (
-                    <SelectItem key={agent.id} value={agent.id}>
-                      {agent.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <FormField
+              label="Refining agent"
+              control={(props) => (
+                <Select
+                  value={form.refineAgentId || ANY}
+                  onValueChange={(value) => field("refineAgentId", value === ANY ? "" : value)}
+                >
+                  <SelectTrigger {...props} className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ANY}>The first enabled agent</SelectItem>
+                    {enabled.map((agent) => (
+                      <SelectItem key={agent.id} value={agent.id}>
+                        {agent.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
           </div>
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="refinePrompt">Refining prompt</Label>
-            <Textarea
-              id="refinePrompt"
-              rows={6}
-              value={form.refinePrompt}
-              onChange={(event) => field("refinePrompt", event.target.value)}
-              placeholder="empty — the built-in one, which asks questions until the task is worth working on"
-            />
-            <p className="text-xs text-muted-foreground">
-              Refinement is a conversation rather than a kind of lane, so it has no role to keep
-              this on. Empty uses the prompt built in.
-            </p>
-          </div>
+          <FormField
+            label="Refining prompt"
+            description="Refinement is a conversation rather than a kind of lane, so it has no role to keep this on. Empty uses the prompt built in."
+            control={
+              <Textarea
+                rows={6}
+                value={form.refinePrompt}
+                onChange={(event) => field("refinePrompt", event.target.value)}
+                placeholder="empty — the built-in one, which asks questions until the task is worth working on"
+              />
+            }
+          />
         </Card>
       ) : null}
 

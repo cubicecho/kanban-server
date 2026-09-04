@@ -514,6 +514,27 @@ refusing. What the shell is really for is the guard: six of the seven closed thr
 `onClose` and quietly lost a typed template name to a stray Escape. A guard a caller cannot see is
 a guard a caller cannot forget.
 
+**A label and its control are introduced by one component.** `form-field.tsx` — cubeui's, over
+shadcn's `Field` — draws the label, the control, the description and the error, and mints the `id`
+that ties them together. What it replaced was seventy-four hand-written `<div className="flex
+flex-col gap-2">` blocks pairing a `<Label htmlFor>` with an input whose `id` matched by hand, and
+the drift is what the count is for: the error was a `<p>` beside the box that nothing pointed at,
+so a screen reader read the field's name and never said it had been rejected, and `aria-invalid`
+— which is where the shadcn primitives get their red ring — was set on none of them. `useFieldError`
+keeps only the timing it was written for, which is that a form does not tell you off for what you
+have not typed yet; it returns the message as a string and the field draws it.
+
+**A `<Select>` has to be handed its wiring rather than given it.** `control` takes a node, which
+the shell clones — or a function, which it calls with the props. The function form is not a
+convenience: a `Select` root renders no DOM at all, so a clone of it swallows the `id` and the
+`aria-describedby` silently, and the field ends up wired to nothing while looking exactly right.
+Every select on this server passes `control={(props) => …}` and spreads onto the `SelectTrigger`;
+`ModelSelect` takes the same props as `...wiring` because it renders a trigger or an input
+depending on how it was last used, and neither is something the shell can see. `asGroup` is the
+other half — a row of badges, a box of switches, the history ledger, a `<pre>` to copy — where the
+heading is drawn as a title the group points back at, because HTML will not let a `<label>` name
+any of them and a `for` that resolves to nothing reads as wired and is not.
+
 ## Code style
 
 - Biome-enforced: double quotes, semicolons, trailing commas, 2-space indent, 100 line width,

@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { ComponentProps } from "react";
 import { useState } from "react";
 import {
   AgentsDocument,
@@ -9,8 +10,8 @@ import {
 } from "@/__generated__/graphql";
 import { useFieldError } from "@/components/field-error";
 import { FormDialog } from "@/components/form-dialog";
+import { FormField } from "@/components/form-field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -91,7 +92,7 @@ export function LaneDialog({
     maxAttempts,
     intake,
   });
-  const nameError = useFieldError("lane-name", name.trim() ? "" : "A lane needs a name.");
+  const nameError = useFieldError(name.trim() ? "" : "A lane needs a name.");
 
   const save = useMutation({
     mutationFn: async () => {
@@ -129,33 +130,32 @@ export function LaneDialog({
     if (!name.trim()) setName((roles.data?.roles ?? []).find((row) => row.id === id)?.name ?? "");
   };
 
-  const laneSelect = (
-    id: string,
-    value: string,
-    onChange: (next: string) => void,
-    empty: string,
-    archive?: boolean,
-  ) => (
-    <Select value={value || NONE} onValueChange={(next) => onChange(next === NONE ? "" : next)}>
-      <SelectTrigger id={id} className="w-full">
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value={NONE}>{empty}</SelectItem>
-        {others.map((row) => (
-          <SelectItem key={row.id} value={row.id}>
-            {row.name}
-          </SelectItem>
-        ))}
-        {archive ? (
-          <>
-            <SelectSeparator />
-            <SelectItem value={ARCHIVE}>Archive it</SelectItem>
-          </>
-        ) : null}
-      </SelectContent>
-    </Select>
-  );
+  // Curried, because the shell hands the wiring — the id the label points at, the
+  // `aria-describedby` — to a function rather than to an element: a `<Select>` root renders no
+  // DOM, so the props have to be spread on the trigger by hand.
+  const laneSelect =
+    (value: string, onChange: (next: string) => void, empty: string, archive?: boolean) =>
+    (props: ComponentProps<typeof SelectTrigger>) => (
+      <Select value={value || NONE} onValueChange={(next) => onChange(next === NONE ? "" : next)}>
+        <SelectTrigger {...props} className="w-full">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={NONE}>{empty}</SelectItem>
+          {others.map((row) => (
+            <SelectItem key={row.id} value={row.id}>
+              {row.name}
+            </SelectItem>
+          ))}
+          {archive ? (
+            <>
+              <SelectSeparator />
+              <SelectItem value={ARCHIVE}>Archive it</SelectItem>
+            </>
+          ) : null}
+        </SelectContent>
+      </Select>
+    );
 
   return (
     <FormDialog
@@ -170,33 +170,37 @@ export function LaneDialog({
     >
       <div className="flex flex-col gap-4">
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="lane-name">Name</Label>
-            <Input
-              id="lane-name"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              placeholder="Review"
-              {...nameError.field}
-            />
-            {nameError.error}
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="lane-kind">Kind</Label>
-            <Select value={roleId || NONE} onValueChange={pickKind}>
-              <SelectTrigger id="lane-kind" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={NONE}>Cards just rest here</SelectItem>
-                {(roles.data?.roles ?? []).map((row) => (
-                  <SelectItem key={row.id} value={row.id}>
-                    {row.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <FormField
+            label="Name"
+            required
+            error={nameError.error}
+            control={
+              <Input
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder="Review"
+                {...nameError.field}
+              />
+            }
+          />
+          <FormField
+            label="Kind"
+            control={(props) => (
+              <Select value={roleId || NONE} onValueChange={pickKind}>
+                <SelectTrigger {...props} className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NONE}>Cards just rest here</SelectItem>
+                  {(roles.data?.roles ?? []).map((row) => (
+                    <SelectItem key={row.id} value={row.id}>
+                      {row.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          />
         </div>
 
         {kind ? (
@@ -212,98 +216,91 @@ export function LaneDialog({
           </div>
         ) : null}
 
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="lane-prompt">Also on this board</Label>
-          <Textarea
-            id="lane-prompt"
-            rows={4}
-            value={prompt}
-            onChange={(event) => setPrompt(event.target.value)}
-            placeholder="Added after the kind's prompt, for this lane only. It never replaces it."
+        <FormField
+          label="Also on this board"
+          control={
+            <Textarea
+              rows={4}
+              value={prompt}
+              onChange={(event) => setPrompt(event.target.value)}
+              placeholder="Added after the kind's prompt, for this lane only. It never replaces it."
+            />
+          }
+        />
+
+        <FormField
+          label="Agent"
+          description="Which model does the work. The same agent can work one lane and judge another."
+          control={(props) => (
+            <Select
+              value={agentId || NONE}
+              onValueChange={(value) => setAgentId(value === NONE ? "" : value)}
+            >
+              <SelectTrigger {...props} className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NONE}>Nothing runs here</SelectItem>
+                {(agents.data?.agents ?? []).map((agent) => (
+                  <SelectItem key={agent.id} value={agent.id}>
+                    {agent.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        />
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <FormField
+            label="On success"
+            description={
+              onSuccess === ARCHIVE
+                ? "A card that passes here goes straight to the archive, keeping this lane — restoring puts it back at the end of it. The end of a pipeline, without a Done pile to empty by hand."
+                : undefined
+            }
+            control={laneSelect(onSuccess, setOnSuccess, "Stay here", true)}
+          />
+          <FormField
+            label="On failure"
+            control={laneSelect(onFailureLaneId, setOnFailure, "Stay here")}
           />
         </div>
 
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="lane-agent">Agent</Label>
-          <Select
-            value={agentId || NONE}
-            onValueChange={(value) => setAgentId(value === NONE ? "" : value)}
-          >
-            <SelectTrigger id="lane-agent" className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={NONE}>Nothing runs here</SelectItem>
-              {(agents.data?.agents ?? []).map((agent) => (
-                <SelectItem key={agent.id} value={agent.id}>
-                  {agent.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <p className="text-xs text-muted-foreground">
-            Which model does the work. The same agent can work one lane and judge another.
-          </p>
-        </div>
-
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="lane-success">On success</Label>
-            {laneSelect("lane-success", onSuccess, setOnSuccess, "Stay here", true)}
-            {onSuccess === ARCHIVE ? (
-              <p className="text-xs text-muted-foreground">
-                A card that passes here goes straight to the archive, keeping this lane — restoring
-                puts it back at the end of it. The end of a pipeline, without a Done pile to empty
-                by hand.
-              </p>
-            ) : null}
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="lane-failure">On failure</Label>
-            {laneSelect("lane-failure", onFailureLaneId, setOnFailure, "Stay here")}
-          </div>
+          <FormField
+            label="Work in progress limit"
+            description="How many cards the worker runs here at once."
+            control={
+              <Input
+                type="number"
+                min={1}
+                value={wipLimit}
+                onChange={(event) => setWipLimit(Number(event.target.value))}
+              />
+            }
+          />
+          <FormField
+            label="Attempts before a person"
+            description="How many times this lane puts a card it failed back in play — the budget a board corrects itself out of. Zero stops at the first failure and waits."
+            control={
+              <Input
+                type="number"
+                min={0}
+                value={maxAttempts}
+                onChange={(event) => setMaxAttempts(Math.max(0, Number(event.target.value)))}
+              />
+            }
+          />
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="lane-wip">Work in progress limit</Label>
-            <Input
-              id="lane-wip"
-              type="number"
-              min={1}
-              value={wipLimit}
-              onChange={(event) => setWipLimit(Number(event.target.value))}
-            />
-            <p className="text-xs text-muted-foreground">
-              How many cards the worker runs here at once.
-            </p>
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="lane-attempts">Attempts before a person</Label>
-            <Input
-              id="lane-attempts"
-              type="number"
-              min={0}
-              value={maxAttempts}
-              onChange={(event) => setMaxAttempts(Math.max(0, Number(event.target.value)))}
-            />
-            <p className="text-xs text-muted-foreground">
-              How many times this lane puts a card it failed back in play — the budget a board
-              corrects itself out of. Zero stops at the first failure and waits.
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center justify-between gap-4 rounded-md border p-3">
-          <div>
-            <Label htmlFor="lane-intake">Intake</Label>
-            <p className="mt-1 text-xs text-muted-foreground">
-              The board's front door: work that arrives without naming a lane lands here. One lane
-              per board, and a kind that expands is the usual choice.
-            </p>
-          </div>
-          <Switch id="lane-intake" checked={intake} onCheckedChange={setIntake} />
-        </div>
+        <FormField
+          orientation="horizontal"
+          label="Intake"
+          description="The board's front door: work that arrives without naming a lane lands here. One lane per board, and a kind that expands is the usual choice."
+          className="rounded-md border p-3"
+          control={<Switch checked={intake} onCheckedChange={setIntake} />}
+        />
       </div>
     </FormDialog>
   );

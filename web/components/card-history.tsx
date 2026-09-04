@@ -2,12 +2,12 @@ import { useQuery } from "@tanstack/react-query";
 import { ArrowDownUp, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { CardRunsDocument, type CardRunsQuery } from "@/__generated__/graphql";
+import { FormField } from "@/components/form-field";
 import { MetaLine } from "@/components/meta-line";
 import { RunStream } from "@/components/run-stream";
 import { RunStatusBadge, VerdictBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { request } from "@/lib/gql";
 import { duration } from "@/lib/runs";
 import { plural } from "@/lib/text";
@@ -81,9 +81,12 @@ export function CardHistory({ cardId }: { cardId: string }) {
   const rows = oldestFirst ? entries : [...entries].reverse();
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center justify-between">
-        <Label>History</Label>
+    <FormField
+      // The ledger is not a control, so the heading names the region rather than pointing a
+      // `for` at the scroll box; the sort toggle is what the label row's far end is for.
+      asGroup
+      label="History"
+      action={
         <Button
           variant="ghost"
           size="sm"
@@ -93,64 +96,69 @@ export function CardHistory({ cardId }: { cardId: string }) {
           <ArrowDownUp className="size-3" />
           {oldestFirst ? "oldest first" : "newest first"}
         </Button>
-      </div>
-      <div className="flex max-h-72 flex-col gap-2 overflow-y-auto rounded-md border p-3">
-        {rows.map(({ id, at, run, event }) => {
-          const running = run?.status === "running";
-          // The reason a card moved is the whole value of a review, so the first line of it is
-          // read without opening anything. The rest is behind the click, with the output.
-          const reason = event?.note?.body.split("\n")[0] ?? "";
-          return (
-            <div key={id} className="flex flex-col gap-1">
-              <button
-                type="button"
-                className="flex w-full items-center gap-2 text-left"
-                disabled={!run}
-                aria-expanded={run ? open === id : undefined}
-                onClick={() => run && setOpen(open === id ? null : id)}
-              >
-                <ChevronRight
-                  aria-hidden
-                  className={cn(
-                    "size-3 shrink-0 text-muted-foreground transition-transform",
-                    !run && "invisible",
-                    open === id && "rotate-90",
+      }
+      control={(props) => (
+        <div
+          {...props}
+          className="flex max-h-72 flex-col gap-2 overflow-y-auto rounded-md border p-3"
+        >
+          {rows.map(({ id, at, run, event }) => {
+            const running = run?.status === "running";
+            // The reason a card moved is the whole value of a review, so the first line of it is
+            // read without opening anything. The rest is behind the click, with the output.
+            const reason = event?.note?.body.split("\n")[0] ?? "";
+            return (
+              <div key={id} className="flex flex-col gap-1">
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2 text-left"
+                  disabled={!run}
+                  aria-expanded={run ? open === id : undefined}
+                  onClick={() => run && setOpen(open === id ? null : id)}
+                >
+                  <ChevronRight
+                    aria-hidden
+                    className={cn(
+                      "size-3 shrink-0 text-muted-foreground transition-transform",
+                      !run && "invisible",
+                      open === id && "rotate-90",
+                    )}
+                  />
+                  {run ? (
+                    <>
+                      <VerdictBadge verdict={run.verdict} />
+                      <RunStatusBadge status={run.status} />
+                    </>
+                  ) : (
+                    <Badge variant="secondary">{event?.actor === "user" ? "you" : "moved"}</Badge>
                   )}
-                />
-                {run ? (
-                  <>
-                    <VerdictBadge verdict={run.verdict} />
-                    <RunStatusBadge status={run.status} />
-                  </>
-                ) : (
-                  <Badge variant="secondary">{event?.actor === "user" ? "you" : "moved"}</Badge>
-                )}
-                <MetaLine
-                  className="min-w-0 flex-1 truncate"
-                  parts={[
-                    run?.lane?.name,
-                    run?.agent?.name,
-                    event ? moved(event) : null,
-                    new Date(at).toLocaleString(),
-                    run ? duration(run.startedAt, run.finishedAt) : null,
-                    run?.totalTokens ? plural(run.totalTokens, "token") : null,
-                  ]}
-                />
-              </button>
-              {reason ? <p className="pl-1 text-xs">{reason}</p> : null}
-              {open === id && run ? (
-                running ? (
-                  <RunStream runId={run.id} />
-                ) : (
-                  <pre className="max-h-48 overflow-auto rounded-md bg-muted/30 p-2 text-xs whitespace-pre-wrap">
-                    {run.error || run.output || "(no output)"}
-                  </pre>
-                )
-              ) : null}
-            </div>
-          );
-        })}
-      </div>
-    </div>
+                  <MetaLine
+                    className="min-w-0 flex-1 truncate"
+                    parts={[
+                      run?.lane?.name,
+                      run?.agent?.name,
+                      event ? moved(event) : null,
+                      new Date(at).toLocaleString(),
+                      run ? duration(run.startedAt, run.finishedAt) : null,
+                      run?.totalTokens ? plural(run.totalTokens, "token") : null,
+                    ]}
+                  />
+                </button>
+                {reason ? <p className="pl-1 text-xs">{reason}</p> : null}
+                {open === id && run ? (
+                  running ? (
+                    <RunStream runId={run.id} />
+                  ) : (
+                    <pre className="max-h-48 overflow-auto rounded-md bg-muted/30 p-2 text-xs whitespace-pre-wrap">
+                      {run.error || run.output || "(no output)"}
+                    </pre>
+                  )
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    />
   );
 }

@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { List } from "lucide-react";
+import type { AriaAttributes } from "react";
 import { useState } from "react";
 import { AgentModelsDocument } from "@/__generated__/graphql";
 import { ActionButton } from "@/components/action-button";
@@ -14,6 +15,14 @@ import {
 } from "@/components/ui/select";
 import { request } from "@/lib/gql";
 import { compactTokens } from "@/lib/runs";
+
+/**
+ * What a `FormField` wires onto the control it is drawn around: the id its label points at, and
+ * the aria the field owns. Spread rather than taken as an `id` alone, because this component
+ * renders two different elements and the shell cannot see either — a clone of it would hand the
+ * attributes to a function and lose them without saying so.
+ */
+type Wiring = { id?: string } & AriaAttributes;
 
 // Radix refuses an empty item value, so the two non-model choices carry sentinels.
 const DEFAULT = "__default__";
@@ -31,20 +40,19 @@ const CUSTOM = "__custom__";
  * all, "Type a name…" drops the field back to free text.
  */
 export function ModelSelect({
-  id,
   value,
   onChange,
   defaultLabel,
   agentId,
+  ...wiring
 }: {
-  id?: string;
   value: string;
   onChange: (model: string) => void;
   /** Label for the empty choice. Omitted, a model must be named. */
   defaultLabel?: string;
   /** Whose endpoint to ask. Omitted, the one in Settings. */
   agentId?: string;
-}) {
+} & Wiring) {
   const [typing, setTyping] = useState(false);
   const [opened, setOpened] = useState(false);
 
@@ -60,7 +68,7 @@ export function ModelSelect({
     return (
       <div className="flex gap-2">
         <Input
-          id={id}
+          {...wiring}
           value={value}
           onChange={(event) => onChange(event.target.value)}
           placeholder="llama3.1:8b"
@@ -94,7 +102,7 @@ export function ModelSelect({
       }}
       onOpenChange={(open) => open && setOpened(true)}
     >
-      <SelectTrigger id={id} className="w-full">
+      <SelectTrigger {...wiring} className="w-full">
         <SelectValue placeholder="Select a model" />
       </SelectTrigger>
       <SelectContent>

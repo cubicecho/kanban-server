@@ -12,10 +12,10 @@ import {
 } from "@/__generated__/graphql";
 import { useFieldError } from "@/components/field-error";
 import { FormDialog } from "@/components/form-dialog";
+import { FormField } from "@/components/form-field";
 import { ProbeResult } from "@/components/probe-result";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -79,15 +79,12 @@ export function McpDialog({
   const dirty = useDirty({ ...draft });
   // What each transport actually needs, said under the field rather than thrown from the save.
   const slugError = useFieldError(
-    "slug",
     draft.slug.trim() ? "" : "A server needs a slug — its tools are named after it.",
   );
   const commandError = useFieldError(
-    "command",
     stdio && !draft.command.trim() ? "A stdio server is started by a command." : "",
   );
   const urlError = useFieldError(
-    "url",
     !stdio && !draft.url.trim() ? "An http server needs a url to reach." : "",
   );
   const invalid = slugError.invalid || commandError.invalid || urlError.invalid;
@@ -164,147 +161,159 @@ export function McpDialog({
       }
     >
       <div className="flex flex-col gap-4">
-        <div className="flex flex-col gap-2 rounded-md border border-dashed p-3">
-          <Label htmlFor="paste">Paste a config</Label>
-          <Textarea
-            id="paste"
-            rows={3}
-            className="font-mono text-xs"
-            value={paste}
-            onChange={(event) => setPaste(event.target.value)}
-            placeholder={'{ "mcpServers": { "fs": { "command": "npx", "args": ["-y", "…"] } } }'}
-          />
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-muted-foreground">
+        <FormField
+          label="Paste a config"
+          className="rounded-md border border-dashed p-3"
+          description={
+            <>
               <code>.mcp.json</code> shaped — the whole file, one entry, or just the body.
-            </p>
+            </>
+          }
+          action={
             <Button variant="secondary" size="sm" onClick={applyPaste} disabled={!paste.trim()}>
               <ClipboardPaste className="size-4" />
               Apply
             </Button>
-          </div>
-        </div>
+          }
+          control={
+            <Textarea
+              rows={3}
+              className="font-mono text-xs"
+              value={paste}
+              onChange={(event) => setPaste(event.target.value)}
+              placeholder={'{ "mcpServers": { "fs": { "command": "npx", "args": ["-y", "…"] } } }'}
+            />
+          }
+        />
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="slug">Slug</Label>
-            <Input
-              id="slug"
-              className="font-mono"
-              value={draft.slug}
-              onChange={(event) => set({ slug: event.target.value })}
-              placeholder="filesystem"
-              {...slugError.field}
-            />
-            {slugError.error}
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="label">Label</Label>
-            <Input
-              id="label"
-              value={draft.label}
-              onChange={(event) => set({ label: event.target.value })}
-              placeholder="Local files"
-            />
-          </div>
+          <FormField
+            label="Slug"
+            required
+            error={slugError.error}
+            control={
+              <Input
+                className="font-mono"
+                value={draft.slug}
+                onChange={(event) => set({ slug: event.target.value })}
+                placeholder="filesystem"
+                {...slugError.field}
+              />
+            }
+          />
+          <FormField
+            label="Label"
+            control={
+              <Input
+                value={draft.label}
+                onChange={(event) => set({ label: event.target.value })}
+                placeholder="Local files"
+              />
+            }
+          />
         </div>
 
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="transport">Transport</Label>
-          <Select
-            value={draft.transport}
-            onValueChange={(value) => set({ transport: value as McpServersTransportEnum })}
-          >
-            <SelectTrigger id="transport" className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={McpServersTransportEnum.Stdio}>
-                stdio — run a local command
-              </SelectItem>
-              <SelectItem value={McpServersTransportEnum.Http}>http — connect to a URL</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        <FormField
+          label="Transport"
+          control={(props) => (
+            <Select
+              value={draft.transport}
+              onValueChange={(value) => set({ transport: value as McpServersTransportEnum })}
+            >
+              <SelectTrigger {...props} className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={McpServersTransportEnum.Stdio}>
+                  stdio — run a local command
+                </SelectItem>
+                <SelectItem value={McpServersTransportEnum.Http}>
+                  http — connect to a URL
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+        />
 
         {stdio ? (
           <>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="command">Command</Label>
-              <Input
-                id="command"
-                className="font-mono"
-                value={draft.command}
-                onChange={(event) => set({ command: event.target.value })}
-                placeholder="npx"
-                {...commandError.field}
-              />
-              {commandError.error}
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="args">Args</Label>
-              <Input
-                id="args"
-                className="font-mono text-xs"
-                value={draft.args}
-                onChange={(event) => set({ args: event.target.value })}
-                placeholder='["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]'
-              />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="env">Env</Label>
-              <Input
-                id="env"
-                className="font-mono text-xs"
-                value={draft.env}
-                onChange={(event) => set({ env: event.target.value })}
-                placeholder='{ "API_TOKEN": "…" }'
-              />
-              <p className="text-xs text-muted-foreground">
-                Merged over the server's own environment, so the child still inherits PATH.
-              </p>
-            </div>
+            <FormField
+              label="Command"
+              required
+              error={commandError.error}
+              control={
+                <Input
+                  className="font-mono"
+                  value={draft.command}
+                  onChange={(event) => set({ command: event.target.value })}
+                  placeholder="npx"
+                  {...commandError.field}
+                />
+              }
+            />
+            <FormField
+              label="Args"
+              control={
+                <Input
+                  className="font-mono text-xs"
+                  value={draft.args}
+                  onChange={(event) => set({ args: event.target.value })}
+                  placeholder='["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]'
+                />
+              }
+            />
+            <FormField
+              label="Env"
+              description="Merged over the server's own environment, so the child still inherits PATH."
+              control={
+                <Input
+                  className="font-mono text-xs"
+                  value={draft.env}
+                  onChange={(event) => set({ env: event.target.value })}
+                  placeholder='{ "API_TOKEN": "…" }'
+                />
+              }
+            />
           </>
         ) : (
           <>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="url">URL</Label>
-              <Input
-                id="url"
-                className="font-mono"
-                value={draft.url}
-                onChange={(event) => set({ url: event.target.value })}
-                placeholder="https://example.com/mcp"
-                {...urlError.field}
-              />
-              {urlError.error}
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="headers">Headers</Label>
-              <Input
-                id="headers"
-                className="font-mono text-xs"
-                value={draft.headers}
-                onChange={(event) => set({ headers: event.target.value })}
-                placeholder='{ "Authorization": "Bearer …" }'
-              />
-            </div>
+            <FormField
+              label="URL"
+              required
+              error={urlError.error}
+              control={
+                <Input
+                  className="font-mono"
+                  value={draft.url}
+                  onChange={(event) => set({ url: event.target.value })}
+                  placeholder="https://example.com/mcp"
+                  {...urlError.field}
+                />
+              }
+            />
+            <FormField
+              label="Headers"
+              control={
+                <Input
+                  className="font-mono text-xs"
+                  value={draft.headers}
+                  onChange={(event) => set({ headers: event.target.value })}
+                  placeholder='{ "Authorization": "Bearer …" }'
+                />
+              }
+            />
           </>
         )}
 
-        <div className="flex items-center justify-between rounded-md border p-3">
-          <div>
-            <Label htmlFor="enabled">Enabled</Label>
-            <p className="text-xs text-muted-foreground">
-              A disabled server stays configured but offers no tools.
-            </p>
-          </div>
-          <Switch
-            id="enabled"
-            checked={draft.enabled}
-            onCheckedChange={(enabled) => set({ enabled })}
-          />
-        </div>
+        <FormField
+          orientation="horizontal"
+          label="Enabled"
+          description="A disabled server stays configured but offers no tools."
+          className="rounded-md border p-3"
+          control={
+            <Switch checked={draft.enabled} onCheckedChange={(enabled) => set({ enabled })} />
+          }
+        />
 
         {probe ? (
           <ProbeResult

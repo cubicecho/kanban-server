@@ -12,23 +12,19 @@ import { useState } from "react";
  * off for the thing you have not typed yet is not helping. The submit button is disabled
  * throughout either way — `invalid` is true from the first render, `error` only once the field
  * has been visited.
+ *
+ * What is left here is that timing. The wiring it used to carry — the id, the
+ * `aria-describedby`, the `aria-invalid`, the paragraph the two point at — belongs to
+ * `FormField`, which mints the id and is the only thing that knows where the message is drawn.
  */
-export function useFieldError(id: string, message: string) {
+export function useFieldError(message: string) {
   const [touched, setTouched] = useState(false);
-  const showing = touched && Boolean(message);
 
   return {
     invalid: Boolean(message),
     /** Spread onto the input or textarea. */
-    field: {
-      "aria-invalid": Boolean(message) || undefined,
-      "aria-describedby": showing ? `${id}-error` : undefined,
-      onBlur: () => setTouched(true),
-    },
-    error: showing ? (
-      <p id={`${id}-error`} className="text-xs text-destructive">
-        {message}
-      </p>
-    ) : null,
+    field: { onBlur: () => setTouched(true) },
+    /** The message, once the field has been visited. Falsy leaves the field unmarked. */
+    error: touched ? message : "",
   };
 }
