@@ -1,7 +1,14 @@
 import { FolderOpen, type LucideIcon, Plus } from "lucide-react";
 import { useProjectActions } from "@/components/project-actions";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 
 /**
  * What a page says when it has nothing to show.
@@ -11,6 +18,10 @@ import { Card } from "@/components/ui/card";
  * says nothing is indistinguishable from one that has not loaded. Where there is something to
  * do about it, `action` is the button that does it: the four "Pick a project first" dead ends
  * were paired with a *disabled* picker reading "No projects yet", which left nowhere to go.
+ *
+ * The drawing is shadcn's `empty` now, which four projects had each re-derived as a dashed card
+ * of centred muted text before anybody ran `shadcn add empty`. What is left here is the voice:
+ * an icon that is not optional, one title, one line, and the thing to do about it.
  */
 export function EmptyState({
   icon: Icon,
@@ -24,12 +35,16 @@ export function EmptyState({
   action?: React.ReactNode;
 }) {
   return (
-    <Card className="items-center gap-2 border-dashed bg-transparent px-6 py-10 text-center">
-      <Icon className="size-6 text-muted-foreground" aria-hidden />
-      <p className="font-medium">{title}</p>
-      <p className="max-w-sm text-sm text-muted-foreground">{description}</p>
-      {action ? <div className="mt-2">{action}</div> : null}
-    </Card>
+    <Empty className="border border-dashed py-10">
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <Icon aria-hidden />
+        </EmptyMedia>
+        <EmptyTitle>{title}</EmptyTitle>
+        <EmptyDescription>{description}</EmptyDescription>
+      </EmptyHeader>
+      {action ? <EmptyContent>{action}</EmptyContent> : null}
+    </Empty>
   );
 }
 
