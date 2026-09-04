@@ -20,13 +20,19 @@ import {
  *
  * Used as a pair: `close` in place of the dialog's own `onClose`, and `guard` rendered inside
  * it. A clean form closes on the first press and never sees this at all.
+ *
+ * `dirty` is a function rather than a boolean because the only thing that ever asks is the
+ * click, and a form library holds that answer in a store rather than in a render. Reading it
+ * when the question is put means this hook needs no subscription of its own — and a shell that
+ * subscribed would re-render every dialog on every keystroke to learn a boolean it looks at
+ * once.
  */
-export function useDiscardGuard(dirty: boolean, onClose: () => void) {
+export function useDiscardGuard(dirty: () => boolean, onClose: () => void) {
   const [asking, setAsking] = useState(false);
 
   return {
     /** Close, or ask first if there is anything to lose. */
-    close: () => (dirty ? setAsking(true) : onClose()),
+    close: () => (dirty() ? setAsking(true) : onClose()),
     guard: (
       <AlertDialog open={asking} onOpenChange={setAsking}>
         <AlertDialogContent>

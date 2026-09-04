@@ -10,23 +10,22 @@ import {
   SettingsToolDiscoveryEnum,
   UpdateSettingsDocument,
 } from "@/__generated__/graphql";
+import {
+  InputField,
+  NumberField,
+  SelectField,
+  TextareaField,
+  useAppForm,
+} from "@/components/app-form";
 import { Page } from "@/components/app-shell";
 import { FormField } from "@/components/form-field";
 import { useLeaveGuard } from "@/components/leave-guard";
-import { ModelSelect } from "@/components/model-select";
+import { ModelField } from "@/components/model-select";
+import { PasswordField } from "@/components/password-field";
 import { QueryError } from "@/components/query-error";
 import { RowSkeleton } from "@/components/row-skeleton";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { request } from "@/lib/gql";
 import { toastError } from "@/lib/toast";
 
@@ -107,24 +106,47 @@ function Snippet({ label, text }: { label: string; text: string }) {
   );
 }
 
+/**
+ * The row as the form holds it: the numbers stay numbers, and a box emptied on the way to
+ * retyping one is `null` rather than a silent zero — which is what the shared validator below
+ * refuses, in the field, instead of writing 0 to a column every agent falls back to.
+ */
 interface Form {
   baseUrl: string;
   model: string;
-  maxTokens: number;
-  contextLength: number;
-  temperature: number;
-  maxToolIterations: number;
+  maxTokens: number | null;
+  contextLength: number | null;
+  temperature: number | null;
+  maxToolIterations: number | null;
   toolDiscovery: SettingsToolDiscoveryEnum;
   toolSelectModel: string;
-  requestTimeoutSeconds: number;
-  maxRetries: number;
-  runRetentionDays: number;
-  workerIntervalSeconds: number;
+  requestTimeoutSeconds: number | null;
+  maxRetries: number | null;
+  runRetentionDays: number | null;
+  workerIntervalSeconds: number | null;
   refineAgentId: string;
   refinePrompt: string;
 }
 
 type Loaded = NonNullable<SettingsQuery["settings"][number]>;
+
+/** What the form starts as, before the row it is a copy of has arrived. */
+const BLANK: Form = {
+  baseUrl: "",
+  model: "",
+  maxTokens: 0,
+  contextLength: 0,
+  temperature: -1,
+  maxToolIterations: 0,
+  toolDiscovery: SettingsToolDiscoveryEnum.Eager,
+  toolSelectModel: "",
+  requestTimeoutSeconds: 0,
+  maxRetries: -1,
+  runRetentionDays: 0,
+  workerIntervalSeconds: 0,
+  refineAgentId: ANY,
+  refinePrompt: "",
+};
 
 /** The row as the form holds it: nulls become the empty string the pickers speak. */
 const toForm = (row: Loaded): Form => ({
@@ -140,26 +162,35 @@ const toForm = (row: Loaded): Form => ({
   maxRetries: row.maxRetries,
   runRetentionDays: row.runRetentionDays,
   workerIntervalSeconds: row.workerIntervalSeconds,
-  refineAgentId: row.refineAgentId ?? "",
+  refineAgentId: row.refineAgentId ?? ANY,
   refinePrompt: row.refinePrompt,
 });
 
-/** The numeric fields, by the label above each rather than by its column name. */
-const NUMBERS = [
-  ["maxTokens", "Max tokens"],
-  ["contextLength", "Context window"],
-  ["temperature", "Temperature"],
-  ["maxToolIterations", "Max tool steps"],
-  ["requestTimeoutSeconds", "Silence before giving up"],
-  ["maxRetries", "Retries"],
-  ["runRetentionDays", "Keep runs for"],
-  ["workerIntervalSeconds", "Look for work every"],
-] as const;
+/**
+ * Whether what is on screen still matches the row.
+ *
+ * Compared against the row as it stands rather than against a snapshot taken when the page
+ * opened: this form is copied once and never re-synced, so a tab left open all afternoon is
+ * exactly the one that saves over somebody else's change. Reset is the way back.
+ */
+const changed = (row: Loaded | undefined, values: Form & { apiKey: string }) => {
+  if (!row) return false;
+  const { apiKey, ...rest } = values;
+  return Boolean(apiKey) || JSON.stringify(rest) !== JSON.stringify(toForm(row));
+};
+
+/** Every number here is optional in the sense that it inherits — none of them is optional empty. */
+const NEEDS_A_NUMBER = {
+  onChange: ({ value }: { value: number | null }) =>
+    value === null ? "This needs to be a number." : undefined,
+};
+
+/** The id the Save button in the page header submits, being outside the form it saves. */
+const FORM_ID = "settings";
 
 export function SettingsRoute() {
   const queryClient = useQueryClient();
-  const [form, setForm] = useState<Form | null>(null);
-  const [apiKey, setApiKey] = useState("");
+  const [seeded, setSeeded] = useState(false);
 
   const settings = useQuery({ queryKey: ["settings"], queryFn: () => request(SettingsDocument) });
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["settings"] });
@@ -169,76 +200,83 @@ export function SettingsRoute() {
   const agents = useQuery({ queryKey: ["agents"], queryFn: () => request(AgentsDocument) });
   const enabled = (agents.data?.agents ?? []).filter((agent) => agent.enabled);
 
-  // The row is the source of truth; the form is a copy taken once it has loaded.
   const loaded = settings.data?.settings[0];
-  useEffect(() => {
-    if (loaded && !form) setForm(toForm(loaded));
-  }, [loaded, form]);
-
-  // Compared against the row as it stands rather than against a snapshot taken when the page
-  // opened: this form is copied once and never re-synced, so a tab left open all afternoon is
-  // exactly the one that saves over somebody else's change. Reset is the way back.
-  const dirty = Boolean(
-    form && loaded && (JSON.stringify(form) !== JSON.stringify(toForm(loaded)) || apiKey),
-  );
-  const badNumber = form ? NUMBERS.find(([key]) => !Number.isFinite(form[key])) : undefined;
-  // "Unsaved changes" in the corner is a label, not a guard: every dialog in the app asks before
-  // throwing away what you typed, and the longest form in it did not.
-  const leaving = useLeaveGuard(dirty);
 
   const save = useMutation({
-    mutationFn: async () => {
-      if (!form) return;
+    mutationFn: async (values: Form & { apiKey: string }) => {
+      const { apiKey, ...row } = values;
       await request(UpdateSettingsDocument, {
-        // An unnamed agent is no row, not a row with an empty id.
         set: {
-          ...form,
-          refineAgentId: form.refineAgentId || null,
+          ...row,
+          maxTokens: row.maxTokens ?? 0,
+          contextLength: row.contextLength ?? 0,
+          temperature: row.temperature ?? -1,
+          maxToolIterations: row.maxToolIterations ?? 0,
+          requestTimeoutSeconds: row.requestTimeoutSeconds ?? 0,
+          maxRetries: row.maxRetries ?? -1,
+          runRetentionDays: row.runRetentionDays ?? 0,
+          workerIntervalSeconds: row.workerIntervalSeconds ?? 0,
+          // An unnamed agent is no row, not a row with an empty id.
+          refineAgentId: row.refineAgentId === ANY ? null : row.refineAgentId,
         },
       });
       // The key travels on its own mutation because it is write-only — it is excluded from
       // the Setting type, so it can never be read back out of the API.
       if (apiKey) await request(SetApiKeyDocument, { apiKey });
-      setApiKey("");
+      return { ...values, apiKey: "" };
     },
-    onSuccess: () => {
+    onSuccess: (saved) => {
+      // What was just written is what the page is now a copy of, and the key is spent.
+      form.reset(saved);
       toast.success("Settings saved");
       refresh();
     },
-    onError: toastError,
   });
 
-  const field = <K extends keyof Form>(key: K, value: Form[K]) =>
-    setForm((current) => (current ? { ...current, [key]: value } : current));
+  const form = useAppForm({
+    defaultValues: { ...BLANK, apiKey: "" },
+    onSubmit: ({ value }) => save.mutateAsync(value).catch(toastError),
+  });
+
+  // The row is the source of truth; the form is a copy taken once it has loaded. `reset` rather
+  // than a field-by-field write, because the row it arrives as is also the baseline everything
+  // after it is compared against.
+  useEffect(() => {
+    if (loaded && !seeded) {
+      form.reset({ ...toForm(loaded), apiKey: "" });
+      setSeeded(true);
+    }
+  }, [loaded, seeded, form]);
+
+  // "Unsaved changes" in the corner is a label, not a guard: every dialog in the app asks before
+  // throwing away what you typed, and the longest form in it did not.
+  const leaving = useLeaveGuard(() => changed(loaded, form.state.values));
 
   return (
     <Page
       title="Settings"
       description="What every agent falls back to for anything it does not set itself."
       actions={
-        <>
-          {badNumber ? (
-            <p className="text-xs text-destructive">{badNumber[1]} needs to be a number.</p>
-          ) : dirty ? (
-            <p className="text-xs text-muted-foreground">Unsaved changes</p>
-          ) : null}
-          <Button
-            variant="ghost"
-            disabled={!dirty || save.isPending}
-            onClick={() => {
-              if (loaded) setForm(toForm(loaded));
-              setApiKey("");
-            }}
-          >
-            Reset
-          </Button>
-          <Button
-            onClick={() => save.mutate()}
-            disabled={!form || !dirty || Boolean(badNumber) || save.isPending}
-          >
-            {save.isPending ? "Saving…" : "Save"}
-          </Button>
-        </>
+        <form.Subscribe selector={(state) => state.values}>
+          {(values) => (
+            <>
+              {changed(loaded, values) ? (
+                <p className="text-xs text-muted-foreground">Unsaved changes</p>
+              ) : null}
+              <Button
+                type="button"
+                variant="ghost"
+                disabled={!changed(loaded, values) || save.isPending}
+                onClick={() => loaded && form.reset({ ...toForm(loaded), apiKey: "" })}
+              >
+                Reset
+              </Button>
+              <form.AppForm>
+                <form.SubmitButton form={FORM_ID} />
+              </form.AppForm>
+            </>
+          )}
+        </form.Subscribe>
       }
     >
       {settings.isError ? (
@@ -249,241 +287,175 @@ export function SettingsRoute() {
         />
       ) : null}
 
-      <Card className="gap-4 p-4">
-        <h2 className="font-medium">Model</h2>
-        {form ? (
-          <>
-            <FormField
-              label="Base URL"
-              description={
-                <>
-                  Any OpenAI-compatible server: Ollama <code>:11434/v1</code>, LM Studio{" "}
-                  <code>:1234/v1</code>, OpenAI, OpenRouter.
-                </>
-              }
-              control={
-                <Input
-                  value={form.baseUrl}
-                  onChange={(event) => field("baseUrl", event.target.value)}
-                  placeholder="http://localhost:11434/v1"
-                  autoComplete="off"
+      <form
+        id={FORM_ID}
+        className="flex flex-col gap-6"
+        onSubmit={(event) => {
+          event.preventDefault();
+          form.handleSubmit();
+        }}
+      >
+        <Card className="gap-4 p-4">
+          <h2 className="font-medium">Model</h2>
+          {seeded ? (
+            <>
+              <InputField
+                form={form}
+                name="baseUrl"
+                label="Base URL"
+                description={
+                  <>
+                    Any OpenAI-compatible server: Ollama <code>:11434/v1</code>, LM Studio{" "}
+                    <code>:1234/v1</code>, OpenAI, OpenRouter.
+                  </>
+                }
+                placeholder="http://localhost:11434/v1"
+                autoComplete="off"
+              />
+
+              {/* `new-password` rather than `off`, which a password box ignores: see the agent dialog. */}
+              <PasswordField
+                form={form}
+                name="apiKey"
+                label="API key"
+                autoComplete="new-password"
+                placeholder="unchanged — leave blank to keep the stored key"
+              />
+
+              <ModelField
+                form={form}
+                name="model"
+                label="Model"
+                description="Opening the list asks the server above for its models, so save a new base URL first."
+              />
+
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <NumberField
+                  form={form}
+                  name="maxTokens"
+                  label="Max tokens"
+                  validators={NEEDS_A_NUMBER}
                 />
-              }
+                <NumberField
+                  form={form}
+                  name="contextLength"
+                  label="Context window"
+                  description="0 asks the endpoint. Set it when the endpoint reports a window it is not actually serving the model in."
+                  validators={NEEDS_A_NUMBER}
+                />
+                <NumberField
+                  form={form}
+                  name="temperature"
+                  label="Temperature"
+                  step="0.1"
+                  validators={NEEDS_A_NUMBER}
+                />
+                <NumberField
+                  form={form}
+                  name="maxToolIterations"
+                  label="Max tool steps"
+                  validators={NEEDS_A_NUMBER}
+                />
+                <NumberField
+                  form={form}
+                  name="requestTimeoutSeconds"
+                  label="Silence before giving up (s)"
+                  description="Resets on every token, so a long answer is never cut off. 0 waits forever."
+                  validators={NEEDS_A_NUMBER}
+                />
+                <NumberField
+                  form={form}
+                  name="maxRetries"
+                  label="Retries"
+                  description="For a request that failed before the model said anything."
+                  validators={NEEDS_A_NUMBER}
+                />
+                <NumberField
+                  form={form}
+                  name="runRetentionDays"
+                  label="Keep runs for (days)"
+                  description="Older runs are deleted hourly. 0 keeps every run forever."
+                  validators={NEEDS_A_NUMBER}
+                />
+                <NumberField
+                  form={form}
+                  name="workerIntervalSeconds"
+                  label="Look for work every (s)"
+                  description="How often boards on auto are checked for cards to pick up. 0 stops the worker."
+                  validators={NEEDS_A_NUMBER}
+                />
+              </div>
+            </>
+          ) : settings.isError ? null : (
+            <RowSkeleton rows={3} />
+          )}
+        </Card>
+
+        {seeded ? (
+          <Card className="gap-4 p-4">
+            <h2 className="font-medium">MCP tools</h2>
+
+            <SelectField
+              form={form}
+              name="toolDiscovery"
+              label="Discovery"
+              description="On demand puts a name-only catalogue in the system prompt and lets the model pull in the schemas it needs mid-run. Much cheaper with many tools; costs one extra round trip on the runs that use them."
+              options={[
+                {
+                  value: SettingsToolDiscoveryEnum.Eager,
+                  label: "Eager — send every definition every time",
+                },
+                {
+                  value: SettingsToolDiscoveryEnum.Ondemand,
+                  label: "On demand — load definitions as needed",
+                },
+              ]}
             />
 
-            {/* `new-password` rather than `off`, which a password box ignores: see the agent dialog. */}
-            <FormField
-              label="API key"
-              control={
-                <Input
-                  type="password"
-                  autoComplete="new-password"
-                  value={apiKey}
-                  onChange={(event) => setApiKey(event.target.value)}
-                  placeholder="unchanged — leave blank to keep the stored key"
-                />
-              }
+            <ModelField
+              form={form}
+              name="toolSelectModel"
+              label="Tool-picking model"
+              description="Guesses which tools a run needs before it starts, so on-demand loading usually costs no round trip at all. A small fast model is enough. Unused unless discovery is on demand."
+              defaultLabel="Same model as the agent"
             />
+          </Card>
+        ) : null}
 
-            <FormField
-              label="Model"
-              description="Opening the list asks the server above for its models, so save a new base URL first."
-              control={(props) => (
-                <ModelSelect
-                  {...props}
-                  value={form.model}
-                  onChange={(model) => field("model", model)}
-                />
-              )}
-            />
+        {seeded ? (
+          <Card className="gap-4 p-4">
+            <div>
+              <h2 className="font-medium">Off the board</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Talking a task over happens nowhere on a board, so no lane can say who does it —
+                everything else an agent does, a lane names. A project may name its own refiner;
+                this is what it falls back to.
+              </p>
+            </div>
 
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <FormField
-                label="Max tokens"
-                control={
-                  <Input
-                    type="number"
-                    value={form.maxTokens}
-                    onChange={(event) => field("maxTokens", Number(event.target.value))}
-                  />
-                }
-              />
-              <FormField
-                label="Context window"
-                description="0 asks the endpoint. Set it when the endpoint reports a window it is not actually serving the model in."
-                control={
-                  <Input
-                    type="number"
-                    value={form.contextLength}
-                    onChange={(event) => field("contextLength", Number(event.target.value))}
-                  />
-                }
-              />
-              <FormField
-                label="Temperature"
-                control={
-                  <Input
-                    type="number"
-                    step="0.1"
-                    value={form.temperature}
-                    onChange={(event) => field("temperature", Number(event.target.value))}
-                  />
-                }
-              />
-              <FormField
-                label="Max tool steps"
-                control={
-                  <Input
-                    type="number"
-                    value={form.maxToolIterations}
-                    onChange={(event) => field("maxToolIterations", Number(event.target.value))}
-                  />
-                }
-              />
-              <FormField
-                label="Silence before giving up (s)"
-                description="Resets on every token, so a long answer is never cut off. 0 waits forever."
-                control={
-                  <Input
-                    type="number"
-                    value={form.requestTimeoutSeconds}
-                    onChange={(event) => field("requestTimeoutSeconds", Number(event.target.value))}
-                  />
-                }
-              />
-              <FormField
-                label="Retries"
-                description="For a request that failed before the model said anything."
-                control={
-                  <Input
-                    type="number"
-                    value={form.maxRetries}
-                    onChange={(event) => field("maxRetries", Number(event.target.value))}
-                  />
-                }
-              />
-              <FormField
-                label="Keep runs for (days)"
-                description="Older runs are deleted hourly. 0 keeps every run forever."
-                control={
-                  <Input
-                    type="number"
-                    value={form.runRetentionDays}
-                    onChange={(event) => field("runRetentionDays", Number(event.target.value))}
-                  />
-                }
-              />
-              <FormField
-                label="Look for work every (s)"
-                description="How often boards on auto are checked for cards to pick up. 0 stops the worker."
-                control={
-                  <Input
-                    type="number"
-                    value={form.workerIntervalSeconds}
-                    onChange={(event) => field("workerIntervalSeconds", Number(event.target.value))}
-                  />
-                }
+            <div className="grid gap-4 sm:grid-cols-2">
+              <SelectField
+                form={form}
+                name="refineAgentId"
+                label="Refining agent"
+                options={[
+                  { value: ANY, label: "The first enabled agent" },
+                  ...enabled.map((agent) => ({ value: agent.id, label: agent.name })),
+                ]}
               />
             </div>
-          </>
-        ) : settings.isError ? null : (
-          <RowSkeleton rows={3} />
-        )}
-      </Card>
 
-      {form ? (
-        <Card className="gap-4 p-4">
-          <h2 className="font-medium">MCP tools</h2>
-
-          <FormField
-            label="Discovery"
-            description="On demand puts a name-only catalogue in the system prompt and lets the model pull in the schemas it needs mid-run. Much cheaper with many tools; costs one extra round trip on the runs that use them."
-            control={(props) => (
-              <Select
-                value={form.toolDiscovery}
-                onValueChange={(value) =>
-                  field("toolDiscovery", value as SettingsToolDiscoveryEnum)
-                }
-              >
-                <SelectTrigger {...props} className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={SettingsToolDiscoveryEnum.Eager}>
-                    Eager — send every definition every time
-                  </SelectItem>
-                  <SelectItem value={SettingsToolDiscoveryEnum.Ondemand}>
-                    On demand — load definitions as needed
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            )}
-          />
-
-          <FormField
-            label="Tool-picking model"
-            description="Guesses which tools a run needs before it starts, so on-demand loading usually costs no round trip at all. A small fast model is enough. Unused unless discovery is on demand."
-            control={(props) => (
-              <ModelSelect
-                {...props}
-                value={form.toolSelectModel}
-                onChange={(model) => field("toolSelectModel", model)}
-                defaultLabel="Same model as the agent"
-              />
-            )}
-          />
-        </Card>
-      ) : null}
-
-      {form ? (
-        <Card className="gap-4 p-4">
-          <div>
-            <h2 className="font-medium">Off the board</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Talking a task over happens nowhere on a board, so no lane can say who does it —
-              everything else an agent does, a lane names. A project may name its own refiner; this
-              is what it falls back to.
-            </p>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <FormField
-              label="Refining agent"
-              control={(props) => (
-                <Select
-                  value={form.refineAgentId || ANY}
-                  onValueChange={(value) => field("refineAgentId", value === ANY ? "" : value)}
-                >
-                  <SelectTrigger {...props} className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={ANY}>The first enabled agent</SelectItem>
-                    {enabled.map((agent) => (
-                      <SelectItem key={agent.id} value={agent.id}>
-                        {agent.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
+            <TextareaField
+              form={form}
+              name="refinePrompt"
+              label="Refining prompt"
+              description="Refinement is a conversation rather than a kind of lane, so it has no role to keep this on. Empty uses the prompt built in."
+              rows={6}
+              placeholder="empty — the built-in one, which asks questions until the task is worth working on"
             />
-          </div>
-
-          <FormField
-            label="Refining prompt"
-            description="Refinement is a conversation rather than a kind of lane, so it has no role to keep this on. Empty uses the prompt built in."
-            control={
-              <Textarea
-                rows={6}
-                value={form.refinePrompt}
-                onChange={(event) => field("refinePrompt", event.target.value)}
-                placeholder="empty — the built-in one, which asks questions until the task is worth working on"
-              />
-            }
-          />
-        </Card>
-      ) : null}
+          </Card>
+        ) : null}
+      </form>
 
       <Card className="gap-4 p-4">
         <div>

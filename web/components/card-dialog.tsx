@@ -7,16 +7,14 @@ import {
   SetCardDepsDocument,
   UpdateCardDocument,
 } from "@/__generated__/graphql";
+import { InputField, TextareaField, useAppForm } from "@/components/app-form";
 import { CardDepsField, type DepCard } from "@/components/card-deps-field";
 import { CardHistory } from "@/components/card-history";
 import { CardNotes } from "@/components/card-notes";
-import { useFieldError } from "@/components/field-error";
 import { FormDialog } from "@/components/form-dialog";
 import { FormField } from "@/components/form-field";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
 import type { DepGraph } from "@/lib/cards";
 import { useDirty } from "@/lib/dirty";
 import { request } from "@/lib/gql";
@@ -58,9 +56,6 @@ export function CardDialog({
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
-  const [title, setTitle] = useState(card?.title ?? "");
-  const [body, setBody] = useState(card?.body ?? "");
-  const [acceptance, setAcceptance] = useState(card?.acceptance ?? "");
 
   // The board query filters archived cards out, so the deps it carries are only the visible
   // half. Asked for separately rather than added to `Board`, which polls every three seconds
@@ -113,18 +108,15 @@ export function CardDialog({
   // — it is the answer to "why does this one matter".
   const blocking = links.data?.blockedBy ?? [];
 
-  // `dependsOn` is null until the query lands, so the snapshot waits for it — otherwise the
-  // answer arriving would count as an edit. Sorted, because the picker's order is the order
+  // The dependencies are loaded and saved as a resource of their own, so they are not fields —
+  // and their own dirtiness is still a snapshot comparison, waiting on the query, because the
+  // answer arriving must not count as an edit. Sorted, because the picker's order is the order
   // things were clicked in and nobody means anything by it.
-  const dirty = useDirty(
-    { title, body, acceptance, dependsOn: dependsOn && [...dependsOn].sort() },
-    dependsOn !== null,
-  );
-  const titleError = useFieldError(title.trim() ? "" : "A card needs a title.");
+  const depsDirty = useDirty({ dependsOn: dependsOn && [...dependsOn].sort() }, dependsOn !== null);
 
   const save = useMutation({
-    mutationFn: async () => {
-      const values = { title: title.trim(), body, acceptance };
+    mutationFn: async (draft: { title: string; body: string; acceptance: string }) => {
+      const values = { title: draft.title.trim(), body: draft.body, acceptance: draft.acceptance };
 
       const before = (links.data?.cardDeps ?? []).map((link) => link.dependsOnCardId);
       const wanted = dependsOn ?? before;
@@ -151,19 +143,25 @@ export function CardDialog({
       queryClient.invalidateQueries({ queryKey: ["card-deps", card?.id] });
       onClose();
     },
-    onError: toastError,
+  });
+
+  const form = useAppForm({
+    defaultValues: {
+      title: card?.title ?? "",
+      body: card?.body ?? "",
+      acceptance: card?.acceptance ?? "",
+    },
+    onSubmit: ({ value }) => save.mutateAsync(value).catch(toastError),
   });
 
   return (
     <FormDialog
+      form={form}
       title={card ? "Edit card" : "New card"}
       description="What one agent is asked to do, and how anyone can tell it is done."
       width="xl"
-      dirty={dirty}
       onClose={onClose}
-      onSave={() => save.mutate()}
-      saving={save.isPending}
-      canSave={!titleError.invalid}
+      alsoUnsaved={() => depsDirty}
     >
       {/* Four things a card is: what to do, what it waits on, what has been said about it
           and what has happened to it. They were one scroll, which meant the deps picker
@@ -185,40 +183,29 @@ export function CardDialog({
         </TabsList>
 
         <TabsContent value="details" className="flex flex-col gap-4">
-          <FormField
+          <InputField
+            form={form}
+            name="title"
             label="Title"
             required
-            error={titleError.error}
-            control={
-              <Input
-                value={title}
-                onChange={(event) => setTitle(event.target.value)}
-                placeholder="One thing an agent can finish"
-                {...titleError.field}
-              />
-            }
+            placeholder="One thing an agent can finish"
+            validators={{
+              onChange: ({ value }) => (value.trim() ? undefined : "A card needs a title."),
+            }}
           />
-          <FormField
+          <TextareaField
+            form={form}
+            name="body"
             label="Body"
-            control={
-              <Textarea
-                rows={6}
-                value={body}
-                onChange={(event) => setBody(event.target.value)}
-                placeholder="What to do, in enough detail that the agent does not have to guess."
-              />
-            }
+            rows={6}
+            placeholder="What to do, in enough detail that the agent does not have to guess."
           />
-          <FormField
+          <TextareaField
+            form={form}
+            name="acceptance"
             label="Acceptance"
-            control={
-              <Textarea
-                rows={3}
-                value={acceptance}
-                onChange={(event) => setAcceptance(event.target.value)}
-                placeholder="What a reviewer checks against. Kept apart from the body so it does not get skipped."
-              />
-            }
+            rows={3}
+            placeholder="What a reviewer checks against. Kept apart from the body so it does not get skipped."
           />
         </TabsContent>
 

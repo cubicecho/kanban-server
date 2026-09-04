@@ -1,9 +1,17 @@
 import { useQuery } from "@tanstack/react-query";
 import { List } from "lucide-react";
-import type { AriaAttributes } from "react";
+import type { AriaAttributes, ComponentProps } from "react";
 import { useState } from "react";
 import { AgentModelsDocument } from "@/__generated__/graphql";
 import { ActionButton } from "@/components/action-button";
+import {
+  bindToForm,
+  type FieldProps,
+  splitProps,
+  useFieldContext,
+  useFieldError,
+} from "@/components/app-form";
+import { FormField } from "@/components/form-field";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -129,3 +137,33 @@ export function ModelSelect({
     </Select>
   );
 }
+
+type ModelFieldProps = FieldProps & Omit<ComponentProps<typeof ModelSelect>, "value" | "onChange">;
+
+/**
+ * The same picker, bound to a form. It goes through `FormField`'s function form because this
+ * control renders a trigger or an input depending on how it was last used, and neither is
+ * something the shell can see to clone.
+ */
+function BoundModelField(props: ModelFieldProps) {
+  const [fieldProps, control] = splitProps(props);
+  const field = useFieldContext<string>();
+  const error = useFieldError();
+
+  return (
+    <FormField
+      {...fieldProps}
+      error={error}
+      control={(wiring) => (
+        <ModelSelect
+          {...wiring}
+          {...control}
+          value={field.state.value ?? ""}
+          onChange={field.handleChange}
+        />
+      )}
+    />
+  );
+}
+
+export const ModelField = bindToForm<ModelFieldProps, string>(BoundModelField, "ModelField");

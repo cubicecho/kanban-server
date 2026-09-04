@@ -23,11 +23,15 @@ import {
  *
  * Used as a pair, like the discard guard: call it with whether there is anything to lose and
  * render what comes back somewhere inside the page.
+ *
+ * A function rather than a boolean, and for the same reason as the discard guard: the router
+ * only ever asks at the moment of leaving, and a form library holds that answer in a store
+ * rather than in a render.
  */
-export function useLeaveGuard(dirty: boolean) {
+export function useLeaveGuard(dirty: () => boolean) {
   const blocker = useBlocker({
-    shouldBlockFn: () => dirty,
-    enableBeforeUnload: () => dirty,
+    shouldBlockFn: dirty,
+    enableBeforeUnload: dirty,
     withResolver: true,
   });
 

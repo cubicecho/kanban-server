@@ -1,25 +1,13 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
 import {
   CreateRoleDocument,
   type RolesContractEnum,
   type RolesQuery,
   UpdateRoleDocument,
 } from "@/__generated__/graphql";
-import { useFieldError } from "@/components/field-error";
+import { InputField, TextareaField, useAppForm } from "@/components/app-form";
 import { FieldRow } from "@/components/field-row";
 import { FormDialog } from "@/components/form-dialog";
-import { FormField } from "@/components/form-field";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { useDirty } from "@/lib/dirty";
 import { request } from "@/lib/gql";
 import { toastError } from "@/lib/toast";
 
@@ -52,111 +40,89 @@ const CONTRACTS: { value: string; label: string; hint: string }[] = [
  */
 export function RoleDialog({ role, onClose }: { role?: Role; onClose: () => void }) {
   const queryClient = useQueryClient();
-  const [name, setName] = useState(role?.name ?? "");
-  const [description, setDescription] = useState(role?.description ?? "");
-  const [contract, setContract] = useState<string>(role?.contract ?? "work");
-  const [prompt, setPrompt] = useState(role?.prompt ?? "");
-
-  // Said where the field is, before the button is pressed, rather than thrown as an error from
-  // inside the mutation and landed in the far corner of the screen as a toast.
-  const dirty = useDirty({ name, description, contract, prompt });
-  const nameError = useFieldError(name.trim() ? "" : "A role needs a name.");
 
   const save = useMutation({
-    mutationFn: async () => {
-      const values = {
-        name: name.trim(),
-        description: description.trim(),
-        contract: contract as RolesContractEnum,
-        prompt,
+    mutationFn: async (values: {
+      name: string;
+      description: string;
+      contract: string;
+      prompt: string;
+    }) => {
+      const row = {
+        name: values.name.trim(),
+        description: values.description.trim(),
+        contract: values.contract as RolesContractEnum,
+        prompt: values.prompt,
       };
-      if (role) await request(UpdateRoleDocument, { id: role.id, set: values });
-      else await request(CreateRoleDocument, { values });
+      if (role) await request(UpdateRoleDocument, { id: role.id, set: row });
+      else await request(CreateRoleDocument, { values: row });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["roles"] });
       onClose();
     },
-    onError: toastError,
   });
 
-  const chosen = CONTRACTS.find((row) => row.value === contract);
+  const form = useAppForm({
+    defaultValues: {
+      name: role?.name ?? "",
+      description: role?.description ?? "",
+      contract: role?.contract ?? "work",
+      prompt: role?.prompt ?? "",
+    },
+    onSubmit: ({ value }) => save.mutateAsync(value).catch(toastError),
+  });
 
   return (
     <FormDialog
+      form={form}
       title={role ? "Edit role" : "New role"}
       description="A kind of lane. Every lane of this kind is told this, so editing it changes all of them at once."
       width="2xl"
-      dirty={dirty}
       onClose={onClose}
-      onSave={() => save.mutate()}
-      saving={save.isPending}
-      canSave={!nameError.invalid}
     >
-      <div className="flex flex-col gap-4">
-        <FieldRow
-          content={
-            <>
-              <FormField
-                label="Name"
-                required
-                error={nameError.error}
-                control={
-                  <Input
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                    placeholder="Testing"
-                    {...nameError.field}
-                  />
-                }
-              />
-              <FormField
-                label="Answers with"
-                description={chosen?.hint}
-                control={(props) => (
-                  <Select value={contract} onValueChange={setContract}>
-                    <SelectTrigger {...props} className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {CONTRACTS.map((row) => (
-                        <SelectItem key={row.value} value={row.value}>
-                          {row.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-            </>
-          }
-        />
-
-        <FormField
-          label="Description"
-          description="One line, to pick this kind of lane by. It is never sent to a model."
-          control={
-            <Input
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              placeholder="Runs the suite and says what broke"
+      <FieldRow
+        content={
+          <>
+            <InputField
+              form={form}
+              name="name"
+              label="Name"
+              required
+              placeholder="Testing"
+              validators={{
+                onChange: ({ value }) => (value.trim() ? undefined : "A role needs a name."),
+              }}
             />
-          }
-        />
+            <form.AppField name="contract">
+              {(field) => (
+                <field.SelectField
+                  label="Answers with"
+                  options={CONTRACTS}
+                  description={CONTRACTS.find((row) => row.value === field.state.value)?.hint}
+                />
+              )}
+            </form.AppField>
+          </>
+        }
+      />
 
-        <FormField
-          label="Prompt"
-          description="A lane may add to this on its own board. It never replaces it."
-          control={
-            <Textarea
-              rows={10}
-              value={prompt}
-              onChange={(event) => setPrompt(event.target.value)}
-              placeholder="What an agent working a lane of this kind is told."
-            />
-          }
-        />
-      </div>
+      <InputField
+        form={form}
+        name="description"
+        label="Description"
+        description="One line, to pick this kind of lane by. It is never sent to a model."
+        placeholder="Runs the suite and says what broke"
+      />
+
+      <TextareaField
+        form={form}
+        name="prompt"
+        label="Prompt"
+        description="A lane may add to this on its own board. It never replaces it."
+        rows={10}
+        placeholder="What an agent working a lane of this kind is told."
+      />
     </FormDialog>
   );
 }
