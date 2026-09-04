@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import express from "express";
 import { createYoga } from "graphql-yoga";
-import { authRequired, mountAuth, requireAuth } from "./auth.ts";
+import { authRequired, callerFor, mountAuth, requireAuth } from "./auth.ts";
 import { ensureSchema } from "./db/migrate.ts";
 import { schema } from "./graphql/schema.ts";
 import { mcpHandler, mountMcp } from "./mcp-endpoint.ts";
@@ -26,7 +26,7 @@ if (interrupted.runs) {
 }
 
 // The GraphQL schema comes from the tables, so a column added upstairs changes the API here.
-// In dev that is regenerated into `schema.graphql` and `src/gql/graphql.ts` on boot; the
+// In dev that is regenerated into `schema.graphql` and `web/__generated__/graphql` on boot; the
 // production image has neither codegen nor sources to write. See `dev/codegen.ts`.
 if (process.env.NODE_ENV !== "production") {
   await import("./dev/codegen.ts")
@@ -41,7 +41,13 @@ const app = express();
 // the API answers.
 mountAuth(app);
 
-const yoga = createYoga({ schema, graphqlEndpoint: "/graphql" });
+// Which kind of caller this is, which is the whole of the identity this server has. The rules
+// on the schema read it and nothing else does; see `callerFor` and `server/graphql/permissions.ts`.
+const yoga = createYoga({
+  schema,
+  graphqlEndpoint: "/graphql",
+  context: ({ request }) => ({ caller: callerFor(request.headers.get("authorization")) }),
+});
 app.use(yoga.graphqlEndpoint, requireAuth, yoga);
 
 // The same schema, offered to other clients as MCP tools, beside GraphQL rather than

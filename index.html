@@ -7,7 +7,7 @@
     <!--
       Before first paint, not in React: the stylesheet lands with the document, so a theme
       applied from an effect means one frame of white on a dark install. Kept in step with
-      `src/lib/theme.ts`, which owns the key and every read after this one.
+      `web/lib/theme.ts`, which owns the key and every read after this one.
     -->
     <script>
       try {
@@ -21,6 +21,6 @@
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <script type="module" src="/web/main.tsx"></script>
   </body>
 </html>

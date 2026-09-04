@@ -1,0 +1,77 @@
+query Agents {
+  agents(orderBy: { name: { direction: asc, priority: 1 } }) {
+    id
+    name
+    enabled
+    baseUrl
+    model
+    systemPrompt
+    maxTokens
+    contextLength
+    temperature
+    maxToolIterations
+    toolDiscovery
+    requestTimeoutSeconds
+    maxRetries
+    servers {
+      serverId
+    }
+  }
+  mcpServers(orderBy: { slug: { direction: asc, priority: 1 } }) {
+    id
+    slug
+    label
+    enabled
+  }
+  # Every lane on the server, for the count beside each agent — as on Roles, and for the same
+  # reason: `lanes.agentId` is `set null`, so deleting an agent is not refused, it is a set of
+  # stations that quietly stop. Which ones, on which board, is the thing worth saying first.
+  lanes {
+    id
+    agentId
+    name
+    project {
+      name
+    }
+  }
+  # What an agent that names neither of these will inherit. An agent inheriting from a
+  # Settings that is itself empty has no endpoint at all, which is a thing to say on the page
+  # rather than at the first run.
+  settings {
+    baseUrl
+    model
+  }
+}
+
+query AgentModels($agentId: String) {
+  models(agentId: $agentId) {
+    id
+    contextLength
+  }
+}
+
+mutation CreateAgent($values: CreateAgentInput!) {
+  createAgent(values: $values) {
+    id
+  }
+}
+
+mutation UpdateAgent($id: String!, $set: UpdateAgentInput!) {
+  updateAgent(where: { id: { eq: $id } }, set: $set) {
+    id
+  }
+}
+
+mutation DeleteAgent($id: String!) {
+  deleteAgent(where: { id: { eq: $id } }) {
+    id
+  }
+}
+
+mutation SetAgentServers($agentId: String!, $serverIds: [String!]!) {
+  setAgentServers(agentId: $agentId, serverIds: $serverIds)
+}
+
+mutation SetAgentApiKey($agentId: String!, $apiKey: String!) {
+  setAgentApiKey(agentId: $agentId, apiKey: $apiKey)
+}

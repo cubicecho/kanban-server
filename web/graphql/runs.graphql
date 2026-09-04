@@ -1,0 +1,116 @@
+query Runs($projectId: String, $limit: Int!) {
+  runs(
+    limit: $limit
+    where: { projectId: { eq: $projectId } }
+    orderBy: { startedAt: { direction: desc, priority: 1 } }
+  ) {
+    id
+    kind
+    status
+    startedAt
+    finishedAt
+    output
+    error
+    toolCalls
+    promptTokens
+    completionTokens
+    totalTokens
+    cardId
+    taskId
+    agent {
+      name
+    }
+    card {
+      title
+    }
+    task {
+      title
+    }
+  }
+}
+
+# Who is working right now, so a page can put a name to the run it wants to watch: a card on
+# the board, or the task being talked over on the home page. Both hold an id for the subject,
+# neither holds one for the run.
+query ActiveRuns($projectId: String!) {
+  runs(
+    limit: 50
+    where: { projectId: { eq: $projectId }, status: { eq: running } }
+    orderBy: { startedAt: { direction: desc, priority: 1 } }
+  ) {
+    id
+    kind
+    cardId
+    taskId
+  }
+}
+
+mutation DeleteRun($id: String!) {
+  deleteRun(where: { id: { eq: $id } }) {
+    id
+  }
+}
+
+subscription RunEvents($runId: String!) {
+  runEvents(runId: $runId) {
+    seq
+    kind
+    text
+    name
+    ok
+    usage {
+      promptTokens
+      completionTokens
+      totalTokens
+    }
+  }
+}
+
+# One card's own history, for the dialog that opens on it. The Runs page has the whole board's;
+# this is the account of why this card is where it is — the attempt that failed, what the
+# reviewer said about the one before, and the afternoon somebody dragged it back by hand.
+#
+# Two lists rather than one, because they answer different halves of the question: the runs are
+# what agents did, the events are what became of the card. Only the second knows about a person.
+# They are merged by time where they are drawn.
+query CardRuns($cardId: String!) {
+  runs(
+    limit: 20
+    where: { cardId: { eq: $cardId } }
+    orderBy: { startedAt: { direction: desc, priority: 1 } }
+  ) {
+    id
+    status
+    verdict
+    startedAt
+    finishedAt
+    output
+    error
+    totalTokens
+    agent {
+      name
+    }
+    lane {
+      name
+    }
+  }
+  cardEvents(
+    limit: 50
+    where: { cardId: { eq: $cardId } }
+    orderBy: { createdAt: { direction: desc, priority: 1 } }
+  ) {
+    id
+    runId
+    note {
+      body
+    }
+    actor
+    createdAt
+    fromLane {
+      name
+    }
+    toLane {
+      name
+    }
+  }
+}

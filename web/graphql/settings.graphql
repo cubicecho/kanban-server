@@ -1,0 +1,29 @@
+query Settings {
+  settings {
+    id
+    baseUrl
+    model
+    maxTokens
+    contextLength
+    temperature
+    maxToolIterations
+    toolDiscovery
+    toolSelectModel
+    requestTimeoutSeconds
+    maxRetries
+    runRetentionDays
+    workerIntervalSeconds
+    refineAgentId
+    refinePrompt
+  }
+}
+
+mutation UpdateSettings($set: UpdateSettingInput!) {
+  updateSetting(where: { id: { eq: "default" } }, set: $set) {
+    id
+  }
+}
+
+mutation SetApiKey($apiKey: String!) {
+  setApiKey(apiKey: $apiKey)
+}

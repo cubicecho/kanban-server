@@ -1,0 +1,30 @@
+query BoardTemplates {
+  boardTemplates(orderBy: { name: { direction: asc, priority: 1 } }) {
+    id
+    name
+    description
+    lanes
+    createdAt
+  }
+}
+
+mutation SaveBoardTemplate($projectId: String!, $name: String!, $description: String) {
+  saveBoardTemplate(projectId: $projectId, name: $name, description: $description) {
+    id
+    name
+  }
+}
+
+mutation ApplyBoardTemplate($projectId: String!, $templateId: String!) {
+  applyBoardTemplate(projectId: $projectId, templateId: $templateId) {
+    id
+    name
+    position
+  }
+}
+
+mutation DeleteBoardTemplate($id: String!) {
+  deleteBoardTemplate(where: { id: { eq: $id } }) {
+    id
+  }
+}

@@ -1,0 +1,29 @@
+query Projects {
+  projects(orderBy: { name: { direction: asc, priority: 1 } }) {
+    id
+    name
+    description
+    context
+    autoRun
+    refineAgentId
+  }
+}
+
+mutation CreateProject($values: CreateProjectInput!) {
+  createProject(values: $values) {
+    id
+    name
+  }
+}
+
+mutation UpdateProject($id: String!, $set: UpdateProjectInput!) {
+  updateProject(where: { id: { eq: $id } }, set: $set) {
+    id
+  }
+}
+
+mutation DeleteProject($id: String!) {
+  deleteProject(where: { id: { eq: $id } }) {
+    id
+  }
+}

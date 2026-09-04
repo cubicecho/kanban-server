@@ -13,7 +13,7 @@ everything else.
 
 Read [`README.md`](README.md) first — it holds the design decisions this file only summarises.
 
-Single package, no workspaces: `server/` (Express 5 + graphql-yoga + Drizzle), `src/` (Vite +
+Single package, no workspaces: `server/` (Express 5 + graphql-yoga + Drizzle), `web/` (Vite +
 React 19 + TanStack Router/Query + shadcn), `shared/`, `tests/` (Vitest).
 
 ## Commands
@@ -32,13 +32,13 @@ npm test                 # vitest run
 
 # Schema and types
 npm run schema           # prints the runtime schema to schema.graphql
-npm run codegen          # schema, then graphql-codegen into src/gql/graphql.ts
+npm run codegen          # schema, then graphql-codegen into web/__generated__/graphql/
 npm run db:generate      # drizzle-kit, after a change to server/db/schema.ts
 npm run db:migrate       # apply drizzle/ by hand; the server does this on boot anyway
 npm run db:studio
 
 # Build / run
-npm run build            # codegen, typecheck, then vite build into dist/
+npm run build            # typecheck (regenerates first), then vite build into dist/
 npm start                # NODE_ENV=production tsx server/index.ts
 docker compose up --build
 ```
@@ -60,15 +60,23 @@ docker compose up --build
 require it, and `allowImportingTsExtensions` is on for that reason.
 
 **The schema is the contract, and it is generated.** Add a column to `server/db/schema.ts` and
-the typed documents in `src/graphql/*.graphql` see it. Never hand-write a type that codegen
-produces, and never edit `src/gql/graphql.ts` — biome ignores it because it is output.
+the typed documents in `web/graphql/*.graphql` see it. Never hand-write a type that codegen
+produces, and never edit `web/__generated__/graphql/index.ts` — biome ignores that folder, and
+git does not track it at all.
 
 `npm run codegen` does it explicitly, but under `npm run dev` you should not need to: the
 server rewrites `schema.graphql` on boot and regenerates with it when the SDL moved, and vite
 runs codegen off its own watcher for the documents. Both are dev-only — `@graphql-codegen/cli`
 is a devDependency and `server/dev/codegen.ts` is behind a `NODE_ENV !== "production"` guard,
-because the image has neither codegen nor the sources it would write. `npm run build` runs
-codegen before the typecheck, and CI regenerates and diffs it against what is committed.
+because the image has neither codegen nor the sources it would write.
+
+**The types are generated, not kept.** `web/__generated__/` is in `.gitignore`: it is a pure
+function of `schema.graphql` and the documents, both of which are tracked, and a generated file
+in a diff is a review nobody reads and a merge conflict everybody resolves the same way. So the
+three scripts that read it regenerate it first — `typecheck` runs codegen, `test` runs codegen,
+and `build` runs `typecheck` — and a fresh clone can go straight to any of them. `schema.graphql`
+stays committed, because that one *is* the API and a column added without codegen should show up
+as a change to it; CI regenerates it and diffs.
 
 **A schema change is an edit and a generate.** Change `server/db/schema.ts`, then run
 `npm run db:generate` and commit what lands in `drizzle/` — the SQL and the snapshot both.
@@ -154,7 +162,7 @@ Settings', else the first enabled agent by name. It is the only agent named anyw
 and the only one that has to be, which is the whole of what "off the board" now means.
 
 **The optimistic board and the server agree by construction.** A drop rewrites the board cache
-before the request goes out, and `src/lib/board-order.ts` holds the pure functions that decide
+before the request goes out, and `web/lib/board-order.ts` holds the pure functions that decide
 where a card lands and how its lane renumbers — the same arithmetic `moveCard` does.
 `tests/board-order.test.ts` runs the real mutation and compares, because the failure mode of a
 disagreement is a card that moves twice: once where it was dropped, once when the refetch lands.
@@ -171,7 +179,7 @@ card whose drawn place and `position` disagree.
 **A dependency you cannot see is a dependency you will lose.** The `Board` query filters archived
 cards out, so a card's `deps` as the board carries them are only the visible half — and a dialog
 seeded from that half writes the short list back on the next save, quietly forgetting whichever
-dependency got archived. `CardDeps` in `src/graphql/board.graphql` asks for one card's real edges,
+dependency got archived. `CardDeps` in `web/graphql/board.graphql` asks for one card's real edges,
 archived ones included, and `card-dialog.tsx` holds the picker empty until that answer lands rather
 than seeding from the board and correcting itself: the window between the two is a save that drops
 work. It is its own query rather than a field on `Board` because `Board` polls every three seconds
@@ -179,7 +187,7 @@ over as many as five hundred cards, and this is one card's answer, wanted once, 
 opens. The reverse direction — what waits on *this* card — comes back with it and is drawn
 read-only: editing another card's list from inside this one is a change with no visible cause.
 
-`cyclingCards` in `src/lib/cards.ts` is the same bargain `board-order.ts` strikes, in the other
+`cyclingCards` in `web/lib/cards.ts` is the same bargain `board-order.ts` strikes, in the other
 direction: it walks the board's edges to find the cards that already lead back to this one, and the
 picker draws those rows disabled with the reason on them. `setCardDeps` stays the authority — it
 reads every card in the project, archived ones included, and names the loop — so the two can only
@@ -313,7 +321,8 @@ belongs in a hook, not in a route handler.
 `agents`, so there is no field to select; `setApiKey` and `setAgentApiKey` are write-only. Two
 tests hold that line.
 
-**The `/mcp` surface is curated, not the whole schema.** `server/mcp-endpoint.ts` lists the
+**The `/mcp` surface is curated, not the whole schema — and the curation is a listing, not
+a lock.** What an agent may reach is `permissions.ts`, below. `server/mcp-endpoint.ts` lists the
 thirty-two tools an outside client gets. Nothing that empties a table in one call, nothing that
 reads or writes the API key, and no editing of agents, roles or MCP servers — a visiting client can
 see which agents and roles exist, because a lane points at each, but which model runs where and on
@@ -339,9 +348,16 @@ object schema refuses `undefined`.
 recurse between tables, and written out as JSON Schema rather than named as SDL they would make
 the listing enormous — more than a model will read, and it arrives before any call. graphql-mcp
 builds each input type once so the repeats become `$ref`s. `tests/mcp-endpoint.test.ts` holds
-every tool under 150 kB and the listing under 1.2 MB. The bounds sit above the real figure on
+every tool under 100 kB and the listing under 1 MB — ~68 kB and ~835 kB as it stands, down from
+~88 kB and ~1.1 MB before drizzle-graphql 12, which gives each column type only the operators it
+can use rather than one filter shape for every column. The bounds sit above the real figure on
 purpose: it is the driver's to move, and what the test is for is the order of magnitude.
 Anything added here that grows it needs to answer to that test rather than raise the bound.
+
+The same test file reaches a tool's `where` through `$ref`s and null branches rather than
+reading its layout, because that layout is the conversion of the week and has changed under us
+without the surface changing at all — and it asserts the operators a column offers, since a
+timestamp advertising `ilike` is bytes an agent reads past on every column of every tool.
 
 **The LLM call retries only before the model has spoken.** `server/runner/agent.ts` owns the
 retry loop, not the OpenAI SDK, whose own retries are off: once a chunk has arrived the turn
@@ -372,12 +388,37 @@ send a bearer header; the browser trades the token for an `httpOnly` `SameSite=S
 `/api/auth`, because an `EventSource` cannot send headers and the run stream is one. Compare
 tokens with `tokenMatches` — hashed, then `timingSafeEqual` — and never say more in a 401.
 
+**One token is not one permission.** Both doors are behind the same secret, so `TOOLS` in
+`mcp-endpoint.ts` was a listing and never a lock: a client that could call a curated tool could
+post to `/graphql` and call `deleteCards` with no `where`. `server/graphql/permissions.ts` holds
+the CASL rules that decide what a caller can *reach*, applied to the schema itself through
+`applyPermissions` — which is what makes them true of both endpoints — and `schema.ts` exports
+the wrapped schema so there is no unguarded path. There are two callers and no accounts:
+`callerFor` in `auth.ts` says which, `/mcp` is always an agent, and a request nothing built a
+context for is the operator, because that is the server executing its own schema.
+
+The operator may do anything. An agent may run the board and not redraw it — no lanes, no agents,
+no roles, no MCP servers, no settings row, and no deleting a project. Two rules bind both: every
+bulk write is denied, and `updateCard` accepts only `title`, `body` and `acceptance`, since a
+card's lane, position, status, attempts and archive date each have a door that renumbers the lane
+and writes the ledger. `MUTATIONS` is a whitelist under `"*": deny`, so a generated write a new
+table brings with it arrives shut. `tests/permissions.test.ts` holds all of it, and a fixture
+wanting a card already failed writes the row through `setCardState` rather than through the
+guarded field.
+
+Reads are accepted except for three tables, and each of those is shut at four doors rather than
+one — a generated schema offers a list, a single row, an aggregate and a group-by, and
+`settingsGroupBy` answers with the same columns as `settings`. The rule also sits on the row
+type, because `agents { servers { server { headers } } }` reaches an MCP server's credentials
+from a table an agent may read; a rule on the type guards every field of it wherever it is
+reached, which naming the query fields alone does not.
+
 **Totals are read, never counted.** `spend` sums the run rows on every call, and reports the
 oldest run it counted. A stored counter would keep climbing after `runRetentionDays` deleted the
 runs behind it, and a total that cannot be checked against the rows is worse than none.
 
-**Frontend:** shadcn primitives in `src/components/ui/` with no app logic; routes in
-`src/routes/`; `@/` maps to `src/`. Every query goes through `request()` in `src/lib/gql.ts`
+**Frontend:** shadcn primitives in `web/components/ui/` with no app logic; routes in
+`web/routes/`; `@/` maps to `web/`. Every query goes through `request()` in `web/lib/gql.ts`
 with a typed document — no raw `fetch` in a component — and every mutation invalidates the
 query keys it affected.
 

@@ -3,7 +3,8 @@ import os from "node:os";
 import path from "node:path";
 import { type GraphQLSchema, graphql } from "graphql";
 import { afterAll, beforeAll, expect, test } from "vitest";
-import { blockingDeps, cyclingCards, type DepGraph } from "../src/lib/cards.ts";
+import { blockingDeps, cyclingCards, type DepGraph } from "../web/lib/cards.ts";
+import { setCardState } from "./fixtures/card-state.ts";
 
 // The schema is built from the live Drizzle tables at import time, so the database has to be
 // pointed somewhere disposable before anything under server/ is loaded.
@@ -132,10 +133,7 @@ test("the card's hint names exactly the cards the server is still waiting on", a
   // The three ways a dependency can stand: done, still going, and taken off the board. Only
   // the middle one is in the way, and the board draws that hint from what it already has in
   // hand rather than asking.
-  await run(
-    `mutation Done($id: String!) { updateCardSingle(where: { id: { eq: $id } }, set: { status: done }) { id } }`,
-    { id: id("finished") },
-  );
+  await setCardState(id("finished"), { status: "done" });
   await run(`mutation Away($cardId: String!) { archiveCard(cardId: $cardId) { id } }`, {
     cardId: id("put away"),
   });

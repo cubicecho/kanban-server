@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { type GraphQLSchema, graphql } from "graphql";
 import { afterAll, beforeAll, expect, test } from "vitest";
+import { setCardState } from "./fixtures/card-state.ts";
 
 // The schema is built from the live Drizzle tables at import time, so the database has to be
 // pointed somewhere disposable before anything under server/ is loaded.
@@ -79,12 +80,7 @@ test("an archived card leaves the board with everything it had, and comes back a
   const { projectId, laneIds, ids } = await board("archived", ["A", "B", "C"]);
 
   // A card that failed, so restoring has an outcome to preserve rather than a blank one.
-  await run(
-    `mutation Fail($id: String!) {
-       updateCardSingle(where: { id: { eq: $id } }, set: { status: error, error: "rejected" }) { id }
-     }`,
-    { id: ids.A },
-  );
+  await setCardState(ids.A, { status: "error", error: "rejected" });
 
   const { archiveCard } = await run(
     `mutation Archive($cardId: String!) { archiveCard(cardId: $cardId) { id archivedAt } }`,
@@ -201,7 +197,7 @@ test("a lane will not be deleted out from under the archive", async () => {
 
   // The lane looks empty — that is exactly the problem, and why the guard is on the server.
   const message = await fails(
-    `mutation Drop($id: String!) { deleteLaneSingle(where: { id: { eq: $id } }) { id } }`,
+    `mutation Drop($id: String!) { deleteLane(where: { id: { eq: $id } }) { id } }`,
     { id: laneIds[0] },
   );
   expect(message).toContain("archived cards");
@@ -211,11 +207,8 @@ test("a lane will not be deleted out from under the archive", async () => {
   });
   // Restored, it is an ordinary card in an ordinary lane, and the ordinary guard applies.
   expect(
-    await fails(
-      `mutation Drop($id: String!) { deleteLaneSingle(where: { id: { eq: $id } }) { id } }`,
-      {
-        id: laneIds[0],
-      },
-    ),
+    await fails(`mutation Drop($id: String!) { deleteLane(where: { id: { eq: $id } }) { id } }`, {
+      id: laneIds[0],
+    }),
   ).not.toContain("archived cards");
 });

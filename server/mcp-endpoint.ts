@@ -7,12 +7,19 @@ import express from "express";
 // Default import, not a named one: Node's own JSON modules only export a default, and the
 // container runs this file through Node rather than tsx.
 import pkg from "../package.json" with { type: "json" };
-import { requireAuth } from "./auth.ts";
+import { type GraphContext, requireAuth } from "./auth.ts";
 import { schema } from "./graphql/schema.ts";
 import { registerPrompts } from "./mcp-prompts.ts";
 
 /**
  * The tools an outside client is handed, and nothing else.
+ *
+ * A listing, not a lock. What an agent may actually reach is decided on the schema, by
+ * `server/graphql/permissions.ts`, which is what makes it true of `/graphql` too — both doors
+ * are one token and one schema, so a rule bolted onto this list would say nothing about the
+ * same field reached over the query endpoint. This list is about an agent's context, which is
+ * worth spending deliberately: thirty-six tools it will read is a different question from the
+ * ninety-eighth mutation it must not call.
  *
  * The schema has fifty-odd root fields — aggregates, group-bys, bulk writes, the settings row
  * with the API key behind it — and projecting all of them would spend an agent's context on
@@ -22,9 +29,9 @@ import { registerPrompts } from "./mcp-prompts.ts";
  *
  * Left out on purpose: `settings`, `setApiKey` and the agent and MCP-server rows (which model
  * runs where, on whose key, is the operator's business and not a visiting agent's); every bulk
- * mutation, since a `deleteCard` with no `where` empties the table and `deleteCardSingle`
- * cannot; and deleting a project, which takes its whole board and history with it and is worth
- * the walk to the UI.
+ * mutation, since a `deleteCards` with no `where` empties the table and `deleteCard` cannot; and
+ * deleting a project, which takes its whole board and history with it and is worth the walk to
+ * the UI.
  */
 const TOOLS = [
   "Query.projects",
@@ -41,15 +48,15 @@ const TOOLS = [
   "Query.spend",
   "Query.boardTemplates",
   "Mutation.createProject",
-  "Mutation.updateProjectSingle",
+  "Mutation.updateProject",
   "Mutation.submitCard",
   "Mutation.createTask",
   "Mutation.refineTask",
   "Mutation.makeCard",
-  "Mutation.deleteTaskSingle",
+  "Mutation.deleteTask",
   "Mutation.createCard",
-  "Mutation.updateCardSingle",
-  "Mutation.deleteCardSingle",
+  "Mutation.updateCard",
+  "Mutation.deleteCard",
   "Mutation.setCardDeps",
   "Mutation.addCardNote",
   "Mutation.updateCardNote",
@@ -161,7 +168,7 @@ const HINTS: Record<string, string> = {
     "server has, so it is ready for work as soon as it exists. Intake breaks a card into the " +
     "cards that carry it out, Doing works them and Review judges what Doing produced. Set " +
     "`autoRun: true` for cards to be picked up without being asked.",
-  update_project_single:
+  update_project:
     "Edits one board. `set: { autoRun: false }` leaves everything in place but stops agents " +
     "picking up cards, which is the gentle way to pause a project.",
   submit_card:
@@ -184,7 +191,7 @@ const HINTS: Record<string, string> = {
     "card at the front door, carrying the task's id. One card, not many — breaking work up is " +
     "a station now, so a front door that expands is what turns it into the cards that carry " +
     "the work out. The conversation is left where it is and can go on afterwards.",
-  delete_task_single:
+  delete_task:
     "Deletes one task and its conversation. The cards it produced are left where they are: " +
     "they are the work, and the task was only how it was asked for.",
   create_card:
@@ -196,11 +203,11 @@ const HINTS: Record<string, string> = {
     "when the body says it in passing — a criterion buried in a paragraph is one that gets " +
     "skipped. A card written this way carries no `taskId`, which is the honest record of " +
     "where it came from.",
-  update_card_single:
+  update_card:
     "Edits one card — its title, body or acceptance criteria. Use `move_card` to put it in a " +
     "different lane; setting `laneId` here skips the renumbering and leaves the board in an " +
     "order it does not look like.",
-  delete_card_single:
+  delete_card:
     "Deletes one card. Refused while an agent is working it: stop it first with `stop_card`.",
   set_card_deps:
     "Replaces what a card waits on, as a whole set — the ids of other cards on the same board " +
@@ -319,6 +326,10 @@ const makeServer = createServerFactory({
       : descriptor.description,
     ...(WRITE_HINTS[descriptor.name] ? { annotations: WRITE_HINTS[descriptor.name] } : {}),
   }),
+  // Everything arriving here is an agent, which is the whole of what the rules on the schema
+  // read. `TOOLS` above decides what a client is told about; `server/graphql/permissions.ts`
+  // decides what it can reach, and this is how it knows who is asking.
+  context: { caller: "agent" } satisfies GraphContext,
 });
 
 /**

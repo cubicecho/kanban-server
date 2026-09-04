@@ -107,3 +107,32 @@ export function mountAuth(app: express.Application) {
     res.json({ ok: true });
   });
 }
+
+/**
+ * Which kind of caller a request is, which is the whole of the identity this server has.
+ *
+ * There are no accounts, and adding them for one person's board would be a table to keep for a
+ * distinction nobody makes. What there is instead is two doors, and they are used by two
+ * different kinds of thing: `/mcp` is where agents call in, and `/graphql` is where the web app
+ * does. That is enough to say an agent may run the board but not re-key it.
+ *
+ * With a token set the split is sharper than the door: the browser trades its token for a
+ * cookie, so a `Bearer` header on `/graphql` is an agent that found the query endpoint, and it
+ * is held to an agent's rules there as it would be on `/mcp`. With no token — the default —
+ * `/graphql` is open and its caller is taken to be the operator, which is what it was before
+ * any of this existed. `/mcp` is an agent either way.
+ */
+export type Caller = "operator" | "agent";
+
+/** What the resolvers are handed. `caller` is the only thing any rule reads. */
+export interface GraphContext {
+  caller: Caller;
+}
+
+/**
+ * The caller behind a `/graphql` request, read off its `Authorization` header. `/mcp` does not
+ * ask: it is always an agent.
+ */
+export function callerFor(authorization: string | null | undefined): Caller {
+  return authRequired() && (authorization ?? "").startsWith("Bearer ") ? "agent" : "operator";
+}

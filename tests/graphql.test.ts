@@ -4,6 +4,7 @@ import path from "node:path";
 import { eq } from "drizzle-orm";
 import { type GraphQLSchema, graphql } from "graphql";
 import { afterAll, beforeAll, expect, test } from "vitest";
+import { setCardState } from "./fixtures/card-state.ts";
 
 // The schema is built from the live Drizzle tables at import time, so the database has to be
 // pointed somewhere disposable before anything under server/ is loaded.
@@ -151,15 +152,7 @@ test("retryCard puts a rejected card back in play where it stands", async () => 
   // What a reviewer's FAIL leaves behind: back in Doing, out of budget, and in a status the
   // worker will not pick up. Nothing on the card says why — the reason is on the move that
   // brought it here, which is why a retry can clear the status without erasing the feedback.
-  await run(
-    `mutation Fail($id: String!) {
-       updateCardSingle(
-         where: { id: { eq: $id } }
-         set: { status: rejected, attempts: 3 }
-       ) { id }
-     }`,
-    { id: createCard.id },
-  );
+  await setCardState(createCard.id, { status: "rejected", attempts: 3 });
 
   const { retryCard } = await run(
     `mutation Retry($cardId: String!) {
@@ -183,15 +176,7 @@ test("retryCard puts a rejected card back in play where it stands", async () => 
     `mutation Make($values: CreateCardInput!) { createCard(values: $values) { id } }`,
     { values: { projectId: project.id, laneId: doing.id, title: "crashed", position: 1 } },
   );
-  await run(
-    `mutation Break($id: String!) {
-       updateCardSingle(
-         where: { id: { eq: $id } }
-         set: { status: error, error: "ECONNREFUSED" }
-       ) { id }
-     }`,
-    { id: crashed.id },
-  );
+  await setCardState(crashed.id, { status: "error", error: "ECONNREFUSED" });
   const retried = await run(
     `mutation Retry($cardId: String!) { retryCard(cardId: $cardId) { status error } }`,
     { cardId: crashed.id },
@@ -234,12 +219,7 @@ test("blockers names what a card is waiting on, and stops naming it when it stop
   // "unknown", which is what a stored `waiting on: …` string decayed into.
   expect(await waitingOn(migration.id)).toEqual([]);
 
-  await run(
-    `mutation Done($id: String!) {
-       updateCardSingle(where: { id: { eq: $id } }, set: { status: done }) { id }
-     }`,
-    { id: migration.id },
-  );
+  await setCardState(migration.id, { status: "done" });
   // Nothing was rewritten anywhere for this to change: the answer is worked out when it is
   // asked for, so it is right the moment the card it is about finishes.
   expect(await waitingOn(page.id)).toEqual(["read it from the endpoint"]);
@@ -545,13 +525,13 @@ test("a board saved under a name is drawn onto the next project the same shape",
   const [, , doing, review, done] = drawn;
   await run(
     `mutation Widen($id: String!) {
-       updateLaneSingle(where: { id: { eq: $id } }, set: { wipLimit: 3 }) { id }
+       updateLane(where: { id: { eq: $id } }, set: { wipLimit: 3 }) { id }
      }`,
     { id: doing.id },
   );
   await run(
     `mutation Budget($id: String!) {
-       updateLaneSingle(where: { id: { eq: $id } }, set: { maxAttempts: 2 }) { id }
+       updateLane(where: { id: { eq: $id } }, set: { maxAttempts: 2 }) { id }
      }`,
     { id: review.id },
   );

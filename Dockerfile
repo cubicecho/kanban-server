@@ -14,8 +14,9 @@ RUN npm ci
 
 COPY . .
 
-# `build` is codegen + typecheck + vite build. It writes dist/, which the server
-# hands to anything that isn't /graphql or /mcp.
+# `build` is typecheck — which regenerates the GraphQL types first, since they are
+# not in the repo — then vite build. It writes dist/, which the server hands to
+# anything that isn't /graphql or /mcp.
 RUN npm run build
 
 # ─── Stage 2: runtime ────────────────────────────────────────────────────────

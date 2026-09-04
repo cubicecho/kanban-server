@@ -245,7 +245,7 @@ to move, space to drop, escape to think better of it. The lane arrows stay becau
 the right" is one keystroke on an arrow and a dozen on a drag.
 
 A drop is applied to the query cache before the server has answered, using the same arithmetic
-the server does (`src/lib/board-order.ts`), because a card that jumps back for a moment reads as
+the server does (`web/lib/board-order.ts`), because a card that jumps back for a moment reads as
 broken. `tests/board-order.test.ts` drags cards against the real mutation and asserts the two
 orders are the same one. A refusal — a card an agent picked up between the drop and the request —
 puts the board back as it was. The board's own three-second poll stops while a card is in the air:
@@ -473,7 +473,7 @@ server/
   mcp-endpoint.ts  the curated /mcp tool surface
   index.ts     express + yoga + the MCP endpoint + the built SPA
 shared/        the bits both halves import
-src/           vite + react + tanstack router/query + shadcn
+web/           vite + react + tanstack router/query + shadcn
                (new task, board, tasks, agents, runs, mcp servers, settings)
 tests/         vitest
 ```
@@ -486,6 +486,14 @@ is queryable as soon as it exists. Hand-written fields fill the gaps that CRUD c
 `models`, `mcpStatus`, `blockers` and `runEvents` on the query side; `refineTask`, `makeCard`,
 `submitCard`, `runCard`, `stopCard`, `stopTask`, `moveCard`, `setAgentServers`,
 `testMcpServer`, `reconnectMcp`, `setApiKey` and `setAgentApiKey` on the mutation side.
+
+Tables are keyed in the plural and the schema is built with `typeNameMapper: "singularize"`, so
+the singular and the plural of a table's own name are what tell one row from many: `card` and
+`cards` on the query side, `createCard`/`createCards`, `updateCard`/`updateCards`,
+`deleteCard`/`deleteCards` on the mutation side. Nothing carries a `Single` any more —
+drizzle-graphql 13 lets the suffixes reach the update and delete pairs, which until then only the
+insert one obeyed, and a `deleteCardSingle` that was really *the* delete read to an agent as a
+variant it had to choose between.
 
 - **`POST /graphql`** — the API, plus GraphiQL in a browser.
 - **`/mcp`** — the same server offered to agents as MCP tools; see below. Not for the web app,
@@ -517,11 +525,11 @@ Thirty-six tools, chosen in `server/mcp-endpoint.ts` rather than projected from 
 
 - **read** — `projects`, `lanes`, `cards`, `tasks`, `runs`, `agents`, `roles`, `run_events`,
   `card_events`, `card_notes`, `blockers`, `spend`, `board_templates`
-- **projects** — `create_project`, `update_project_single`
-- **tasks** — `create_task`, `refine_task`, `make_card`, `delete_task_single`
-- **cards** — `submit_card`, `create_card`, `update_card_single`, `delete_card_single`,
-  `set_card_deps`, `move_card`, `retry_card`, `archive_card`, `restore_card`, `run_card`,
-  `stop_card`, `stop_task`, `add_card_note`, `update_card_note`, `delete_card_note`
+- **projects** — `create_project`, `update_project`
+- **tasks** — `create_task`, `refine_task`, `make_card`, `delete_task`
+- **cards** — `submit_card`, `create_card`, `update_card`, `delete_card`, `set_card_deps`,
+  `move_card`, `retry_card`, `archive_card`, `restore_card`, `run_card`, `stop_card`,
+  `stop_task`, `add_card_note`, `update_card_note`, `delete_card_note`
 - **boards** — `save_board_template`, `apply_board_template`
 
 `submit_card` is the one to reach for: describe what you want and it lands at the board's front
@@ -572,9 +580,9 @@ done, and gains an idempotent one, because a second call finds nothing in flight
 
 Left out on purpose: the settings row and `setApiKey` (which model runs where, on whose key, is
 the operator's business, not a visiting agent's), writes to agents and MCP servers, the aggregates
-and group-bys, every bulk mutation — `deleteCard` with no `where` empties the table, where
-`deleteCardSingle` cannot — and deleting a project, which takes its whole board and history with
-it and is worth the walk to the UI. Each tool selects one level of fields, so a listing of cards
+and group-bys, every bulk mutation — `deleteCards` with no `where` empties the table, where
+`deleteCard` cannot — and deleting a project, which takes its whole board and history with it
+and is worth the walk to the UI. Each tool selects one level of fields, so a listing of cards
 does not drag every run's output along with it.
 
 The whole listing is about 662 kB, which is worth saying because it very nearly was not. The
@@ -585,7 +593,9 @@ that recursion out at every level, and the listing runs to megabytes of tool def
 over before a client can call anything. graphql-mcp builds each input type once and emits a `$ref`
 for the repeats, so the relation filters cost almost nothing and stay — `where: { cards: { some:
 { status: { eq: "error" } } } }` is a question worth being able to ask. A test holds every tool
-under 150 kB and the listing under 1.2 MB.
+under 100 kB and the listing under 1 MB, and asserts that a column offers only the operators it
+can take: drizzle-graphql 12 stopped generating one filter shape for every column, so a timestamp
+no longer advertises `ilike` and an enum no longer advertises `startsWith`.
 
 Unknown fields in a tool's arguments are rejected rather than dropped: a misspelled key comes back
 as `Unrecognized key: "order"` instead of a success with that part of the request quietly
@@ -631,6 +641,48 @@ another site's page cannot borrow it. Log out by deleting it: `DELETE /api/auth`
 One shared token, not accounts: this is a tool one person points at their own board, and what is
 worth locking is not who you are but the key the agents spend. A wrong token is compared in
 constant time and refused with a bare `401` that says nothing about what is here.
+
+### What a caller may do
+
+One token is not one permission. Both doors are behind the same secret, so a client that could
+call a curated MCP tool could equally post to `/graphql` and call `deleteCards` with no `where`,
+which empties the table. The tool listing in `server/mcp-endpoint.ts` decided what an agent was
+*told about*; nothing decided what it could *reach*.
+
+`server/graphql/permissions.ts` now does, in CASL rules applied to the schema itself through
+[`@vantreeseba/graphql-casl`](https://github.com/cubicecho/graphql-casl) — so they are true of
+both endpoints rather than of whichever one they were bolted onto. There are two kinds of caller
+and no accounts: the **operator**, which is the web app and the person whose server this is, and
+an **agent**, which is anything arriving on `/mcp`. With a token set, a `Bearer` header on
+`/graphql` is an agent too, since the browser trades its token for a cookie.
+
+The operator may do anything. An agent runs the board: it makes projects, cards and tasks, works
+them, moves them and says what it found. What it may not do is re-key the server or re-staff it —
+which model runs where and on whose key is the operator's business — nor redraw the lanes, nor
+delete a project, which takes a whole board and its history with it. It can read the agents and
+the roles, because a lane names one of each, and it is told nothing of the settings row.
+
+Reading is where the doors outnumber the rooms. A generated schema offers a table four ways —
+the list, the single row, the aggregate and the group-by — and `settingsGroupBy(groupBy: [model])`
+answers with the same column values as `settings` under a different heading. Three tables are
+withheld from an agent, so all four of each are: the settings row, the MCP servers, and the
+rows joining an agent to one. The MCP servers matter most, because `env` and `headers` on one of
+those rows are credentials in all but name.
+
+Naming those twelve fields is still not enough, because a table an agent *may* read leads to one
+it may not: `agents { servers { server { headers } } }` walks there from a lane's own agent. So
+the rule sits on the row type as well, which guards every field of it wherever it is reached.
+
+Two things are refused for everyone. Every bulk write is shut, because `deleteCard` cannot empty
+a table and `deleteCards` can. And `updateCard` writes only the columns a card's *author* owns —
+its title, body and acceptance. A card's lane, position, status, attempts and archive date are
+the board's, and each has a door of its own that renumbers the lane and writes the ledger row
+saying why the card moved; `set: { laneId }` would do neither.
+
+The map is a whitelist: every mutation is denied unless it is named, so a generated write that a
+new table brings with it ships shut rather than open. Reads are the other way round, and
+deliberately — the one thing on this server worth keeping from a reader is the API key, and that
+is dropped from the types entirely, so there is no field to guard.
 
 ## Retention
 
@@ -699,26 +751,28 @@ publishes the images without tagging a release.
 The schema is built at runtime from the tables, so codegen needs it written out first:
 
 ```sh
-npm run codegen    # prints schema.graphql, then generates src/gql/
+npm run codegen    # prints schema.graphql, then generates web/__generated__/graphql/
 ```
 
-That produces `src/gql/graphql.ts`: a typed document node per operation, so a query whose shape
-changes breaks compilation rather than at runtime.
+That produces `web/__generated__/graphql/index.ts`: a typed document node per operation, so a
+query whose shape changes breaks compilation rather than at runtime. It is not committed — the
+folder is in `.gitignore` — because it is a function of two things that are, and a generated file
+under review is a diff nobody reads. `npm run typecheck`, `npm test` and `npm run build` each
+regenerate it before they start, so a fresh clone needs no step before any of them.
 
 In development you rarely run it by hand, because both halves of `npm run dev` keep it current
 from the side they can see:
 
 - the **server** rewrites `schema.graphql` on boot, and regenerates the types with it — that is
   the moment after a table changes, and it only does the work when the SDL actually moved
-- **vite** watches `schema.graphql` and `src/graphql/**/*.graphql` through
+- **vite** watches `schema.graphql` and `web/graphql/**/*.graphql` through
   `vite-plugin-graphql-codegen`, so editing a document regenerates its typed node and hot-reloads
 
 Both are dev-only. The production image has no codegen in it and nothing to regenerate: it serves
 a `dist/` that was built against the types it was typechecked with.
 
-`npm run build` runs codegen before the typecheck, so a stale `src/gql/graphql.ts` cannot reach a
-build. CI additionally regenerates and diffs against what is committed — the artefacts are
-generated *and* checked in, and that step is what stops the two from drifting apart.
+`schema.graphql` *is* committed, and CI regenerates it and diffs: the SDL is the API, and a column
+added without running codegen is a change to it that a review would otherwise never see.
 
 ## Postgres
 
@@ -773,10 +827,10 @@ other is your own `pg_dump`-shaped problem.
 | | |
 | --- | --- |
 | `npm run dev` | server and web together |
-| `npm run build` | codegen, typecheck, then build the SPA into `dist/` |
+| `npm run build` | typecheck (which regenerates first), then build the SPA into `dist/` |
 | `npm start` | production: express serves `dist/` and the API on one port |
-| `npm run codegen` | print `schema.graphql` and regenerate `src/gql/` |
-| `npm test` | vitest |
+| `npm run codegen` | print `schema.graphql` and regenerate `web/__generated__/graphql/` |
+| `npm test` | codegen, then vitest |
 | `npm run lint` / `format` | biome |
 | `npm run db:generate` | write a migration into `drizzle/` after a schema change |
 | `npm run db:migrate` | apply `drizzle/` by hand; the server does it on boot anyway |

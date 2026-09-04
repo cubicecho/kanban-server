@@ -6,3 +6,5 @@ data
 *.local
 # Claude Code's own scratch space — worktrees, session state. Not part of the app.
 .claude
+# Codegen output. Rebuilt by `npm run typecheck`, `test` and `build`, and by `npm run dev`.
+web/__generated__

@@ -3,7 +3,7 @@ import path from "node:path";
 import { writeSchemaFile } from "../graphql/write-schema.ts";
 import { ROOT } from "../paths.ts";
 
-const TYPES_FILE = path.join(ROOT, "src/gql/graphql.ts");
+const TYPES_FILE = path.join(ROOT, "web/__generated__/graphql/index.ts");
 
 /**
  * Regenerates `schema.graphql` and the typed documents when the schema has moved.
@@ -29,5 +29,7 @@ export async function runCodegen(): Promise<void> {
   const { default: config } = await import("../../codegen.ts");
 
   await generate({ ...config, silent: true }, true);
-  console.log("[kanban-server] codegen: schema.graphql and src/gql/graphql.ts are up to date");
+  console.log(
+    "[kanban-server] codegen: schema.graphql and web/__generated__/graphql are up to date",
+  );
 }
