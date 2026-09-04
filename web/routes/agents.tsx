@@ -14,12 +14,13 @@ import { ConfirmButton } from "@/components/confirm-button";
 import { EmptyState } from "@/components/empty-state";
 import { EnableSwitch } from "@/components/enable-switch";
 import { QueryState } from "@/components/query-state";
-import { RowCard } from "@/components/row-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Item, ItemActions, ItemContent, ItemDescription, ItemTitle } from "@/components/ui/item";
 import { request } from "@/lib/gql";
 import { nameList, plural } from "@/lib/text";
 import { toastError } from "@/lib/toast";
+import { cn } from "@/lib/utils";
 
 type Agent = AgentsQuery["agents"][number];
 
@@ -117,79 +118,71 @@ export function AgentsRoute() {
         // rather than after: an unstaffed station looks exactly like a resting place.
         const where = nameList(staffed.map((lane) => `${lane.name} on ${lane.project.name}`));
         return (
-          <RowCard
-            key={agent.id}
-            dim={!agent.enabled}
-            title={agent.name}
-            badges={
-              <>
-                <span className="text-xs text-muted-foreground">{plural(count, "lane")}</span>
-                <span className="text-xs text-muted-foreground">
+          <Item key={agent.id} variant="outline" className="items-start">
+            {/* A switched-off agent goes quiet, but the switch that turns it back on must not,
+                so the dimming is on the row's words and not on what acts on them. */}
+            <ItemContent className={cn("min-w-0", !agent.enabled && "opacity-50")}>
+              <ItemTitle className="flex-wrap">
+                <span className="truncate">{agent.name}</span>
+                <span className="font-normal text-muted-foreground text-xs">
+                  {plural(count, "lane")}
+                </span>
+                <span className="font-normal text-muted-foreground text-xs">
                   {agent.servers.length ? plural(agent.servers.length, "server") : "no tools"}
                 </span>
-              </>
-            }
-            meta={
-              <>
-                <p className="mt-1 truncate font-mono text-xs text-muted-foreground">
-                  {agent.model || "model from Settings"} ·{" "}
-                  {agent.baseUrl || "endpoint from Settings"}
-                </p>
-                {/* The seeded agent is a name and nothing else, and inheriting from a Settings
-                  that was never filled in resolves to no endpoint at all — which showed up
-                  as a raw connection error on the first run and nowhere before it. */}
-                {!agent.model || !agent.baseUrl ? (
-                  <SettingsNeeded
-                    missing={
-                      !agent.model && !agent.baseUrl
-                        ? "a model and an endpoint"
-                        : agent.model
-                          ? "an endpoint"
-                          : "a model"
-                    }
-                    settings={settings}
-                  />
-                ) : null}
-              </>
-            }
-            actions={
-              <>
-                <EnableSwitch
-                  enabled={agent.enabled}
-                  onChange={(enabled) => toggle.mutate({ id: agent.id, enabled })}
-                  name={agent.name}
-                />
-                <ActionButton
-                  variant="ghost"
-                  size="icon"
-                  label={`Edit ${agent.name}`}
-                  hint="Edit"
-                  onClick={() => setEditing(agent)}
-                >
-                  <Pencil className="size-4" aria-hidden />
-                </ActionButton>
-                <ConfirmButton
-                  variant="ghost"
-                  size="icon"
-                  label={`Delete ${agent.name}`}
-                  hint={count ? `Staffs ${where}` : "Delete"}
-                  title={`Delete the agent "${agent.name}"?`}
-                  description={
-                    count
-                      ? `${plural(count, "lane")} — ${where} — stop running until another agent is picked.`
-                      : "No lane is staffed by it, so nothing on any board stops."
+              </ItemTitle>
+              <p className="truncate font-mono text-muted-foreground text-xs">
+                {agent.model || "model from Settings"} · {agent.baseUrl || "endpoint from Settings"}
+              </p>
+              {/* The seeded agent is a name and nothing else, and inheriting from a Settings
+                  that was never filled in resolves to no endpoint at all — which showed up as a
+                  raw connection error on the first run and nowhere before it. */}
+              {!agent.model || !agent.baseUrl ? (
+                <SettingsNeeded
+                  missing={
+                    !agent.model && !agent.baseUrl
+                      ? "a model and an endpoint"
+                      : agent.model
+                        ? "an endpoint"
+                        : "a model"
                   }
-                  onConfirm={() => remove.mutate(agent.id)}
-                >
-                  <Trash2 className="size-4" aria-hidden />
-                </ConfirmButton>
-              </>
-            }
-          >
-            {agent.systemPrompt ? (
-              <p className="line-clamp-2 text-sm text-muted-foreground">{agent.systemPrompt}</p>
-            ) : null}
-          </RowCard>
+                  settings={settings}
+                />
+              ) : null}
+              {agent.systemPrompt ? <ItemDescription>{agent.systemPrompt}</ItemDescription> : null}
+            </ItemContent>
+            <ItemActions className="gap-1">
+              <EnableSwitch
+                enabled={agent.enabled}
+                onChange={(enabled) => toggle.mutate({ id: agent.id, enabled })}
+                name={agent.name}
+              />
+              <ActionButton
+                variant="ghost"
+                size="icon"
+                label={`Edit ${agent.name}`}
+                hint="Edit"
+                onClick={() => setEditing(agent)}
+              >
+                <Pencil className="size-4" aria-hidden />
+              </ActionButton>
+              <ConfirmButton
+                variant="ghost"
+                size="icon"
+                label={`Delete ${agent.name}`}
+                hint={count ? `Staffs ${where}` : "Delete"}
+                title={`Delete the agent "${agent.name}"?`}
+                description={
+                  count
+                    ? `${plural(count, "lane")} — ${where} — stop running until another agent is picked.`
+                    : "No lane is staffed by it, so nothing on any board stops."
+                }
+                onConfirm={() => remove.mutate(agent.id)}
+              >
+                <Trash2 className="size-4" aria-hidden />
+              </ConfirmButton>
+            </ItemActions>
+          </Item>
         );
       })}
 

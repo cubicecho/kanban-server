@@ -19,13 +19,14 @@ import { EnableSwitch } from "@/components/enable-switch";
 import { McpDialog } from "@/components/mcp-dialog";
 import { ProbeResult } from "@/components/probe-result";
 import { QueryState } from "@/components/query-state";
-import { RowCard } from "@/components/row-card";
 import { toolCount } from "@/components/tool-list";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Item, ItemActions, ItemContent, ItemFooter, ItemTitle } from "@/components/ui/item";
 import { request } from "@/lib/gql";
 import { toConnection } from "@/lib/mcp-config";
 import { toastError } from "@/lib/toast";
+import { cn } from "@/lib/utils";
 
 type McpServer = McpServersQuery["mcpServers"][number];
 
@@ -117,76 +118,76 @@ export function McpRoute() {
         const tools = status?.tools ?? [];
         const probe = probes[server.id];
         return (
-          <RowCard
-            key={server.id}
-            dim={!server.enabled}
-            title={<span className="font-mono text-sm">{server.slug}</span>}
-            badges={
-              <>
+          <Item key={server.id} variant="outline" className="items-start">
+            {/* Dimmed on the row's words only: the switch that turns a disabled server back on
+                has to stay legible, and it is what the reader is looking for. */}
+            <ItemContent className={cn("min-w-0", !server.enabled && "opacity-50")}>
+              <ItemTitle className="flex-wrap">
+                <span className="truncate font-mono">{server.slug}</span>
                 <Badge variant="outline">{server.transport}</Badge>
                 <Badge variant={status?.status === "ready" ? "secondary" : "outline"}>
                   {status?.status ?? "unknown"}
                 </Badge>
                 {tools.length ? (
-                  <span className="text-xs text-muted-foreground">{toolCount(tools.length)}</span>
+                  <span className="font-normal text-muted-foreground text-xs">
+                    {toolCount(tools.length)}
+                  </span>
                 ) : null}
-              </>
-            }
-            meta={
-              <p className="truncate font-mono text-xs text-muted-foreground">
+              </ItemTitle>
+              <p className="truncate font-mono text-muted-foreground text-xs">
                 {server.transport === "stdio"
                   ? [server.command, ...(toConnection(server).args ?? [])].join(" ")
                   : server.url}
               </p>
-            }
-            actions={
-              <>
-                <EnableSwitch
-                  enabled={server.enabled}
-                  onChange={(enabled) => toggle.mutate({ id: server.id, enabled })}
-                  name={server.slug}
-                />
-                <ActionButton
-                  variant="ghost"
-                  size="icon"
-                  label={`Test the connection to ${server.slug}`}
-                  hint="Test connection"
-                  onClick={() => test.mutate(server)}
-                  disabled={test.isPending && test.variables?.id === server.id}
-                >
-                  <PlugZap className="size-4" aria-hidden />
-                </ActionButton>
-                <ActionButton
-                  variant="ghost"
-                  size="icon"
-                  label={`Edit ${server.slug}`}
-                  hint="Edit"
-                  onClick={() => setEditing(server)}
-                >
-                  <Pencil className="size-4" aria-hidden />
-                </ActionButton>
-                <ConfirmButton
-                  variant="ghost"
-                  size="icon"
-                  label={`Delete ${server.slug}`}
-                  hint="Delete"
-                  title={`Delete the server "${server.slug}"?`}
-                  description="Every agent given these tools loses them, on every board on this server. The tools themselves are wherever they were — this is only the connection to them."
-                  onConfirm={() => remove.mutate(server.id)}
-                >
-                  <Trash2 className="size-4" aria-hidden />
-                </ConfirmButton>
-              </>
-            }
-          >
-            {status?.error ? (
-              <p className="whitespace-pre-wrap font-mono text-xs text-destructive">
-                {status.error}
-              </p>
+              {status?.error ? (
+                <p className="whitespace-pre-wrap font-mono text-destructive text-xs">
+                  {status.error}
+                </p>
+              ) : null}
+            </ItemContent>
+            <ItemActions className="gap-1">
+              <EnableSwitch
+                enabled={server.enabled}
+                onChange={(enabled) => toggle.mutate({ id: server.id, enabled })}
+                name={server.slug}
+              />
+              <ActionButton
+                variant="ghost"
+                size="icon"
+                label={`Test the connection to ${server.slug}`}
+                hint="Test connection"
+                onClick={() => test.mutate(server)}
+                disabled={test.isPending && test.variables?.id === server.id}
+              >
+                <PlugZap className="size-4" aria-hidden />
+              </ActionButton>
+              <ActionButton
+                variant="ghost"
+                size="icon"
+                label={`Edit ${server.slug}`}
+                hint="Edit"
+                onClick={() => setEditing(server)}
+              >
+                <Pencil className="size-4" aria-hidden />
+              </ActionButton>
+              <ConfirmButton
+                variant="ghost"
+                size="icon"
+                label={`Delete ${server.slug}`}
+                hint="Delete"
+                title={`Delete the server "${server.slug}"?`}
+                description="Every agent given these tools loses them, on every board on this server. The tools themselves are wherever they were — this is only the connection to them."
+                onConfirm={() => remove.mutate(server.id)}
+              >
+                <Trash2 className="size-4" aria-hidden />
+              </ConfirmButton>
+            </ItemActions>
+            {probe ? (
+              <ItemFooter>
+                <ProbeResult probe={probe} className="w-full border-t pt-3" />
+              </ItemFooter>
             ) : null}
-
-            {probe ? <ProbeResult probe={probe} className="border-t pt-3" /> : null}
-          </RowCard>
+          </Item>
         );
       })}
 

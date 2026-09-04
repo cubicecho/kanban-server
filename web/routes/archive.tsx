@@ -155,16 +155,19 @@ export function ArchiveRoute() {
               </ConfirmButton>
             </>
           }
-        >
-          {card.body ? (
-            <pre className="overflow-x-auto text-sm whitespace-pre-wrap">{card.body}</pre>
-          ) : null}
-          {card.error ? (
-            <pre className="overflow-x-auto text-sm whitespace-pre-wrap text-muted-foreground">
-              {card.error}
-            </pre>
-          ) : null}
-        </DisclosureRow>
+          content={
+            <>
+              {card.body ? (
+                <pre className="overflow-x-auto text-sm whitespace-pre-wrap">{card.body}</pre>
+              ) : null}
+              {card.error ? (
+                <pre className="overflow-x-auto text-sm whitespace-pre-wrap text-muted-foreground">
+                  {card.error}
+                </pre>
+              ) : null}
+            </>
+          }
+        />
       ))}
 
       {more ? <ShowMore count={PAGE} onMore={() => setLimit(limit + PAGE)} /> : null}
