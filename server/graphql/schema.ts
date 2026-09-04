@@ -1,4 +1,5 @@
 import { buildSchema, GraphQLDateTime } from "@vantreeseba/drizzle-graphql";
+import { applyPermissions } from "@vantreeseba/graphql-casl";
 import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 import {
   GraphQLBoolean,
@@ -46,6 +47,7 @@ import {
   stopSubject,
   submitCard,
 } from "../runner/run.ts";
+import { permissions } from "./permissions.ts";
 
 /**
  * The CRUD half of the API is generated from the Drizzle schema — projects, lanes, cards,
@@ -647,7 +649,7 @@ const taskOrThrow = async (taskId: string) => {
   return task;
 };
 
-export const schema = new GraphQLSchema({
+const baseSchema = new GraphQLSchema({
   query: new GraphQLObjectType({
     name: "Query",
     fields: {
@@ -1329,4 +1331,23 @@ export const schema = new GraphQLSchema({
     },
   }),
   types: [...Object.values(entities.types), ...Object.values(entities.inputs)],
+});
+
+/**
+ * The schema every caller gets, rules and all.
+ *
+ * Wrapped here rather than at either endpoint, because there is one schema and two doors: a
+ * rule bolted onto `/mcp` says nothing about the same field reached over `/graphql`, and both
+ * are behind the same token. Wrapping the export is what makes there be no unguarded path —
+ * `permissions.ts` says who may call what, and this is the only place it is put on.
+ *
+ * `allowExternalErrors` stays at its default: a refusal that came from a resolver — the cycle
+ * `setCardDeps` will not close, the lane `deleteLane` will not empty — is the whole of what the
+ * caller needs told, and replacing it with `Forbidden` would lose it.
+ */
+export const schema = applyPermissions(baseSchema, permissions, {
+  fallbackError: (_original, _parent, _args, _context, info) =>
+    new GraphQLError(`Not authorized to call ${info.parentType.name}.${info.fieldName}.`, {
+      extensions: { code: "FORBIDDEN" },
+    }),
 });

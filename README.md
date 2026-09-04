@@ -642,6 +642,48 @@ One shared token, not accounts: this is a tool one person points at their own bo
 worth locking is not who you are but the key the agents spend. A wrong token is compared in
 constant time and refused with a bare `401` that says nothing about what is here.
 
+### What a caller may do
+
+One token is not one permission. Both doors are behind the same secret, so a client that could
+call a curated MCP tool could equally post to `/graphql` and call `deleteCards` with no `where`,
+which empties the table. The tool listing in `server/mcp-endpoint.ts` decided what an agent was
+*told about*; nothing decided what it could *reach*.
+
+`server/graphql/permissions.ts` now does, in CASL rules applied to the schema itself through
+[`@vantreeseba/graphql-casl`](https://github.com/cubicecho/graphql-casl) — so they are true of
+both endpoints rather than of whichever one they were bolted onto. There are two kinds of caller
+and no accounts: the **operator**, which is the web app and the person whose server this is, and
+an **agent**, which is anything arriving on `/mcp`. With a token set, a `Bearer` header on
+`/graphql` is an agent too, since the browser trades its token for a cookie.
+
+The operator may do anything. An agent runs the board: it makes projects, cards and tasks, works
+them, moves them and says what it found. What it may not do is re-key the server or re-staff it —
+which model runs where and on whose key is the operator's business — nor redraw the lanes, nor
+delete a project, which takes a whole board and its history with it. It can read the agents and
+the roles, because a lane names one of each, and it is told nothing of the settings row.
+
+Reading is where the doors outnumber the rooms. A generated schema offers a table four ways —
+the list, the single row, the aggregate and the group-by — and `settingsGroupBy(groupBy: [model])`
+answers with the same column values as `settings` under a different heading. Three tables are
+withheld from an agent, so all four of each are: the settings row, the MCP servers, and the
+rows joining an agent to one. The MCP servers matter most, because `env` and `headers` on one of
+those rows are credentials in all but name.
+
+Naming those twelve fields is still not enough, because a table an agent *may* read leads to one
+it may not: `agents { servers { server { headers } } }` walks there from a lane's own agent. So
+the rule sits on the row type as well, which guards every field of it wherever it is reached.
+
+Two things are refused for everyone. Every bulk write is shut, because `deleteCard` cannot empty
+a table and `deleteCards` can. And `updateCard` writes only the columns a card's *author* owns —
+its title, body and acceptance. A card's lane, position, status, attempts and archive date are
+the board's, and each has a door of its own that renumbers the lane and writes the ledger row
+saying why the card moved; `set: { laneId }` would do neither.
+
+The map is a whitelist: every mutation is denied unless it is named, so a generated write that a
+new table brings with it ships shut rather than open. Reads are the other way round, and
+deliberately — the one thing on this server worth keeping from a reader is the API key, and that
+is dropped from the types entirely, so there is no field to guard.
+
 ## Retention
 
 **Settings → Keep runs for** sets how many days of runs to keep. At `0`, the default, nothing is

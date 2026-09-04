@@ -4,6 +4,7 @@ import path from "node:path";
 import { type GraphQLSchema, graphql } from "graphql";
 import { afterAll, beforeAll, expect, test } from "vitest";
 import { landing, laneOrder, placement } from "../web/lib/board-order.ts";
+import { setCardState } from "./fixtures/card-state.ts";
 
 // The schema is built from the live Drizzle tables at import time, so the database has to be
 // pointed somewhere disposable before anything under server/ is loaded.
@@ -157,12 +158,7 @@ test("a moved card comes back to idle, and the client's guess says so too", asyn
   if (!failed) throw new Error("no card A");
 
   // A card a reviewer rejected: `error`, and waiting for a person.
-  await run(
-    `mutation Fail($id: String!) {
-       updateCard(where: { id: { eq: $id } }, set: { status: error, error: "rejected" }) { id }
-     }`,
-    { id: failed.id },
-  );
+  await setCardState(failed.id, { status: "error", error: "rejected" });
 
   await run(
     `mutation Move($cardId: String!, $laneId: String!, $position: Int) {

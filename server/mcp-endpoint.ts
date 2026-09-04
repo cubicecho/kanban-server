@@ -7,12 +7,19 @@ import express from "express";
 // Default import, not a named one: Node's own JSON modules only export a default, and the
 // container runs this file through Node rather than tsx.
 import pkg from "../package.json" with { type: "json" };
-import { requireAuth } from "./auth.ts";
+import { type GraphContext, requireAuth } from "./auth.ts";
 import { schema } from "./graphql/schema.ts";
 import { registerPrompts } from "./mcp-prompts.ts";
 
 /**
  * The tools an outside client is handed, and nothing else.
+ *
+ * A listing, not a lock. What an agent may actually reach is decided on the schema, by
+ * `server/graphql/permissions.ts`, which is what makes it true of `/graphql` too — both doors
+ * are one token and one schema, so a rule bolted onto this list would say nothing about the
+ * same field reached over the query endpoint. This list is about an agent's context, which is
+ * worth spending deliberately: thirty-six tools it will read is a different question from the
+ * ninety-eighth mutation it must not call.
  *
  * The schema has fifty-odd root fields — aggregates, group-bys, bulk writes, the settings row
  * with the API key behind it — and projecting all of them would spend an agent's context on
@@ -319,6 +326,10 @@ const makeServer = createServerFactory({
       : descriptor.description,
     ...(WRITE_HINTS[descriptor.name] ? { annotations: WRITE_HINTS[descriptor.name] } : {}),
   }),
+  // Everything arriving here is an agent, which is the whole of what the rules on the schema
+  // read. `TOOLS` above decides what a client is told about; `server/graphql/permissions.ts`
+  // decides what it can reach, and this is how it knows who is asking.
+  context: { caller: "agent" } satisfies GraphContext,
 });
 
 /**

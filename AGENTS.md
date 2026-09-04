@@ -321,7 +321,8 @@ belongs in a hook, not in a route handler.
 `agents`, so there is no field to select; `setApiKey` and `setAgentApiKey` are write-only. Two
 tests hold that line.
 
-**The `/mcp` surface is curated, not the whole schema.** `server/mcp-endpoint.ts` lists the
+**The `/mcp` surface is curated, not the whole schema — and the curation is a listing, not
+a lock.** What an agent may reach is `permissions.ts`, below. `server/mcp-endpoint.ts` lists the
 thirty-two tools an outside client gets. Nothing that empties a table in one call, nothing that
 reads or writes the API key, and no editing of agents, roles or MCP servers — a visiting client can
 see which agents and roles exist, because a lane points at each, but which model runs where and on
@@ -386,6 +387,31 @@ it always was; set, `server/auth.ts` puts `requireAuth` in front of `/graphql` a
 send a bearer header; the browser trades the token for an `httpOnly` `SameSite=Strict` cookie at
 `/api/auth`, because an `EventSource` cannot send headers and the run stream is one. Compare
 tokens with `tokenMatches` — hashed, then `timingSafeEqual` — and never say more in a 401.
+
+**One token is not one permission.** Both doors are behind the same secret, so `TOOLS` in
+`mcp-endpoint.ts` was a listing and never a lock: a client that could call a curated tool could
+post to `/graphql` and call `deleteCards` with no `where`. `server/graphql/permissions.ts` holds
+the CASL rules that decide what a caller can *reach*, applied to the schema itself through
+`applyPermissions` — which is what makes them true of both endpoints — and `schema.ts` exports
+the wrapped schema so there is no unguarded path. There are two callers and no accounts:
+`callerFor` in `auth.ts` says which, `/mcp` is always an agent, and a request nothing built a
+context for is the operator, because that is the server executing its own schema.
+
+The operator may do anything. An agent may run the board and not redraw it — no lanes, no agents,
+no roles, no MCP servers, no settings row, and no deleting a project. Two rules bind both: every
+bulk write is denied, and `updateCard` accepts only `title`, `body` and `acceptance`, since a
+card's lane, position, status, attempts and archive date each have a door that renumbers the lane
+and writes the ledger. `MUTATIONS` is a whitelist under `"*": deny`, so a generated write a new
+table brings with it arrives shut. `tests/permissions.test.ts` holds all of it, and a fixture
+wanting a card already failed writes the row through `setCardState` rather than through the
+guarded field.
+
+Reads are accepted except for three tables, and each of those is shut at four doors rather than
+one — a generated schema offers a list, a single row, an aggregate and a group-by, and
+`settingsGroupBy` answers with the same columns as `settings`. The rule also sits on the row
+type, because `agents { servers { server { headers } } }` reaches an MCP server's credentials
+from a table an agent may read; a rule on the type guards every field of it wherever it is
+reached, which naming the query fields alone does not.
 
 **Totals are read, never counted.** `spend` sums the run rows on every call, and reports the
 oldest run it counted. A stored counter would keep climbing after `runRetentionDays` deleted the

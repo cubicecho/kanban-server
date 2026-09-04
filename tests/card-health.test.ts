@@ -5,6 +5,7 @@ import { type GraphQLSchema, graphql } from "graphql";
 import { afterAll, beforeAll, expect, test } from "vitest";
 import { CardsStatusEnum } from "../web/__generated__/graphql/index.ts";
 import { cardHealth, type DepStatus } from "../web/lib/cards.ts";
+import { setCardState } from "./fixtures/card-state.ts";
 
 // The schema is built from the live Drizzle tables at import time, so the database has to be
 // pointed somewhere disposable before anything under server/ is loaded.
@@ -93,12 +94,7 @@ test("blocked means what the server means by it, archived dependencies and all",
     { cardId: id("waiter"), dependsOn: [id("done"), id("archived"), id("outstanding")] },
   );
 
-  await run(
-    `mutation Finish($id: String!) {
-       updateCard(where: { id: { eq: $id } }, set: { status: done }) { id }
-     }`,
-    { id: id("done") },
-  );
+  await setCardState(id("done"), { status: "done" });
   await run(`mutation Off($id: String!) { archiveCard(cardId: $id) { id } }`, {
     id: id("archived"),
   });
@@ -121,12 +117,7 @@ test("blocked means what the server means by it, archived dependencies and all",
   expect((await blockers(id("waiter"))).map((row) => row.id)).toEqual([id("outstanding")]);
   expect(cardHealth(waiting, STATION, await onBoard())).toBe("blocked");
 
-  await run(
-    `mutation Finish($id: String!) {
-       updateCard(where: { id: { eq: $id } }, set: { status: done }) { id }
-     }`,
-    { id: id("outstanding") },
-  );
+  await setCardState(id("outstanding"), { status: "done" });
 
   expect(await blockers(id("waiter"))).toEqual([]);
   expect(cardHealth(waiting, STATION, await onBoard())).toBe("waiting");

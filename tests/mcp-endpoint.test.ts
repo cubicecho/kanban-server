@@ -548,3 +548,33 @@ test("says what a card is, for a client that has only ever seen a task", async (
   // Applying one wipes lanes, and a lane takes its cards with it.
   expect(described("apply_board_template")).toMatch(/no cards/i);
 });
+
+test("a client here is an agent, and the rules on the schema know it", async () => {
+  const created = (await call("create_project", { values: { name: "guarded over mcp" } })) as {
+    createProject: { id: string };
+  };
+  const projectId = created.createProject.id;
+  const board = (await call("lanes", { where: { projectId: { eq: projectId } } })) as {
+    lanes: { id: string }[];
+  };
+  const made = (await call("create_card", {
+    values: { projectId, laneId: board.lanes[0].id, title: "guarded" },
+  })) as { createCard: { id: string } };
+
+  // The listing is what a client is told about; what it may reach is decided on the schema, and
+  // this is that decision arriving through this door. A card's status is the board's to write —
+  // `move_card` and `retry_card` are the ones that renumber the lane and write the ledger.
+  const refused = await raw("update_card", {
+    where: { id: { eq: made.createCard.id } },
+    set: { status: "done" },
+  });
+  expect(refused.text).toMatch(/status is the board's to set/);
+
+  // And the columns a card's author owns go through, which is what the tool is for.
+  expect(
+    await call("update_card", {
+      where: { id: { eq: made.createCard.id } },
+      set: { title: "renamed" },
+    }),
+  ).toMatchObject({ updateCard: { title: "renamed" } });
+});
