@@ -20,6 +20,7 @@ import { MetaLine } from "@/components/meta-line";
 import { useProjectActions } from "@/components/project-actions";
 import { QueryError } from "@/components/query-error";
 import { RowSkeleton } from "@/components/row-skeleton";
+import { Section } from "@/components/section";
 import { CardStatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -381,139 +382,137 @@ export function StatusRoute() {
         </div>
       ) : null}
 
-      <section className="flex flex-col gap-3">
-        {/* The heading names which heap is being shown, and there are no heaps on an empty
-            board — "Needs you: turned down by a reviewer" over "nothing here yet" is a
-            question nobody asked answered above the one they did. */}
-        {total > 0 ? (
-          <div>
-            <h2 className="font-medium">{HEALTH[focus].label}</h2>
-            <p className="text-sm text-muted-foreground">{HEALTH[focus].blurb}</p>
-          </div>
-        ) : null}
+      {/* The heading names which heap is being shown, and there are no heaps on an empty
+          board — "Needs you: turned down by a reviewer" over "nothing here yet" is a question
+          nobody asked answered above the one they did, which is what the `total` guard is for. */}
+      <Section
+        title={total > 0 ? HEALTH[focus].label : undefined}
+        description={total > 0 ? HEALTH[focus].blurb : undefined}
+        contentClassName="flex flex-col gap-3 space-y-0"
+        content={
+          <>
+            {shown.length === 0 && !board.isPending && !board.isError ? (
+              <EmptyState
+                icon={CircleCheck}
+                title={
+                  total === 0
+                    ? "Nothing on this board yet"
+                    : `Nothing is ${HEALTH[focus].label.toLowerCase()}`
+                }
+                description={
+                  total === 0
+                    ? "Describe what you want on the New task page. It lands as a card at the front of the board, and what becomes of it shows up here."
+                    : "Pick another heap above to see what is in it."
+                }
+                action={
+                  total === 0 ? (
+                    <Button asChild>
+                      <Link to="/">New task</Link>
+                    </Button>
+                  ) : null
+                }
+              />
+            ) : null}
 
-        {shown.length === 0 && !board.isPending && !board.isError ? (
-          <EmptyState
-            icon={CircleCheck}
-            title={
-              total === 0
-                ? "Nothing on this board yet"
-                : `Nothing is ${HEALTH[focus].label.toLowerCase()}`
-            }
-            description={
-              total === 0
-                ? "Describe what you want on the New task page. It lands as a card at the front of the board, and what becomes of it shows up here."
-                : "Pick another heap above to see what is in it."
-            }
-            action={
-              total === 0 ? (
-                <Button asChild>
-                  <Link to="/">New task</Link>
-                </Button>
-              ) : null
-            }
-          />
-        ) : null}
-
-        {shown.map((card) => {
-          const lane = laneById.get(card.laneId);
-          const reason = why(card);
-          const kind = health.get(card.id);
-          return (
-            <Card key={card.id} className="gap-2 p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <CardStatusBadge status={card.status} />
-                    <span className="truncate font-medium">{card.title || "Untitled"}</span>
+            {shown.map((card) => {
+              const lane = laneById.get(card.laneId);
+              const reason = why(card);
+              const kind = health.get(card.id);
+              return (
+                <Card key={card.id} className="gap-2 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <CardStatusBadge status={card.status} />
+                        <span className="truncate font-medium">{card.title || "Untitled"}</span>
+                      </div>
+                      <MetaLine
+                        className="mt-1 block"
+                        parts={[
+                          lane?.name ?? "(lane gone)",
+                          card.attempts ? plural(card.attempts, "failed attempt") : null,
+                          when(card.updatedAt),
+                        ]}
+                      />
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1">
+                      {kind === "attention" ? (
+                        <ActionButton
+                          variant="ghost"
+                          size="icon"
+                          label={`Put ${card.title} back in play`}
+                          hint="Clear it and start it over where it stands"
+                          disabled={retry.isPending}
+                          onClick={() => retry.mutate(card.id)}
+                        >
+                          <RotateCcw className="size-4" aria-hidden />
+                        </ActionButton>
+                      ) : null}
+                      {kind === "waiting" ? (
+                        <ActionButton
+                          variant="ghost"
+                          size="icon"
+                          label={`Run ${card.title}`}
+                          hint="Run it now, without waiting for the worker"
+                          disabled={run.isPending}
+                          onClick={() => run.mutate(card.id)}
+                        >
+                          <Play className="size-4" aria-hidden />
+                        </ActionButton>
+                      ) : null}
+                      <Button variant="outline" size="sm" onClick={() => setOpened(card)}>
+                        Open
+                      </Button>
+                    </div>
                   </div>
-                  <MetaLine
-                    className="mt-1 block"
-                    parts={[
-                      lane?.name ?? "(lane gone)",
-                      card.attempts ? plural(card.attempts, "failed attempt") : null,
-                      when(card.updatedAt),
-                    ]}
-                  />
-                </div>
-                <div className="flex shrink-0 items-center gap-1">
-                  {kind === "attention" ? (
-                    <ActionButton
-                      variant="ghost"
-                      size="icon"
-                      label={`Put ${card.title} back in play`}
-                      hint="Clear it and start it over where it stands"
-                      disabled={retry.isPending}
-                      onClick={() => retry.mutate(card.id)}
-                    >
-                      <RotateCcw className="size-4" aria-hidden />
-                    </ActionButton>
+                  {reason ? (
+                    <p className="line-clamp-4 text-sm whitespace-pre-wrap text-muted-foreground">
+                      {reason}
+                    </p>
                   ) : null}
-                  {kind === "waiting" ? (
-                    <ActionButton
-                      variant="ghost"
-                      size="icon"
-                      label={`Run ${card.title}`}
-                      hint="Run it now, without waiting for the worker"
-                      disabled={run.isPending}
-                      onClick={() => run.mutate(card.id)}
-                    >
-                      <Play className="size-4" aria-hidden />
-                    </ActionButton>
-                  ) : null}
-                  <Button variant="outline" size="sm" onClick={() => setOpened(card)}>
-                    Open
-                  </Button>
-                </div>
-              </div>
-              {reason ? (
-                <p className="line-clamp-4 text-sm whitespace-pre-wrap text-muted-foreground">
-                  {reason}
-                </p>
-              ) : null}
-            </Card>
-          );
-        })}
-      </section>
+                </Card>
+              );
+            })}
+          </>
+        }
+      />
 
       {lanes.length ? (
-        <section className="flex flex-col gap-3">
-          <div>
-            <h2 className="font-medium">Lanes</h2>
-            <p className="text-sm text-muted-foreground">
-              Where the work is standing. A pile in one lane and nothing after it is a station that
-              has stopped.
-            </p>
-          </div>
-          <Card className="gap-0 overflow-hidden p-0">
-            {lanes.map((lane) => (
-              <LaneRow key={lane.id} lane={lane} tally={perLane.get(lane.id) ?? noneYet()} />
-            ))}
-          </Card>
-        </section>
+        <Section
+          title="Lanes"
+          description="Where the work is standing. A pile in one lane and nothing after it is a station that has stopped."
+          content={
+            <Card className="gap-0 overflow-hidden p-0">
+              {lanes.map((lane) => (
+                <LaneRow key={lane.id} lane={lane} tally={perLane.get(lane.id) ?? noneYet()} />
+              ))}
+            </Card>
+          }
+        />
       ) : null}
 
       {unexplained.length ? (
-        <section className="flex flex-col gap-3">
-          <div>
-            <h2 className="flex items-center gap-2 font-medium">
+        <Section
+          title={
+            <span className="inline-flex items-center gap-2">
               {/* On the heading rather than on every row: five broken runs are one thing to
                   look at, and five pulsing dots are five. */}
               <LiveDot tone="fault" />
               Failures with nothing to show for them
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              Runs that broke and left no card standing in the way — a refinement that never reached
-              the board, or a card somebody has since moved on.
-            </p>
-          </div>
-          {unexplained.slice(0, 5).map((failure) => (
-            <FailureRow key={failure.id} failure={failure} />
-          ))}
-          <Button asChild variant="outline" className="self-start">
-            <Link to="/runs">Every run</Link>
-          </Button>
-        </section>
+            </span>
+          }
+          description="Runs that broke and left no card standing in the way — a refinement that never reached the board, or a card somebody has since moved on."
+          content={
+            <>
+              {unexplained.slice(0, 5).map((failure) => (
+                <FailureRow key={failure.id} failure={failure} />
+              ))}
+              <Button asChild variant="outline" className="flex w-fit">
+                <Link to="/runs">Every run</Link>
+              </Button>
+            </>
+          }
+        />
       ) : null}
 
       {clear && total > 0 && !board.isPending ? (

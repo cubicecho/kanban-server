@@ -2,9 +2,9 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { Check, Circle } from "lucide-react";
 import { AgentsDocument, ProjectsDocument, RecentTasksDocument } from "@/__generated__/graphql";
+import { CardLayout } from "@/components/card-layout";
 import { useProjectActions } from "@/components/project-actions";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { request } from "@/lib/gql";
 import { useProjectId } from "@/lib/project";
 import { cn } from "@/lib/utils";
@@ -77,31 +77,32 @@ export function SetupChecklist() {
   if (steps.every((step) => step.done)) return null;
 
   return (
-    <Card className="gap-3 p-4">
-      <div>
-        <h2 className="font-medium">First run</h2>
-        <p className="text-sm text-muted-foreground">
-          Three things, once. Each ticks itself off as it becomes true.
-        </p>
-      </div>
-      <ol className="flex flex-col gap-2">
-        {steps.map((step) => (
-          <li key={step.title} className="flex items-center gap-3">
-            {step.done ? (
-              <Check aria-label="done" className="size-4 shrink-0 text-status-running" />
-            ) : (
-              <Circle aria-label="not done yet" className="size-4 shrink-0 text-muted-foreground" />
-            )}
-            <div className="min-w-0 flex-1">
-              <p className={cn("text-sm", step.done && "text-muted-foreground line-through")}>
-                {step.title}
-              </p>
-              {step.done ? null : <p className="text-xs text-muted-foreground">{step.detail}</p>}
-            </div>
-            {step.done ? null : step.action}
-          </li>
-        ))}
-      </ol>
-    </Card>
+    <CardLayout
+      title="First run"
+      description="Three things, once. Each ticks itself off as it becomes true."
+      content={
+        <ol className="flex flex-col gap-2">
+          {steps.map((step) => (
+            <li key={step.title} className="flex items-center gap-3">
+              {step.done ? (
+                <Check aria-label="done" className="size-4 shrink-0 text-status-running" />
+              ) : (
+                <Circle
+                  aria-label="not done yet"
+                  className="size-4 shrink-0 text-muted-foreground"
+                />
+              )}
+              <div className="min-w-0 flex-1">
+                <p className={cn("text-sm", step.done && "text-muted-foreground line-through")}>
+                  {step.title}
+                </p>
+                {step.done ? null : <p className="text-xs text-muted-foreground">{step.detail}</p>}
+              </div>
+              {step.done ? null : step.action}
+            </li>
+          ))}
+        </ol>
+      }
+    />
   );
 }

@@ -18,14 +18,13 @@ import {
   useAppForm,
 } from "@/components/app-form";
 import { Page } from "@/components/app-shell";
+import { CardLayout } from "@/components/card-layout";
 import { FormField } from "@/components/form-field";
 import { useLeaveGuard } from "@/components/leave-guard";
 import { ModelField } from "@/components/model-select";
 import { PasswordField } from "@/components/password-field";
 import { QueryError } from "@/components/query-error";
-import { RowSkeleton } from "@/components/row-skeleton";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { request } from "@/lib/gql";
 import { toastError } from "@/lib/toast";
 
@@ -295,181 +294,190 @@ export function SettingsRoute() {
           form.handleSubmit();
         }}
       >
-        <Card className="gap-4 p-4">
-          <h2 className="font-medium">Model</h2>
-          {seeded ? (
-            <>
-              <InputField
-                form={form}
-                name="baseUrl"
-                label="Base URL"
-                description={
-                  <>
-                    Any OpenAI-compatible server: Ollama <code>:11434/v1</code>, LM Studio{" "}
-                    <code>:1234/v1</code>, OpenAI, OpenRouter.
-                  </>
-                }
-                placeholder="http://localhost:11434/v1"
-                autoComplete="off"
-              />
+        <CardLayout
+          title="Model"
+          loading={!seeded && !settings.isError}
+          contentClassName="flex flex-col gap-4"
+          content={
+            seeded ? (
+              <>
+                <InputField
+                  form={form}
+                  name="baseUrl"
+                  label="Base URL"
+                  description={
+                    <>
+                      Any OpenAI-compatible server: Ollama <code>:11434/v1</code>, LM Studio{" "}
+                      <code>:1234/v1</code>, OpenAI, OpenRouter.
+                    </>
+                  }
+                  placeholder="http://localhost:11434/v1"
+                  autoComplete="off"
+                />
 
-              {/* `new-password` rather than `off`, which a password box ignores: see the agent dialog. */}
-              <PasswordField
-                form={form}
-                name="apiKey"
-                label="API key"
-                autoComplete="new-password"
-                placeholder="unchanged — leave blank to keep the stored key"
-              />
+                {/* `new-password` rather than `off`, which a password box ignores: see the agent
+                    dialog, where the pair was being read as a login. */}
+                <PasswordField
+                  form={form}
+                  name="apiKey"
+                  label="API key"
+                  autoComplete="new-password"
+                  placeholder="unchanged — leave blank to keep the stored key"
+                />
 
-              <ModelField
-                form={form}
-                name="model"
-                label="Model"
-                description="Opening the list asks the server above for its models, so save a new base URL first."
-              />
+                <ModelField
+                  form={form}
+                  name="model"
+                  label="Model"
+                  description="Opening the list asks the server above for its models, so save a new base URL first."
+                />
 
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <NumberField
-                  form={form}
-                  name="maxTokens"
-                  label="Max tokens"
-                  validators={NEEDS_A_NUMBER}
-                />
-                <NumberField
-                  form={form}
-                  name="contextLength"
-                  label="Context window"
-                  description="0 asks the endpoint. Set it when the endpoint reports a window it is not actually serving the model in."
-                  validators={NEEDS_A_NUMBER}
-                />
-                <NumberField
-                  form={form}
-                  name="temperature"
-                  label="Temperature"
-                  step="0.1"
-                  validators={NEEDS_A_NUMBER}
-                />
-                <NumberField
-                  form={form}
-                  name="maxToolIterations"
-                  label="Max tool steps"
-                  validators={NEEDS_A_NUMBER}
-                />
-                <NumberField
-                  form={form}
-                  name="requestTimeoutSeconds"
-                  label="Silence before giving up (s)"
-                  description="Resets on every token, so a long answer is never cut off. 0 waits forever."
-                  validators={NEEDS_A_NUMBER}
-                />
-                <NumberField
-                  form={form}
-                  name="maxRetries"
-                  label="Retries"
-                  description="For a request that failed before the model said anything."
-                  validators={NEEDS_A_NUMBER}
-                />
-                <NumberField
-                  form={form}
-                  name="runRetentionDays"
-                  label="Keep runs for (days)"
-                  description="Older runs are deleted hourly. 0 keeps every run forever."
-                  validators={NEEDS_A_NUMBER}
-                />
-                <NumberField
-                  form={form}
-                  name="workerIntervalSeconds"
-                  label="Look for work every (s)"
-                  description="How often boards on auto are checked for cards to pick up. 0 stops the worker."
-                  validators={NEEDS_A_NUMBER}
-                />
-              </div>
-            </>
-          ) : settings.isError ? null : (
-            <RowSkeleton rows={3} />
-          )}
-        </Card>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <NumberField
+                    form={form}
+                    name="maxTokens"
+                    label="Max tokens"
+                    validators={NEEDS_A_NUMBER}
+                  />
+                  <NumberField
+                    form={form}
+                    name="contextLength"
+                    label="Context window"
+                    description="0 asks the endpoint. Set it when the endpoint reports a window it is not actually serving the model in."
+                    validators={NEEDS_A_NUMBER}
+                  />
+                  <NumberField
+                    form={form}
+                    name="temperature"
+                    label="Temperature"
+                    step="0.1"
+                    validators={NEEDS_A_NUMBER}
+                  />
+                  <NumberField
+                    form={form}
+                    name="maxToolIterations"
+                    label="Max tool steps"
+                    validators={NEEDS_A_NUMBER}
+                  />
+                  <NumberField
+                    form={form}
+                    name="requestTimeoutSeconds"
+                    label="Silence before giving up (s)"
+                    description="Resets on every token, so a long answer is never cut off. 0 waits forever."
+                    validators={NEEDS_A_NUMBER}
+                  />
+                  <NumberField
+                    form={form}
+                    name="maxRetries"
+                    label="Retries"
+                    description="For a request that failed before the model said anything."
+                    validators={NEEDS_A_NUMBER}
+                  />
+                  <NumberField
+                    form={form}
+                    name="runRetentionDays"
+                    label="Keep runs for (days)"
+                    description="Older runs are deleted hourly. 0 keeps every run forever."
+                    validators={NEEDS_A_NUMBER}
+                  />
+                  <NumberField
+                    form={form}
+                    name="workerIntervalSeconds"
+                    label="Look for work every (s)"
+                    description="How often boards on auto are checked for cards to pick up. 0 stops the worker."
+                    validators={NEEDS_A_NUMBER}
+                  />
+                </div>
+              </>
+            ) : null
+          }
+        />
 
         {seeded ? (
-          <Card className="gap-4 p-4">
-            <h2 className="font-medium">MCP tools</h2>
+          <CardLayout
+            title="MCP tools"
+            contentClassName="flex flex-col gap-4"
+            content={
+              <>
+                <SelectField
+                  form={form}
+                  name="toolDiscovery"
+                  label="Discovery"
+                  description="On demand puts a name-only catalogue in the system prompt and lets the model pull in the schemas it needs mid-run. Much cheaper with many tools; costs one extra round trip on the runs that use them."
+                  options={[
+                    {
+                      value: SettingsToolDiscoveryEnum.Eager,
+                      label: "Eager — send every definition every time",
+                    },
+                    {
+                      value: SettingsToolDiscoveryEnum.Ondemand,
+                      label: "On demand — load definitions as needed",
+                    },
+                  ]}
+                />
 
-            <SelectField
-              form={form}
-              name="toolDiscovery"
-              label="Discovery"
-              description="On demand puts a name-only catalogue in the system prompt and lets the model pull in the schemas it needs mid-run. Much cheaper with many tools; costs one extra round trip on the runs that use them."
-              options={[
-                {
-                  value: SettingsToolDiscoveryEnum.Eager,
-                  label: "Eager — send every definition every time",
-                },
-                {
-                  value: SettingsToolDiscoveryEnum.Ondemand,
-                  label: "On demand — load definitions as needed",
-                },
-              ]}
-            />
-
-            <ModelField
-              form={form}
-              name="toolSelectModel"
-              label="Tool-picking model"
-              description="Guesses which tools a run needs before it starts, so on-demand loading usually costs no round trip at all. A small fast model is enough. Unused unless discovery is on demand."
-              defaultLabel="Same model as the agent"
-            />
-          </Card>
+                <ModelField
+                  form={form}
+                  name="toolSelectModel"
+                  label="Tool-picking model"
+                  description="Guesses which tools a run needs before it starts, so on-demand loading usually costs no round trip at all. A small fast model is enough. Unused unless discovery is on demand."
+                  defaultLabel="Same model as the agent"
+                />
+              </>
+            }
+          />
         ) : null}
 
         {seeded ? (
-          <Card className="gap-4 p-4">
-            <div>
-              <h2 className="font-medium">Off the board</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Talking a task over happens nowhere on a board, so no lane can say who does it —
-                everything else an agent does, a lane names. A project may name its own refiner;
-                this is what it falls back to.
-              </p>
-            </div>
+          <CardLayout
+            title="Off the board"
+            description="Talking a task over happens nowhere on a board, so no lane can say who does it — everything else an agent does, a lane names. A project may name its own refiner; this is what it falls back to."
+            contentClassName="flex flex-col gap-4"
+            content={
+              <>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <SelectField
+                    form={form}
+                    name="refineAgentId"
+                    label="Refining agent"
+                    options={[
+                      { value: ANY, label: "The first enabled agent" },
+                      ...enabled.map((agent) => ({ value: agent.id, label: agent.name })),
+                    ]}
+                  />
+                </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <SelectField
-                form={form}
-                name="refineAgentId"
-                label="Refining agent"
-                options={[
-                  { value: ANY, label: "The first enabled agent" },
-                  ...enabled.map((agent) => ({ value: agent.id, label: agent.name })),
-                ]}
-              />
-            </div>
-
-            <TextareaField
-              form={form}
-              name="refinePrompt"
-              label="Refining prompt"
-              description="Refinement is a conversation rather than a kind of lane, so it has no role to keep this on. Empty uses the prompt built in."
-              rows={6}
-              placeholder="empty — the built-in one, which asks questions until the task is worth working on"
-            />
-          </Card>
+                <TextareaField
+                  form={form}
+                  name="refinePrompt"
+                  label="Refining prompt"
+                  description="Refinement is a conversation rather than a kind of lane, so it has no role to keep this on. Empty uses the prompt built in."
+                  rows={6}
+                  placeholder="empty — the built-in one, which asks questions until the task is worth working on"
+                />
+              </>
+            }
+          />
         ) : null}
       </form>
 
-      <Card className="gap-4 p-4">
-        <div>
-          <h2 className="font-medium">Connect an agent</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
+      <CardLayout
+        title="Connect an agent"
+        description={
+          <>
             This server's own API is served as MCP tools at <code>{ENDPOINT}</code>, so an assistant
             elsewhere can make a project, hand it a task, and watch it broken into cards and worked.
             There is no authentication: anyone who can reach the port can do all of that.
-          </p>
-        </div>
-
-        <Snippet label=".mcp.json" text={MCP_JSON} />
-        <Snippet label="Claude Code" text={CLAUDE_CLI} />
-      </Card>
+          </>
+        }
+        contentClassName="flex flex-col gap-4"
+        content={
+          <>
+            <Snippet label=".mcp.json" text={MCP_JSON} />
+            <Snippet label="Claude Code" text={CLAUDE_CLI} />
+          </>
+        }
+      />
 
       {leaving}
     </Page>

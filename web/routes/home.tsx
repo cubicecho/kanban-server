@@ -16,16 +16,16 @@ import {
   TaskDocument,
   type TaskQuery,
 } from "@/__generated__/graphql";
+import { InputField, TextareaField, useAppForm } from "@/components/app-form";
 import { Page } from "@/components/app-shell";
+import { CardLayout } from "@/components/card-layout";
 import { EmptyState } from "@/components/empty-state";
-import { FormField } from "@/components/form-field";
 import { useProjectActions } from "@/components/project-actions";
 import { RunStream } from "@/components/run-stream";
 import { SetupChecklist } from "@/components/setup-checklist";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { request } from "@/lib/gql";
@@ -85,8 +85,6 @@ function TaskComposer({ project }: { project: Project }) {
   const linked = useSearch({ from: "/" }).task;
   const [draftId, setDraftId] = useState<string | null>(linked ?? null);
   const [message, setMessage] = useState("");
-  const [title, setTitle] = useState("");
-  const [brief, setBrief] = useState("");
 
   // Which conversation, and then that conversation — two queries rather than one, because the
   // question "is anything still being talked about?" is about card counts and this page was
@@ -169,15 +167,23 @@ function TaskComposer({ project }: { project: Project }) {
   });
 
   const submit = useMutation({
-    mutationFn: () => request(SubmitCardDocument, { projectId: project.id, title, body: brief }),
+    mutationFn: (values: { title: string; brief: string }) =>
+      request(SubmitCardDocument, {
+        projectId: project.id,
+        title: values.title.trim(),
+        body: values.brief,
+      }),
     onSuccess: () => {
       toast.success("On the board");
-      setTitle("");
-      setBrief("");
+      straight.reset();
       refresh();
       navigate({ to: "/board" });
     },
-    onError: toastError,
+  });
+
+  const straight = useAppForm({
+    defaultValues: { title: "", brief: "" },
+    onSubmit: ({ value }) => submit.mutateAsync(value).catch(toastError),
   });
 
   const working = say.isPending || make.isPending || submit.isPending;
@@ -289,14 +295,14 @@ function TaskComposer({ project }: { project: Project }) {
         </form>
 
         {draft ? (
-          <Card className="gap-3 p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <h2 className="truncate font-medium">{draft.title || "Untitled task"}</h2>
-                <Badge variant="outline" className="mt-1">
-                  {draft.cards.length ? plural(draft.cards.length, "card") : "being talked about"}
-                </Badge>
-              </div>
+          <CardLayout
+            title={draft.title || "Untitled task"}
+            description={
+              <Badge variant="outline">
+                {draft.cards.length ? plural(draft.cards.length, "card") : "being talked about"}
+              </Badge>
+            }
+            action={
               <div className="flex shrink-0 items-center gap-2">
                 {/* Leaving a conversation open is what carrying one on means, so there has to be
                     a way out of it that is not making a card of it. */}
@@ -318,46 +324,65 @@ function TaskComposer({ project }: { project: Project }) {
                   {make.isPending ? "Making…" : "Make a card"}
                 </Button>
               </div>
-            </div>
-            <p className="text-sm whitespace-pre-wrap text-muted-foreground">
-              {draft.brief || "No brief yet — the agent writes it as you talk."}
-            </p>
-          </Card>
+            }
+            content={
+              <p className="text-sm whitespace-pre-wrap text-muted-foreground">
+                {draft.brief || "No brief yet — the agent writes it as you talk."}
+              </p>
+            }
+          />
         ) : null}
       </TabsContent>
 
       <TabsContent value="straight" className="flex flex-col gap-4">
-        <Card className="gap-4 p-4">
-          <FormField
-            label="Title"
-            control={
-              <Input
-                value={title}
-                onChange={(event) => setTitle(event.target.value)}
-                placeholder="Migrate the billing tables"
-              />
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            straight.handleSubmit();
+          }}
+        >
+          <CardLayout
+            contentClassName="flex flex-col gap-4"
+            content={
+              <>
+                <InputField
+                  form={straight}
+                  name="title"
+                  label="Title"
+                  required
+                  placeholder="Migrate the billing tables"
+                  validators={{
+                    onChange: ({ value }) => (value.trim() ? undefined : "A card needs a title."),
+                  }}
+                />
+                <TextareaField
+                  form={straight}
+                  name="brief"
+                  label="Brief"
+                  required
+                  rows={8}
+                  placeholder="Everything the first agent should know. It gets this and the project's context, and nothing else."
+                  validators={{
+                    onChange: ({ value }) =>
+                      value.trim() ? undefined : "Say what the agent is being asked to do.",
+                  }}
+                />
+              </>
+            }
+            footerActions={
+              <straight.AppForm>
+                {/* Not also disabled while the other tab is mid-turn: `SubmitButton` owns its
+                    own disabled state (cubicecho/cubeui#12), and the two tabs are two doors —
+                    writing a card straight to the board while a conversation is being refined
+                    was never the thing that could go wrong. */}
+                <straight.SubmitButton pendingLabel="Adding…">
+                  <SquarePlus className="size-4" />
+                  Put it on the board
+                </straight.SubmitButton>
+              </straight.AppForm>
             }
           />
-          <FormField
-            label="Brief"
-            control={
-              <Textarea
-                rows={8}
-                value={brief}
-                onChange={(event) => setBrief(event.target.value)}
-                placeholder="Everything the first agent should know. It gets this and the project's context, and nothing else."
-              />
-            }
-          />
-          <Button
-            className="self-start"
-            disabled={working || !title.trim() || !brief.trim()}
-            onClick={() => submit.mutate()}
-          >
-            <SquarePlus className="size-4" />
-            {submit.isPending ? "Adding…" : "Put it on the board"}
-          </Button>
-        </Card>
+        </form>
       </TabsContent>
     </Tabs>
   );

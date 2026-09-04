@@ -1,9 +1,9 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { CardLayout } from "@/components/card-layout";
 import { FormField } from "@/components/form-field";
+import { PasswordInput } from "@/components/password-input";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 
 interface Auth {
   /** Whether this server was started with a token at all. */
@@ -70,33 +70,36 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-full items-center justify-center p-6">
-      <Card className="w-full max-w-sm gap-4 p-6">
-        <div>
-          <h1 className="text-base font-semibold">kanban-server</h1>
-          <p className="text-sm text-muted-foreground">
-            {auth.error
-              ? "The server is not answering."
-              : "This board is locked. The token is the one the server was started with."}
-          </p>
-        </div>
-        <form className="flex flex-col gap-3" onSubmit={submit}>
-          <FormField
-            label="Token"
-            control={
-              <Input
-                type="password"
-                autoComplete="current-password"
-                value={token}
-                onChange={(event) => setToken(event.target.value)}
-              />
-            }
-          />
-          {error ? <p className="text-sm text-destructive">{error}</p> : null}
-          <Button type="submit" disabled={sending || !token}>
-            {sending ? "Checking…" : "Unlock"}
-          </Button>
-        </form>
-      </Card>
+      <CardLayout
+        className="w-full max-w-sm"
+        title="kanban-server"
+        description={
+          auth.error
+            ? "The server is not answering."
+            : "This board is locked. The token is the one the server was started with."
+        }
+        content={
+          <form className="flex flex-col gap-3" onSubmit={submit}>
+            {/* The refusal goes on the field rather than beside it: a token is mistyped or
+                pasted short far more often than it is wrong, and a paragraph the box does not
+                point at is one a screen reader never reads out with it. */}
+            <FormField
+              label="Token"
+              error={error}
+              control={
+                <PasswordInput
+                  autoComplete="current-password"
+                  value={token}
+                  onChange={(event) => setToken(event.target.value)}
+                />
+              }
+            />
+            <Button type="submit" disabled={sending || !token}>
+              {sending ? "Checking…" : "Unlock"}
+            </Button>
+          </form>
+        }
+      />
     </div>
   );
 }
