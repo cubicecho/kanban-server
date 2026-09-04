@@ -128,8 +128,8 @@ export function ArchiveRoute() {
               ]}
             />
           }
-          summary={card.error || card.body || "(nothing written down)"}
-          actions={
+          description={card.error || card.body || "(nothing written down)"}
+          action={
             <>
               <ActionButton
                 variant="ghost"

@@ -139,8 +139,8 @@ export function TasksRoute() {
                 ]}
               />
             }
-            summary={task.brief || "(no brief)"}
-            actions={
+            description={task.brief || "(no brief)"}
+            action={
               <>
                 {/* A conversation is not finished when it produces a card, and until now there
                     was no way back into one: the composer opened whichever task had no cards

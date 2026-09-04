@@ -175,8 +175,8 @@ export function RunsRoute() {
                 ]}
               />
             }
-            summary={run.error || run.output || "(no output)"}
-            actions={
+            description={run.error || run.output || "(no output)"}
+            action={
               <>
                 {running ? (
                   <ActionButton
