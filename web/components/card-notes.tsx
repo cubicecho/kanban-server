@@ -9,8 +9,7 @@ import {
   DeleteCardNoteDocument,
   UpdateCardNoteDocument,
 } from "@/__generated__/graphql";
-import { ActionButton } from "@/components/action-button";
-import { ConfirmButton } from "@/components/confirm-button";
+import { ActionButton, ConfirmButton } from "@/components/app-buttons";
 import { FormField } from "@/components/form-field";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";

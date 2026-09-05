@@ -11,11 +11,7 @@ import {
 import { cn } from "@/lib/utils";
 
 /**
- * One row in a list of things you can open: a run, a task, an archived card.
- *
- * The three pages that draw these had written the same forty lines each, and they had drifted in
- * the ways a copy drifts: a chevron that did not turn, a summary clipped at three lines on one
- * page and two on the next, an `aria-expanded` on the row that also sat on something inside it.
+ * One row in a list of things you can open: a run, a task, an archived record.
  *
  * The row itself is `Item`, so a row that opens and a row that does not line up down to the
  * padding. What this adds is the opening, and it is here rather than left to each app because
