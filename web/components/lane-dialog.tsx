@@ -1,6 +1,4 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { ComponentProps } from "react";
-import { useState } from "react";
 import {
   AgentsDocument,
   type BoardQuery,
@@ -8,22 +6,18 @@ import {
   RolesDocument,
   UpdateLaneDocument,
 } from "@/__generated__/graphql";
-import { useFieldError } from "@/components/field-error";
-import { FormDialog } from "@/components/form-dialog";
-import { FormField } from "@/components/form-field";
-import { Input } from "@/components/ui/input";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectSeparator,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
-import { useDirty } from "@/lib/dirty";
+  InputField,
+  NumberField,
+  SelectField,
+  SwitchField,
+  TextareaField,
+  useAppForm,
+} from "@/components/app-form";
+import { FieldRow } from "@/components/field-row";
+import { FormDialog } from "@/components/form-dialog";
 import { request } from "@/lib/gql";
+import { forPicker, idOrNone } from "@/lib/picker";
 import { toastError } from "@/lib/toast";
 
 type Lane = BoardQuery["lanes"][number];
@@ -32,7 +26,9 @@ type Lane = BoardQuery["lanes"][number];
 const NONE = "__none__";
 // And so does "off the board", which is a pass target like any other rather than a switch
 // beside one: a card that passes either goes somewhere or is archived, never both, and one
-// picker with three kinds of answer is what makes that true by construction.
+// picker with three kinds of answer is what makes that true by construction. It used to be set
+// apart by a `SelectSeparator`, which `SelectField` has no way to express (cubicecho/cubeui#10);
+// until it has, the label says what the rule said.
 const ARCHIVE = "__archive__";
 
 /** What a lane of each kind does to a card, said in the dialog rather than found out from a run. */
@@ -64,49 +60,33 @@ export function LaneDialog({
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
-  const [name, setName] = useState(lane?.name ?? "");
-  const [roleId, setRoleId] = useState(lane?.roleId ?? "");
-  const [prompt, setPrompt] = useState(lane?.prompt ?? "");
-  const [agentId, setAgentId] = useState(lane?.agentId ?? "");
-  const [onSuccess, setOnSuccess] = useState(
-    lane?.archiveOnSuccess ? ARCHIVE : (lane?.onSuccessLaneId ?? ""),
-  );
-  const [onFailureLaneId, setOnFailure] = useState(lane?.onFailureLaneId ?? "");
-  const [wipLimit, setWipLimit] = useState(lane?.wipLimit ?? 1);
-  const [maxAttempts, setMaxAttempts] = useState(lane?.maxAttempts ?? 0);
-  const [intake, setIntake] = useState(lane?.intake ?? false);
-
   const agents = useQuery({ queryKey: ["agents"], queryFn: () => request(AgentsDocument) });
   const roles = useQuery({ queryKey: ["roles"], queryFn: () => request(RolesDocument) });
   const others = lanes.filter((row) => row.id !== lane?.id);
-  const kind = (roles.data?.roles ?? []).find((row) => row.id === roleId);
-
-  const dirty = useDirty({
-    name,
-    roleId,
-    prompt,
-    agentId,
-    onSuccess,
-    onFailureLaneId,
-    wipLimit,
-    maxAttempts,
-    intake,
-  });
-  const nameError = useFieldError(name.trim() ? "" : "A lane needs a name.");
 
   const save = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (draft: {
+      name: string;
+      roleId: string;
+      prompt: string;
+      agentId: string;
+      onSuccess: string;
+      onFailureLaneId: string;
+      wipLimit: number | null;
+      maxAttempts: number | null;
+      intake: boolean;
+    }) => {
       const values = {
-        name: name.trim(),
-        roleId: roleId || null,
-        prompt,
-        agentId: agentId || null,
-        onSuccessLaneId: onSuccess === ARCHIVE ? null : onSuccess || null,
-        archiveOnSuccess: onSuccess === ARCHIVE,
-        onFailureLaneId: onFailureLaneId || null,
-        wipLimit,
-        maxAttempts,
-        intake,
+        name: draft.name.trim(),
+        roleId: idOrNone(draft.roleId, NONE),
+        prompt: draft.prompt,
+        agentId: idOrNone(draft.agentId, NONE),
+        onSuccessLaneId: idOrNone(draft.onSuccess, NONE, ARCHIVE),
+        archiveOnSuccess: draft.onSuccess === ARCHIVE,
+        onFailureLaneId: idOrNone(draft.onFailureLaneId, NONE),
+        wipLimit: draft.wipLimit ?? 1,
+        maxAttempts: Math.max(0, draft.maxAttempts ?? 0),
+        intake: draft.intake,
       };
       if (lane) await request(UpdateLaneDocument, { id: lane.id, set: values });
       else {
@@ -119,189 +99,175 @@ export function LaneDialog({
       queryClient.invalidateQueries({ queryKey: ["board", projectId] });
       onClose();
     },
-    onError: toastError,
   });
 
-  // Picking a kind for a lane nobody has named yet names it: a board is assembled out of known
-  // parts, and "New lane ▸ Review" is the whole gesture.
-  const pickKind = (next: string) => {
-    const id = next === NONE ? "" : next;
-    setRoleId(id);
-    if (!name.trim()) setName((roles.data?.roles ?? []).find((row) => row.id === id)?.name ?? "");
-  };
+  const form = useAppForm({
+    defaultValues: {
+      name: lane?.name ?? "",
+      roleId: forPicker(lane?.roleId, NONE),
+      prompt: lane?.prompt ?? "",
+      agentId: forPicker(lane?.agentId, NONE),
+      onSuccess: lane?.archiveOnSuccess ? ARCHIVE : forPicker(lane?.onSuccessLaneId, NONE),
+      onFailureLaneId: forPicker(lane?.onFailureLaneId, NONE),
+      wipLimit: (lane?.wipLimit ?? 1) as number | null,
+      maxAttempts: (lane?.maxAttempts ?? 0) as number | null,
+      intake: lane?.intake ?? false,
+    },
+    onSubmit: ({ value }) => save.mutateAsync(value).catch(toastError),
+  });
 
-  // Curried, because the shell hands the wiring — the id the label points at, the
-  // `aria-describedby` — to a function rather than to an element: a `<Select>` root renders no
-  // DOM, so the props have to be spread on the trigger by hand.
-  const laneSelect =
-    (value: string, onChange: (next: string) => void, empty: string, archive?: boolean) =>
-    (props: ComponentProps<typeof SelectTrigger>) => (
-      <Select value={value || NONE} onValueChange={(next) => onChange(next === NONE ? "" : next)}>
-        <SelectTrigger {...props} className="w-full">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value={NONE}>{empty}</SelectItem>
-          {others.map((row) => (
-            <SelectItem key={row.id} value={row.id}>
-              {row.name}
-            </SelectItem>
-          ))}
-          {archive ? (
-            <>
-              <SelectSeparator />
-              <SelectItem value={ARCHIVE}>Archive it</SelectItem>
-            </>
-          ) : null}
-        </SelectContent>
-      </Select>
-    );
+  const laneOptions = (empty: string, archive?: boolean) => [
+    { value: NONE, label: empty },
+    ...others.map((row) => ({ value: row.id, label: row.name })),
+    ...(archive ? [{ value: ARCHIVE, label: "Archive it — off the board" }] : []),
+  ];
 
   return (
     <FormDialog
+      form={form}
       title={lane ? "Edit lane" : "New lane"}
       description="A lane with a kind and an agent is a station. One without either is somewhere cards rest."
       width="lg"
-      dirty={dirty}
       onClose={onClose}
-      onSave={() => save.mutate()}
-      saving={save.isPending}
-      canSave={!nameError.invalid}
     >
-      <div className="flex flex-col gap-4">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <FormField
-            label="Name"
-            required
-            error={nameError.error}
-            control={
-              <Input
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                placeholder="Review"
-                {...nameError.field}
-              />
-            }
-          />
-          <FormField
-            label="Kind"
-            control={(props) => (
-              <Select value={roleId || NONE} onValueChange={pickKind}>
-                <SelectTrigger {...props} className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NONE}>Cards just rest here</SelectItem>
-                  {(roles.data?.roles ?? []).map((row) => (
-                    <SelectItem key={row.id} value={row.id}>
-                      {row.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          />
-        </div>
-
-        {kind ? (
-          <div className="flex flex-col gap-2 rounded-md border p-3">
-            <p className="text-xs text-muted-foreground">{CONTRACT_SAYS[kind.contract]}</p>
-            <pre className="max-h-40 overflow-y-auto whitespace-pre-wrap text-xs text-muted-foreground">
-              {kind.prompt || "This kind of lane says nothing yet."}
-            </pre>
-            <p className="text-xs text-muted-foreground">
-              Shared with every {kind.name} lane on this server — editing it on the Roles page
-              changes all of them.
-            </p>
-          </div>
-        ) : null}
-
-        <FormField
-          label="Also on this board"
-          control={
-            <Textarea
-              rows={4}
-              value={prompt}
-              onChange={(event) => setPrompt(event.target.value)}
-              placeholder="Added after the kind's prompt, for this lane only. It never replaces it."
+      <FieldRow
+        content={
+          <>
+            <InputField
+              form={form}
+              name="name"
+              label="Name"
+              required
+              placeholder="Review"
+              validators={{
+                onChange: ({ value }) => (value.trim() ? undefined : "A lane needs a name."),
+              }}
             />
-          }
-        />
-
-        <FormField
-          label="Agent"
-          description="Which model does the work. The same agent can work one lane and judge another."
-          control={(props) => (
-            <Select
-              value={agentId || NONE}
-              onValueChange={(value) => setAgentId(value === NONE ? "" : value)}
+            {/*
+              `form.AppField` rather than the one-line form, because picking a kind for a lane
+              nobody has named yet names it — "New lane ▸ Review" is the whole gesture — and a
+              side effect of a change is a `listeners`, which the bound fields do not forward
+              (cubicecho/cubeui#11).
+            */}
+            <form.AppField
+              name="roleId"
+              listeners={{
+                onChange: ({ value }) => {
+                  if (form.state.values.name.trim()) return;
+                  const kind = (roles.data?.roles ?? []).find((row) => row.id === value);
+                  if (kind) form.setFieldValue("name", kind.name);
+                },
+              }}
             >
-              <SelectTrigger {...props} className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={NONE}>Nothing runs here</SelectItem>
-                {(agents.data?.agents ?? []).map((agent) => (
-                  <SelectItem key={agent.id} value={agent.id}>
-                    {agent.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-        />
+              {(field) => (
+                <field.SelectField
+                  label="Kind"
+                  options={[
+                    { value: NONE, label: "Cards just rest here" },
+                    ...(roles.data?.roles ?? []).map((row) => ({
+                      value: row.id,
+                      label: row.name,
+                    })),
+                  ]}
+                />
+              )}
+            </form.AppField>
+          </>
+        }
+      />
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <FormField
-            label="On success"
-            description={
-              onSuccess === ARCHIVE
-                ? "A card that passes here goes straight to the archive, keeping this lane — restoring puts it back at the end of it. The end of a pipeline, without a Done pile to empty by hand."
-                : undefined
-            }
-            control={laneSelect(onSuccess, setOnSuccess, "Stay here", true)}
-          />
-          <FormField
-            label="On failure"
-            control={laneSelect(onFailureLaneId, setOnFailure, "Stay here")}
-          />
-        </div>
+      <form.Subscribe selector={(state) => state.values.roleId}>
+        {(roleId) => {
+          const kind = (roles.data?.roles ?? []).find((row) => row.id === roleId);
+          if (!kind) return null;
+          return (
+            <div className="flex flex-col gap-2 rounded-md border p-3">
+              <p className="text-xs text-muted-foreground">{CONTRACT_SAYS[kind.contract]}</p>
+              <pre className="max-h-40 overflow-y-auto whitespace-pre-wrap text-xs text-muted-foreground">
+                {kind.prompt || "This kind of lane says nothing yet."}
+              </pre>
+              <p className="text-xs text-muted-foreground">
+                Shared with every {kind.name} lane on this server — editing it on the Roles page
+                changes all of them.
+              </p>
+            </div>
+          );
+        }}
+      </form.Subscribe>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <FormField
-            label="Work in progress limit"
-            description="How many cards the worker runs here at once."
-            control={
-              <Input
-                type="number"
-                min={1}
-                value={wipLimit}
-                onChange={(event) => setWipLimit(Number(event.target.value))}
-              />
-            }
-          />
-          <FormField
-            label="Attempts before a person"
-            description="How many times this lane puts a card it failed back in play — the budget a board corrects itself out of. Zero stops at the first failure and waits."
-            control={
-              <Input
-                type="number"
-                min={0}
-                value={maxAttempts}
-                onChange={(event) => setMaxAttempts(Math.max(0, Number(event.target.value)))}
-              />
-            }
-          />
-        </div>
+      <TextareaField
+        form={form}
+        name="prompt"
+        label="Also on this board"
+        rows={4}
+        placeholder="Added after the kind's prompt, for this lane only. It never replaces it."
+      />
 
-        <FormField
-          orientation="horizontal"
-          label="Intake"
-          description="The board's front door: work that arrives without naming a lane lands here. One lane per board, and a kind that expands is the usual choice."
-          className="rounded-md border p-3"
-          control={<Switch checked={intake} onCheckedChange={setIntake} />}
-        />
-      </div>
+      <SelectField
+        form={form}
+        name="agentId"
+        label="Agent"
+        description="Which model does the work. The same agent can work one lane and judge another."
+        options={[
+          { value: NONE, label: "Nothing runs here" },
+          ...(agents.data?.agents ?? []).map((agent) => ({ value: agent.id, label: agent.name })),
+        ]}
+      />
+
+      <FieldRow
+        content={
+          <>
+            <form.AppField name="onSuccess">
+              {(field) => (
+                <field.SelectField
+                  label="On success"
+                  options={laneOptions("Stay here", true)}
+                  description={
+                    field.state.value === ARCHIVE
+                      ? "A card that passes here goes straight to the archive, keeping this lane — restoring puts it back at the end of it. The end of a pipeline, without a Done pile to empty by hand."
+                      : undefined
+                  }
+                />
+              )}
+            </form.AppField>
+            <SelectField
+              form={form}
+              name="onFailureLaneId"
+              label="On failure"
+              options={laneOptions("Stay here")}
+            />
+          </>
+        }
+      />
+
+      <FieldRow
+        content={
+          <>
+            <NumberField
+              form={form}
+              name="wipLimit"
+              label="Work in progress limit"
+              description="How many cards the worker runs here at once."
+              min={1}
+            />
+            <NumberField
+              form={form}
+              name="maxAttempts"
+              label="Attempts before a person"
+              description="How many times this lane puts a card it failed back in play — the budget a board corrects itself out of. Zero stops at the first failure and waits."
+              min={0}
+            />
+          </>
+        }
+      />
+
+      <SwitchField
+        form={form}
+        name="intake"
+        label="Intake"
+        description="The board's front door: work that arrives without naming a lane lands here. One lane per board, and a kind that expands is the usual choice."
+        className="rounded-md border p-3"
+      />
     </FormDialog>
   );
 }

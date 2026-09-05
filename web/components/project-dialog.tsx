@@ -10,7 +10,13 @@ import {
   type ProjectsQuery,
   UpdateProjectDocument,
 } from "@/__generated__/graphql";
-import { useFieldError } from "@/components/field-error";
+import {
+  InputField,
+  SelectField,
+  SwitchField,
+  TextareaField,
+  useAppForm,
+} from "@/components/app-form";
 import { FormDialog } from "@/components/form-dialog";
 import { FormField } from "@/components/form-field";
 import {
@@ -24,17 +30,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
-import { useDirty } from "@/lib/dirty";
 import { request } from "@/lib/gql";
+import { forPicker, idOrNone } from "@/lib/picker";
 import { selectProject } from "@/lib/project";
 import { toastError } from "@/lib/toast";
 
@@ -44,22 +41,6 @@ type Project = ProjectsQuery["projects"][number];
 const ANY = "__any__";
 // And the same for "the four lanes every project already gets".
 const SEEDED = "__seeded__";
-
-interface Draft {
-  name: string;
-  description: string;
-  context: string;
-  autoRun: boolean;
-  refineAgentId: string;
-}
-
-const toDraft = (project?: Project | null): Draft => ({
-  name: project?.name ?? "",
-  description: project?.description ?? "",
-  context: project?.context ?? "",
-  autoRun: project?.autoRun ?? false,
-  refineAgentId: project?.refineAgentId ?? "",
-});
 
 /**
  * A project, made or edited.
@@ -77,15 +58,8 @@ export function ProjectDialog({
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
-  const [draft, setDraft] = useState<Draft>(() => toDraft(project));
-  const set = (patch: Partial<Draft>) => setDraft((current) => ({ ...current, ...patch }));
-
-  const [templateId, setTemplateId] = useState(SEEDED);
   const [deleting, setDeleting] = useState(false);
   const [typed, setTyped] = useState("");
-
-  const dirty = useDirty({ ...draft, templateId });
-  const nameError = useFieldError(draft.name.trim() ? "" : "A project needs a name.");
 
   const agents = useQuery({ queryKey: ["agents"], queryFn: () => request(AgentsDocument) });
   // Every enabled agent, for both pickers: an agent is a model, and refining is a prompt this
@@ -101,22 +75,29 @@ export function ProjectDialog({
   });
 
   const save = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (draft: {
+      name: string;
+      description: string;
+      context: string;
+      autoRun: boolean;
+      refineAgentId: string;
+      templateId: string;
+    }) => {
       const values = {
         name: draft.name.trim(),
         description: draft.description.trim(),
         context: draft.context,
         autoRun: draft.autoRun,
-        refineAgentId: draft.refineAgentId || null,
+        refineAgentId: idOrNone(draft.refineAgentId, ANY),
       };
       if (project) return request(UpdateProjectDocument, { id: project.id, set: values });
       const created = await request(CreateProjectDocument, { values });
       // Made from here, it is the one you meant to work in.
       selectProject(created.createProject.id);
-      if (templateId !== SEEDED) {
+      if (draft.templateId !== SEEDED) {
         await request(ApplyBoardTemplateDocument, {
           projectId: created.createProject.id,
-          templateId,
+          templateId: draft.templateId,
         });
       }
       return created;
@@ -125,7 +106,18 @@ export function ProjectDialog({
       queryClient.invalidateQueries({ queryKey: ["projects"] });
       onClose();
     },
-    onError: toastError,
+  });
+
+  const form = useAppForm({
+    defaultValues: {
+      name: project?.name ?? "",
+      description: project?.description ?? "",
+      context: project?.context ?? "",
+      autoRun: project?.autoRun ?? false,
+      refineAgentId: forPicker(project?.refineAgentId, ANY),
+      templateId: SEEDED,
+    },
+    onSubmit: ({ value }) => save.mutateAsync(value).catch(toastError),
   });
 
   // The one delete in this app that takes a whole body of work with it, and until now the only
@@ -149,17 +141,15 @@ export function ProjectDialog({
 
   return (
     <FormDialog
+      form={form}
       title={project ? "Edit project" : "New project"}
       description="A project is a board and the standing context every agent working it is given."
       width="xl"
-      dirty={dirty}
       onClose={onClose}
-      onSave={() => save.mutate()}
-      saving={save.isPending}
-      canSave={!nameError.invalid}
       aside={
         project ? (
           <Button
+            type="button"
             variant="ghost"
             className="text-destructive hover:bg-destructive/10 hover:text-destructive"
             onClick={() => {
@@ -172,105 +162,73 @@ export function ProjectDialog({
         ) : null
       }
     >
-      <div className="flex flex-col gap-4">
-        <FormField
-          label="Name"
-          required
-          error={nameError.error}
-          control={
-            <Input
-              value={draft.name}
-              onChange={(event) => set({ name: event.target.value })}
-              placeholder="Billing rewrite"
-              {...nameError.field}
+      <InputField
+        form={form}
+        name="name"
+        label="Name"
+        required
+        placeholder="Billing rewrite"
+        validators={{
+          onChange: ({ value }) => (value.trim() ? undefined : "A project needs a name."),
+        }}
+      />
+
+      <InputField
+        form={form}
+        name="description"
+        label="Description"
+        placeholder="One line, for the picker."
+      />
+
+      <TextareaField
+        form={form}
+        name="context"
+        label="Context"
+        rows={6}
+        placeholder="The stack, the conventions, where things live — whatever every agent working this project needs to know before its own prompt."
+      />
+
+      {project ? null : (
+        <form.AppField name="templateId">
+          {(field) => (
+            <field.SelectField
+              label="Board"
+              options={[
+                { value: SEEDED, label: "Backlog, Doing, Review, Done" },
+                ...(templates.data?.boardTemplates ?? []).map((template) => ({
+                  value: template.id,
+                  label: template.name,
+                })),
+              ]}
+              description={
+                field.state.value === SEEDED
+                  ? "The default four, wired to whichever agents this server has."
+                  : ((templates.data?.boardTemplates ?? []).find(
+                      (one) => one.id === field.state.value,
+                    )?.description ?? "A board saved from another project.")
+              }
             />
-          }
-        />
+          )}
+        </form.AppField>
+      )}
 
-        <FormField
-          label="Description"
-          control={
-            <Input
-              value={draft.description}
-              onChange={(event) => set({ description: event.target.value })}
-              placeholder="One line, for the picker."
-            />
-          }
-        />
+      <SwitchField
+        form={form}
+        name="autoRun"
+        label="Run cards automatically"
+        description="Off, cards sit where they are put and run when you ask. On, a card that lands in a lane with an agent is picked up, worked and moved along on its own."
+        className="rounded-md border p-3"
+      />
 
-        <FormField
-          label="Context"
-          control={
-            <Textarea
-              rows={6}
-              value={draft.context}
-              onChange={(event) => set({ context: event.target.value })}
-              placeholder="The stack, the conventions, where things live — whatever every agent working this project needs to know before its own prompt."
-            />
-          }
-        />
-
-        {project ? null : (
-          <FormField
-            label="Board"
-            description={
-              templateId === SEEDED
-                ? "The default four, wired to whichever agents this server has."
-                : ((templates.data?.boardTemplates ?? []).find((one) => one.id === templateId)
-                    ?.description ?? "A board saved from another project.")
-            }
-            control={(props) => (
-              <Select value={templateId} onValueChange={setTemplateId}>
-                <SelectTrigger {...props} className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={SEEDED}>Backlog, Doing, Review, Done</SelectItem>
-                  {(templates.data?.boardTemplates ?? []).map((template) => (
-                    <SelectItem key={template.id} value={template.id}>
-                      {template.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          />
-        )}
-
-        <FormField
-          orientation="horizontal"
-          label="Run cards automatically"
-          description="Off, cards sit where they are put and run when you ask. On, a card that lands in a lane with an agent is picked up, worked and moved along on its own."
-          className="rounded-md border p-3"
-          control={
-            <Switch checked={draft.autoRun} onCheckedChange={(autoRun) => set({ autoRun })} />
-          }
-        />
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <FormField
-            label="Refining agent"
-            control={(props) => (
-              <Select
-                value={draft.refineAgentId || ANY}
-                onValueChange={(value) => set({ refineAgentId: value === ANY ? "" : value })}
-              >
-                <SelectTrigger {...props} className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ANY}>Whatever Settings says</SelectItem>
-                  {enabled.map((agent) => (
-                    <SelectItem key={agent.id} value={agent.id}>
-                      {agent.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          />
-        </div>
-      </div>
+      <SelectField
+        form={form}
+        name="refineAgentId"
+        label="Refining agent"
+        options={[
+          { value: ANY, label: "Whatever Settings says" },
+          ...enabled.map((agent) => ({ value: agent.id, label: agent.name })),
+        ]}
+      />
 
       {project ? (
         <AlertDialog open={deleting} onOpenChange={setDeleting}>
@@ -301,6 +259,7 @@ export function ProjectDialog({
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
               <Button
+                type="button"
                 variant="destructive"
                 disabled={typed.trim() !== project.name || remove.isPending}
                 onClick={() => remove.mutate(project.id)}

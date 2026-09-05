@@ -1,79 +1,112 @@
 import { ChevronRight } from "lucide-react";
-import { Card } from "@/components/ui/card";
+import { type ReactNode, useId } from "react";
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemFooter,
+  ItemTitle,
+} from "@/components/ui/item";
 import { cn } from "@/lib/utils";
 
 /**
  * One row in a list of things you can open: a run, a task, an archived card.
  *
- * The three pages that draw these had written the same forty lines each — a `Card`, a button
- * carrying a rotating chevron and `aria-expanded`, badges and a title and a grey line of facts,
- * two clipped lines of whatever the thing said, the buttons on the right, and the whole of it
- * behind a border when open. They had drifted in the ways a copy drifts: a chevron that did not
- * turn, a summary that clipped at three lines on one page and two on the next, an `aria-expanded`
- * on the row that also sat on something inside it.
+ * The three pages that draw these had written the same forty lines each, and they had drifted in
+ * the ways a copy drifts: a chevron that did not turn, a summary clipped at three lines on one
+ * page and two on the next, an `aria-expanded` on the row that also sat on something inside it.
  *
- * The shape is fixed here and the contents are the caller's. What is *not* the caller's is the
- * disclosure itself: the whole heading is the button, so opening a row never depends on hitting
- * the chevron, and the actions sit outside it because a button inside a button is neither.
+ * The row itself is `Item`, so a row that opens and a row that does not line up down to the
+ * padding. What this adds is the opening, and it is here rather than left to each app because
+ * the parts of a disclosure that go wrong are the small ones:
+ *
+ * - **The whole heading is one `<button>`**, so the row is reachable by keyboard and works with
+ *   Space — not a chevron with a click handler, which is the version hand-written rows ship.
+ * - `aria-expanded` on that button, so the state is announced rather than only drawn as a
+ *   rotated chevron.
+ * - The chevron turns off the same boolean, so there is one source of truth for open.
+ * - **`action` sits outside the button.** A control nested inside a button is invalid HTML and,
+ *   in practice, a delete button that cannot be clicked. Three pages of one app were laid out
+ *   this way after finding that out.
+ *
+ * It is not a prop on `Item`: an `open`/`onOpenChange` pair there would turn every existing
+ * caller's heading into a button, which is a different element and a different contract.
+ *
+ * Open is controlled, because in these apps a row is often opened from somewhere else — a deep
+ * link to a run, a "show the failure" button further up the page. An uncontrolled default would
+ * be a convenience worth adding, not the base case.
  */
 export function DisclosureRow({
   open,
   onOpenChange,
-  badges,
   title,
+  badges,
   meta,
-  summary,
-  actions,
-  children,
+  description,
+  action,
+  content,
+  className,
+  contentClassName,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Whatever this row is wearing: a status, a kind, a state. Drawn before the title. */
-  badges?: React.ReactNode;
-  title: React.ReactNode;
-  /** The grey line of facts beside the title — a `MetaLine`, usually. */
-  meta?: React.ReactNode;
+  title: ReactNode;
+  /** Whatever the row is wearing: a status, a kind, a state. Drawn before the title. */
+  badges?: ReactNode;
+  /** The grey line of facts beside the title — a name, a time, a count. */
+  meta?: ReactNode;
   /** Two clipped lines of what the thing said, drawn under the title whether open or not. */
-  summary?: React.ReactNode;
+  description?: ReactNode;
   /** Buttons, outside the disclosure: a row is opened by its heading and acted on by these. */
-  actions?: React.ReactNode;
-  children?: React.ReactNode;
+  action?: ReactNode;
+  /** What the row opens onto. */
+  content?: ReactNode;
+  className?: string;
+  contentClassName?: string;
 }) {
-  return (
-    <Card className="gap-2 p-4">
-      <div className="flex items-start justify-between gap-3">
-        <button
-          type="button"
-          className="flex min-w-0 flex-1 items-start gap-2 rounded text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-          aria-expanded={open}
-          onClick={() => onOpenChange(!open)}
-        >
-          <ChevronRight
-            aria-hidden
-            className={cn(
-              "mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform",
-              open && "rotate-90",
-            )}
-          />
-          <span className="min-w-0 flex-1">
-            <span className="flex flex-wrap items-center gap-2">
-              {badges}
-              <span className="truncate font-medium">{title}</span>
-              {meta}
-            </span>
-            {summary ? (
-              <span className="mt-1 line-clamp-2 block text-sm text-muted-foreground">
-                {summary}
-              </span>
-            ) : null}
-          </span>
-        </button>
-        {actions ? <div className="flex shrink-0 items-center gap-1">{actions}</div> : null}
-      </div>
+  const contentId = useId();
+  const isOpen = open && Boolean(content);
 
-      {open && children ? (
-        <div className="flex flex-col gap-2 border-t pt-3">{children}</div>
+  return (
+    <Item data-slot="disclosure-row" variant="outline" className={cn("items-start", className)}>
+      <button
+        type="button"
+        // Only while it is open, because `aria-controls` pointing at an id that is not in the
+        // document is a broken reference rather than a hint — and the body is unmounted when
+        // closed, which is what keeps a list of two hundred rows cheap.
+        aria-controls={isOpen ? contentId : undefined}
+        aria-expanded={open}
+        onClick={() => onOpenChange(!open)}
+        className="flex min-w-0 flex-1 items-start gap-2 rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <ChevronRight
+          aria-hidden
+          className={cn(
+            "mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform",
+            open && "rotate-90",
+          )}
+        />
+        <ItemContent className="min-w-0">
+          <ItemTitle className="flex-wrap">
+            {badges}
+            <span className="truncate">{title}</span>
+            {meta}
+          </ItemTitle>
+          {description ? <ItemDescription>{description}</ItemDescription> : null}
+        </ItemContent>
+      </button>
+
+      {action ? <ItemActions className="gap-1">{action}</ItemActions> : null}
+
+      {isOpen ? (
+        <ItemFooter
+          id={contentId}
+          className={cn("flex-col items-stretch gap-2 border-t pt-3", contentClassName)}
+        >
+          {content}
+        </ItemFooter>
       ) : null}
-    </Card>
+    </Item>
   );
 }

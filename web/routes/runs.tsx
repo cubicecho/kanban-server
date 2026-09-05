@@ -175,8 +175,8 @@ export function RunsRoute() {
                 ]}
               />
             }
-            summary={run.error || run.output || "(no output)"}
-            actions={
+            description={run.error || run.output || "(no output)"}
+            action={
               <>
                 {running ? (
                   <ActionButton
@@ -203,33 +203,37 @@ export function RunsRoute() {
                 </ConfirmButton>
               </>
             }
-          >
-            {/* A run in flight has no stored output yet — this is the run itself, live. */}
-            {running ? (
-              <RunStream runId={run.id} />
-            ) : (
+            content={
               <>
-                {/* The split and the rate live here rather than in the row above, which is a
+                {/* A run in flight has no stored output yet — this is the run itself, live. */}
+                {running ? (
+                  <RunStream runId={run.id} />
+                ) : (
+                  <>
+                    {/* The split and the rate live here rather than in the row above, which is a
                     button: a tooltip trigger is a button too, and one cannot sit in the other. */}
-                {run.totalTokens ? (
-                  <TokenStats
-                    usage={run}
-                    seconds={
-                      run.finishedAt
-                        ? (new Date(run.finishedAt).getTime() - new Date(run.startedAt).getTime()) /
-                          1000
-                        : null
-                    }
-                    className="self-start"
-                  />
-                ) : null}
-                <ToolChips calls={run.toolCalls} />
-                <pre className="overflow-x-auto text-sm whitespace-pre-wrap">
-                  {run.error || run.output || "(no output)"}
-                </pre>
+                    {run.totalTokens ? (
+                      <TokenStats
+                        usage={run}
+                        seconds={
+                          run.finishedAt
+                            ? (new Date(run.finishedAt).getTime() -
+                                new Date(run.startedAt).getTime()) /
+                              1000
+                            : null
+                        }
+                        className="self-start"
+                      />
+                    ) : null}
+                    <ToolChips calls={run.toolCalls} />
+                    <pre className="overflow-x-auto text-sm whitespace-pre-wrap">
+                      {run.error || run.output || "(no output)"}
+                    </pre>
+                  </>
+                )}
               </>
-            )}
-          </DisclosureRow>
+            }
+          />
         );
       })}
 

@@ -22,7 +22,10 @@ export function QueryError({
   what: string;
 }) {
   return (
-    <Card className="gap-2 border-destructive/30 bg-destructive/5 p-4">
+    // No tinted ground behind it: `bg-destructive/5` put the red heading at 4.36:1 and the grey
+    // message at 4.33:1 against their own background, both under the 4.5 they need. The border
+    // and the icon say "this failed" without moving the ground the words sit on.
+    <Card className="gap-2 border-destructive/50 p-4">
       <div className="flex items-center gap-2 text-sm font-medium text-destructive">
         <TriangleAlert className="size-4" aria-hidden />
         Could not load {what}

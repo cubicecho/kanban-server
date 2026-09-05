@@ -1,3 +1,5 @@
+import type { ComponentType, ReactNode } from "react";
+import { useId } from "react";
 import { DialogLayout } from "@/components/dialog-layout";
 import { useDiscardGuard } from "@/components/discard-guard";
 import { Button } from "@/components/ui/button";
@@ -7,6 +9,17 @@ const WIDTH = {
   lg: "sm:max-w-lg",
   xl: "sm:max-w-xl",
   "2xl": "sm:max-w-2xl",
+};
+
+/**
+ * As much of a `useAppForm` form as this shell touches, described structurally so that this file
+ * imports no form library — `app-form.tsx` is the only one that may.
+ */
+type DialogForm = {
+  state: { isDefaultValue: boolean };
+  handleSubmit: () => unknown;
+  AppForm: ComponentType<{ children?: ReactNode }>;
+  SubmitButton: ComponentType<{ form?: string; children?: ReactNode; pendingLabel?: ReactNode }>;
 };
 
 /**
@@ -20,43 +33,42 @@ const WIDTH = {
  * was written before the guard existed and never caught up, and a shell is how it stops
  * happening: the guard is not a thing a caller can forget, because a caller cannot see it.
  *
- * `dirty` is asked for rather than worked out here, because only the caller knows what its
- * fields are — pass `useDirty({ ...the state })`.
+ * cubeui says there is no `FormDialog` — a form in a dialog is a `DialogLayout` with a `<form>`
+ * as its `content` and the submit in `footerActions`, which is exactly what this is underneath.
+ * What it adds is the guard over all four ways out: the shell's own `hasUnsavedChanges` covers
+ * the three doors Radix owns and not the Cancel button, which is the most-clicked way out of
+ * these seven (cubicecho/cubeui#2). When it can cover Cancel this file goes away.
  *
- * The chassis is cubeui's `DialogLayout`, which is where the header and the footer stay put
- * while the body scrolls between them — this had `overflow-y-auto` on the whole dialog, so a
- * long form took its own title off the screen before its Save button. The guard stays here
- * rather than moving to the shell's `hasUnsavedChanges`, because that prop covers the three
- * doors Radix owns and not the Cancel button, which is the most-clicked way out of these seven
- * (cubicecho/cubeui#2). One guard over all four doors is the property worth keeping; when the
- * shell can cover Cancel this file is a `DialogLayout` call and nothing else.
+ * Whether there is anything to lose is the form's own answer — `isDefaultValue`, not `isDirty`,
+ * because a field typed into and then typed back out of has nothing in it to throw away — and it
+ * is read at the click rather than watched, so a keystroke does not re-render the dialog to
+ * maintain a boolean nothing is drawing.
  */
 export function FormDialog({
+  form,
   title,
   description,
   width,
-  dirty,
   onClose,
-  onSave,
-  saving,
-  canSave = true,
+  alsoUnsaved,
   saveLabel = "Save",
   savingLabel = "Saving…",
   aside,
   children,
 }: {
+  form: DialogForm;
   title: React.ReactNode;
   description: React.ReactNode;
   width?: keyof typeof WIDTH;
-  /** Whether there is anything to lose, which is what decides if closing asks first. */
-  dirty: boolean;
   onClose: () => void;
-  onSave: () => void;
-  saving: boolean;
-  /** Whether the form is in a state worth saving. */
-  canSave?: boolean;
-  saveLabel?: string;
-  savingLabel?: string;
+  /**
+   * Anything held outside the form that closing would also lose — the card dialog's dependency
+   * picker is loaded and saved as a resource of its own, so it is not a field. Asked at the
+   * click, like the form's own answer.
+   */
+  alsoUnsaved?: () => boolean;
+  saveLabel?: React.ReactNode;
+  savingLabel?: React.ReactNode;
   /**
    * Whatever belongs at the far end of the footer, away from Cancel and Save: a second action
    * of its own, or a word about why Save is refusing. Its presence is what splits the footer.
@@ -64,7 +76,13 @@ export function FormDialog({
   aside?: React.ReactNode;
   children: React.ReactNode;
 }) {
-  const { close, guard } = useDiscardGuard(dirty, onClose);
+  // The `<form>` is the dialog's body and the submit is in its footer, so the two are tied by
+  // the `form` attribute rather than by containment.
+  const formId = useId();
+  const { close, guard } = useDiscardGuard(
+    () => !form.state.isDefaultValue || (alsoUnsaved?.() ?? false),
+    onClose,
+  );
 
   return (
     <>
@@ -74,16 +92,29 @@ export function FormDialog({
         title={title}
         description={description}
         className={width && WIDTH[width]}
-        content={children}
+        content={
+          <form
+            id={formId}
+            className="flex flex-col gap-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              form.handleSubmit();
+            }}
+          >
+            {children}
+          </form>
+        }
         footer={aside}
         footerActions={
           <>
-            <Button variant="ghost" onClick={close}>
+            <Button type="button" variant="ghost" onClick={close}>
               Cancel
             </Button>
-            <Button onClick={onSave} disabled={!canSave || saving}>
-              {saving ? savingLabel : saveLabel}
-            </Button>
+            <form.AppForm>
+              <form.SubmitButton form={formId} pendingLabel={savingLabel}>
+                {saveLabel}
+              </form.SubmitButton>
+            </form.AppForm>
           </>
         }
       />

@@ -32,6 +32,11 @@ type Project = ProjectsQuery["projects"][number];
  * amber the badges use for "this is waiting on you" and says it with an icon as well as a word,
  * and running takes the green and the pulse a run wears everywhere else. Two tones and no more,
  * for the reason the badges have two.
+ *
+ * The switch leads and the word follows it, which is `Field`'s own horizontal arrangement — the
+ * one every other switch on this server now draws in. A pill is not a field and cannot use the
+ * component, but a control that reads one way here and the other way in every dialog is a
+ * difference nobody meant.
  */
 export function AutoRunSwitch({ project }: { project: Project }) {
   const queryClient = useQueryClient();
@@ -73,14 +78,10 @@ export function AutoRunSwitch({ project }: { project: Project }) {
       <TooltipTrigger asChild>
         <div
           className={cn(
-            "flex items-center gap-2 rounded-full border py-1 pr-1.5 pl-2.5",
+            "flex items-center gap-2 rounded-full border py-1 pr-2.5 pl-1.5",
             toneSurface(on ? "running" : "attention"),
           )}
         >
-          {on ? <LiveDot /> : <PauseCircle className="size-3.5" aria-hidden />}
-          <Label htmlFor="auto-run" className="font-medium text-sm">
-            {on ? "Auto-run" : "Paused"}
-          </Label>
           <Switch
             id="auto-run"
             checked={on}
@@ -91,6 +92,10 @@ export function AutoRunSwitch({ project }: { project: Project }) {
             // Naming the action rather than the state, which is the switch's own job to say.
             aria-label={on ? `Pause ${project.name}` : `Let ${project.name} run itself`}
           />
+          {on ? <LiveDot /> : <PauseCircle className="size-3.5" aria-hidden />}
+          <Label htmlFor="auto-run" className="font-medium text-sm">
+            {on ? "Auto-run" : "Paused"}
+          </Label>
         </div>
       </TooltipTrigger>
       <TooltipContent>

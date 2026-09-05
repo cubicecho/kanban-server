@@ -139,8 +139,8 @@ export function TasksRoute() {
                 ]}
               />
             }
-            summary={task.brief || "(no brief)"}
-            actions={
+            description={task.brief || "(no brief)"}
+            action={
               <>
                 {/* A conversation is not finished when it produces a card, and until now there
                     was no way back into one: the composer opened whichever task had no cards
@@ -193,40 +193,43 @@ export function TasksRoute() {
                 </ConfirmButton>
               </>
             }
-          >
-            <pre className="overflow-x-auto text-sm whitespace-pre-wrap">
-              {task.brief || "(no brief)"}
-            </pre>
-            {/* Beside the cards, because the cards are where the tokens went: a task's total is
+            content={
+              <>
+                <pre className="overflow-x-auto text-sm whitespace-pre-wrap">
+                  {task.brief || "(no brief)"}
+                </pre>
+                {/* Beside the cards, because the cards are where the tokens went: a task's total is
                 its refinement and every run of every card it became. */}
-            <Spend projectId={projectId} taskId={task.id} days={0} />
-            {task.cards.length ? (
-              <ul className="flex flex-col gap-1">
-                {task.cards.map((card) => (
-                  <li key={card.id} className="flex items-center gap-2 text-sm">
-                    <CardStatusBadge status={card.status} />
-                    {card.title}
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-            {task.messages.length ? (
-              <div className="flex flex-col gap-2 border-t pt-3">
-                {task.messages.map((message) => (
-                  <p
-                    key={message.id}
-                    className={
-                      message.role === "user"
-                        ? "self-end rounded-lg bg-accent px-3 py-2 text-sm whitespace-pre-wrap"
-                        : "text-sm whitespace-pre-wrap text-muted-foreground"
-                    }
-                  >
-                    {message.content}
-                  </p>
-                ))}
-              </div>
-            ) : null}
-          </DisclosureRow>
+                <Spend projectId={projectId} taskId={task.id} days={0} />
+                {task.cards.length ? (
+                  <ul className="flex flex-col gap-1">
+                    {task.cards.map((card) => (
+                      <li key={card.id} className="flex items-center gap-2 text-sm">
+                        <CardStatusBadge status={card.status} />
+                        {card.title}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+                {task.messages.length ? (
+                  <div className="flex flex-col gap-2 border-t pt-3">
+                    {task.messages.map((message) => (
+                      <p
+                        key={message.id}
+                        className={
+                          message.role === "user"
+                            ? "self-end rounded-lg bg-accent px-3 py-2 text-sm whitespace-pre-wrap"
+                            : "text-sm whitespace-pre-wrap text-muted-foreground"
+                        }
+                      >
+                        {message.content}
+                      </p>
+                    ))}
+                  </div>
+                ) : null}
+              </>
+            }
+          />
         );
       })}
 
