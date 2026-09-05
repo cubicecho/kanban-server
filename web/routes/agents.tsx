@@ -7,10 +7,9 @@ import {
   DeleteAgentDocument,
   UpdateAgentDocument,
 } from "@/__generated__/graphql";
-import { ActionButton } from "@/components/action-button";
 import { AgentDialog } from "@/components/agent-dialog";
+import { ActionButton, ConfirmButton } from "@/components/app-buttons";
 import { Page } from "@/components/app-shell";
-import { ConfirmButton } from "@/components/confirm-button";
 import { EmptyState } from "@/components/empty-state";
 import { EnableSwitch } from "@/components/enable-switch";
 import { QueryState } from "@/components/query-state";

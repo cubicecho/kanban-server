@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { BoardQuery } from "@/__generated__/graphql";
-import { ActionButton } from "@/components/action-button";
+import { ActionButton } from "@/components/app-buttons";
 import { RunStream } from "@/components/run-stream";
 import { CardStatusBadge } from "@/components/status-badge";
 import {

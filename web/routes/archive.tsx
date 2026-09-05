@@ -8,9 +8,8 @@ import {
   DeleteCardDocument,
   RestoreCardDocument,
 } from "@/__generated__/graphql";
-import { ActionButton } from "@/components/action-button";
+import { ActionButton, ConfirmButton } from "@/components/app-buttons";
 import { Page, useCurrentProject } from "@/components/app-shell";
-import { ConfirmButton } from "@/components/confirm-button";
 import { DisclosureRow } from "@/components/disclosure-row";
 import { EmptyState, NoProject } from "@/components/empty-state";
 import { MetaLine } from "@/components/meta-line";

@@ -23,7 +23,7 @@ import { FormField } from "@/components/form-field";
 import { useLeaveGuard } from "@/components/leave-guard";
 import { ModelField } from "@/components/model-select";
 import { PasswordField } from "@/components/password-field";
-import { QueryError } from "@/components/query-error";
+import { QueryError } from "@/components/query-state";
 import { Button } from "@/components/ui/button";
 import { request } from "@/lib/gql";
 import { forPicker, idOrNone } from "@/lib/picker";
@@ -272,7 +272,12 @@ export function SettingsRoute() {
                 Reset
               </Button>
               <form.AppForm>
-                <form.SubmitButton form={FORM_ID} />
+                {/* Off until something has changed, which is the state this page is in most of
+                    the time it is open: it is a form of forty fields nobody edits more than two
+                    of, and a Save that is always live says nothing about whether there is
+                    anything to save. `changed` is false before the row lands, too, so the button
+                    is not offering to write the blank form over it. */}
+                <form.SubmitButton form={FORM_ID} disabled={!changed(loaded, values)} />
               </form.AppForm>
             </>
           )}
