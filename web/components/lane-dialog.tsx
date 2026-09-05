@@ -17,6 +17,7 @@ import {
 import { FieldRow } from "@/components/field-row";
 import { FormDialog } from "@/components/form-dialog";
 import { request } from "@/lib/gql";
+import { forPicker, idOrNone } from "@/lib/picker";
 import { toastError } from "@/lib/toast";
 
 type Lane = BoardQuery["lanes"][number];
@@ -77,13 +78,12 @@ export function LaneDialog({
     }) => {
       const values = {
         name: draft.name.trim(),
-        roleId: draft.roleId === NONE ? null : draft.roleId,
+        roleId: idOrNone(draft.roleId, NONE),
         prompt: draft.prompt,
-        agentId: draft.agentId === NONE ? null : draft.agentId,
-        onSuccessLaneId:
-          draft.onSuccess === ARCHIVE || draft.onSuccess === NONE ? null : draft.onSuccess,
+        agentId: idOrNone(draft.agentId, NONE),
+        onSuccessLaneId: idOrNone(draft.onSuccess, NONE, ARCHIVE),
         archiveOnSuccess: draft.onSuccess === ARCHIVE,
-        onFailureLaneId: draft.onFailureLaneId === NONE ? null : draft.onFailureLaneId,
+        onFailureLaneId: idOrNone(draft.onFailureLaneId, NONE),
         wipLimit: draft.wipLimit ?? 1,
         maxAttempts: Math.max(0, draft.maxAttempts ?? 0),
         intake: draft.intake,
@@ -104,11 +104,11 @@ export function LaneDialog({
   const form = useAppForm({
     defaultValues: {
       name: lane?.name ?? "",
-      roleId: lane?.roleId ?? NONE,
+      roleId: forPicker(lane?.roleId, NONE),
       prompt: lane?.prompt ?? "",
-      agentId: lane?.agentId ?? NONE,
-      onSuccess: lane?.archiveOnSuccess ? ARCHIVE : (lane?.onSuccessLaneId ?? NONE),
-      onFailureLaneId: lane?.onFailureLaneId ?? NONE,
+      agentId: forPicker(lane?.agentId, NONE),
+      onSuccess: lane?.archiveOnSuccess ? ARCHIVE : forPicker(lane?.onSuccessLaneId, NONE),
+      onFailureLaneId: forPicker(lane?.onFailureLaneId, NONE),
       wipLimit: (lane?.wipLimit ?? 1) as number | null,
       maxAttempts: (lane?.maxAttempts ?? 0) as number | null,
       intake: lane?.intake ?? false,

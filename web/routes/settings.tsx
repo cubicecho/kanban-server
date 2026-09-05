@@ -26,6 +26,7 @@ import { PasswordField } from "@/components/password-field";
 import { QueryError } from "@/components/query-error";
 import { Button } from "@/components/ui/button";
 import { request } from "@/lib/gql";
+import { forPicker, idOrNone } from "@/lib/picker";
 import { toastError } from "@/lib/toast";
 
 /**
@@ -161,7 +162,7 @@ const toForm = (row: Loaded): Form => ({
   maxRetries: row.maxRetries,
   runRetentionDays: row.runRetentionDays,
   workerIntervalSeconds: row.workerIntervalSeconds,
-  refineAgentId: row.refineAgentId ?? ANY,
+  refineAgentId: forPicker(row.refineAgentId, ANY),
   refinePrompt: row.refinePrompt,
 });
 
@@ -216,7 +217,7 @@ export function SettingsRoute() {
           runRetentionDays: row.runRetentionDays ?? 0,
           workerIntervalSeconds: row.workerIntervalSeconds ?? 0,
           // An unnamed agent is no row, not a row with an empty id.
-          refineAgentId: row.refineAgentId === ANY ? null : row.refineAgentId,
+          refineAgentId: idOrNone(row.refineAgentId, ANY),
         },
       });
       // The key travels on its own mutation because it is write-only — it is excluded from

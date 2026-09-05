@@ -31,6 +31,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { request } from "@/lib/gql";
+import { forPicker, idOrNone } from "@/lib/picker";
 import { selectProject } from "@/lib/project";
 import { toastError } from "@/lib/toast";
 
@@ -87,7 +88,7 @@ export function ProjectDialog({
         description: draft.description.trim(),
         context: draft.context,
         autoRun: draft.autoRun,
-        refineAgentId: draft.refineAgentId === ANY ? null : draft.refineAgentId,
+        refineAgentId: idOrNone(draft.refineAgentId, ANY),
       };
       if (project) return request(UpdateProjectDocument, { id: project.id, set: values });
       const created = await request(CreateProjectDocument, { values });
@@ -113,7 +114,7 @@ export function ProjectDialog({
       description: project?.description ?? "",
       context: project?.context ?? "",
       autoRun: project?.autoRun ?? false,
-      refineAgentId: project?.refineAgentId ?? ANY,
+      refineAgentId: forPicker(project?.refineAgentId, ANY),
       templateId: SEEDED,
     },
     onSubmit: ({ value }) => save.mutateAsync(value).catch(toastError),
