@@ -2,7 +2,7 @@
   "name": "kanban-server",
   "private": true,
   "license": "MIT",
-  "version": "0.1.0",
+  "version": "0.0.0-dev",
   "type": "module",
   "scripts": {
     "dev": "concurrently -n server,web -c cyan,magenta \"npm:dev:server\" \"npm:dev:web\"",
@@ -23,8 +23,8 @@
   },
   "dependencies": {
     "@casl/ability": "^7.0.1",
-    "@cubicecho/agent-core": "^2.2.0",
-    "@cubicecho/agent-mcp-pool": "^2.2.0",
+    "@cubicecho/agent-core": "^2.2.1",
+    "@cubicecho/agent-mcp-pool": "^2.4.0",
     "@cubicecho/graphql-mcp": "^2.10.0",
     "@electric-sql/pglite": "^0.5.8",
     "@modelcontextprotocol/sdk": "^1.30.0",
