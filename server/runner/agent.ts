@@ -207,10 +207,10 @@ export async function runAgent({
     // Normalising them here is cheap and cloud providers accept the result unchanged.
     const declared = sanitizeTools(
       routed
-        ? mcp.tools(preselected, config.serverIds)
+        ? mcp.tools({ names: preselected, servers: config.serverIds })
         : onDemand
-          ? [LOAD_TOOLS_DEFINITION, ...mcp.tools([...loaded], config.serverIds)]
-          : mcp.tools(undefined, config.serverIds),
+          ? [LOAD_TOOLS_DEFINITION, ...mcp.tools({ names: [...loaded], servers: config.serverIds })]
+          : mcp.tools({ servers: config.serverIds }),
     );
 
     // Rebuilt on every attempt rather than held: what `runTurn` negotiates away changes what
