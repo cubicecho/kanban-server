@@ -9,6 +9,7 @@ import {
 import {
   InputField,
   NumberField,
+  type SelectEntry,
   SelectField,
   SwitchField,
   TextareaField,
@@ -24,11 +25,11 @@ type Lane = BoardQuery["lanes"][number];
 
 // Radix refuses an empty item value, so "nothing" carries a sentinel.
 const NONE = "__none__";
-// And so does "off the board", which is a pass target like any other rather than a switch
-// beside one: a card that passes either goes somewhere or is archived, never both, and one
-// picker with three kinds of answer is what makes that true by construction. It used to be set
-// apart by a `SelectSeparator`, which `SelectField` has no way to express (cubicecho/cubeui#10);
-// until it has, the label says what the rule said.
+// And so does "off the board", which is a pass target like any other rather than a switch beside
+// one: a card that passes either goes somewhere or is archived, never both, and one picker with
+// three kinds of answer is what makes that true by construction. It is not a lane, though, so it
+// is set apart by a rule rather than by a sentence in its own label doing a divider's job
+// (cubicecho/cubeui#10).
 const ARCHIVE = "__archive__";
 
 /** What a lane of each kind does to a card, said in the dialog rather than found out from a run. */
@@ -116,10 +117,10 @@ export function LaneDialog({
     onSubmit: ({ value }) => save.mutateAsync(value).catch(toastError),
   });
 
-  const laneOptions = (empty: string, archive?: boolean) => [
+  const laneOptions = (empty: string, archive?: boolean): SelectEntry[] => [
     { value: NONE, label: empty },
     ...others.map((row) => ({ value: row.id, label: row.name })),
-    ...(archive ? [{ value: ARCHIVE, label: "Archive it — off the board" }] : []),
+    ...(archive ? [{ separator: true } as const, { value: ARCHIVE, label: "Archive it" }] : []),
   ];
 
   return (
@@ -143,14 +144,19 @@ export function LaneDialog({
                 onChange: ({ value }) => (value.trim() ? undefined : "A lane needs a name."),
               }}
             />
-            {/*
-              `form.AppField` rather than the one-line form, because picking a kind for a lane
-              nobody has named yet names it — "New lane ▸ Review" is the whole gesture — and a
-              side effect of a change is a `listeners`, which the bound fields do not forward
-              (cubicecho/cubeui#11).
-            */}
-            <form.AppField
+            <SelectField
+              form={form}
               name="roleId"
+              label="Kind"
+              options={[
+                { value: NONE, label: "Cards just rest here" },
+                ...(roles.data?.roles ?? []).map((row) => ({ value: row.id, label: row.name })),
+              ]}
+              // Picking a kind for a lane nobody has named yet names it — "New lane ▸ Review" is
+              // the whole gesture. A side effect of a change is a `listeners`, which the bound
+              // fields forward as of cubicecho/cubeui#11; this was a `form.AppField` for want of
+              // that alone, and the render prop is for a field that needs the `field` object to
+              // draw itself rather than one that needs a callback passing on.
               listeners={{
                 onChange: ({ value }) => {
                   if (form.state.values.name.trim()) return;
@@ -158,20 +164,7 @@ export function LaneDialog({
                   if (kind) form.setFieldValue("name", kind.name);
                 },
               }}
-            >
-              {(field) => (
-                <field.SelectField
-                  label="Kind"
-                  options={[
-                    { value: NONE, label: "Cards just rest here" },
-                    ...(roles.data?.roles ?? []).map((row) => ({
-                      value: row.id,
-                      label: row.name,
-                    })),
-                  ]}
-                />
-              )}
-            </form.AppField>
+            />
           </>
         }
       />
