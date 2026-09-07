@@ -115,14 +115,8 @@ export function ActionButton({
   type = "button",
   side = "top",
   tooltip = true,
-  // The one divergence from the registry copy, and the reason the props exist: `main.tsx` puts a
-  // `TooltipProvider delayDuration={300}` at the root, and the provider this renders *replaces*
-  // it rather than inheriting from it — so every icon button on this server was opening at
-  // shadcn's `0` while every other tooltip waited, which on a card's row of eight reads as a
-  // flicker. Defaulted here rather than passed at thirty-one call sites. A re-install from the
-  // registry drops these two lines; the diff is where you find out.
-  delayDuration = 300,
-  skipDelayDuration = 300,
+  delayDuration,
+  skipDelayDuration,
   disabled,
   className,
   onClick,

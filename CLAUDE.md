@@ -400,6 +400,34 @@ reading its layout, because that layout is the conversion of the week and has ch
 without the surface changing at all — and it asserts the operators a column offers, since a
 timestamp advertising `ilike` is bytes an agent reads past on every column of every tool.
 
+**The seam is a shape, not a config type.** Both packages were this server's own files, copied
+into `task_server` and `min-agent` until the three had drifted; what made them uncopiable was one
+line each, an `import { db }` and a config type. So neither package imports a type from a
+consumer: every function takes the narrowest shape it reads — `Endpoint`, `McpServerConfig` —
+which `Resolved` and an `mcp_servers` row satisfy structurally without being named anywhere, and
+the pool asks for its rows through `options.load` rather than reaching for a database.
+
+**The pool's debounce is what a write hook needs.** `syncSoon()` waits past the transaction the
+hook runs inside, where `sync()` read the table as it stood *before* the edit it was reacting to
+and folded nothing; it also folds a batch of edits into one reconnect rather than a child process
+each. `mcpStatus` calls `flush()` first, because "add a server" and "did it connect?" arrive
+milliseconds apart and the answer must not predate the write. `undefined` scope means every
+connected server and an *empty* scope means none of them: an agent with no servers linked to it
+wants the second, so the two must not collapse.
+
+**Both packages come from npm, and the two forms before it are worth remembering.** They started
+as `file:../` links to sibling checkouts, which the Docker build cannot see at all — a sibling is
+outside the build context, so `npm ci` could not find it and there was no image. A git URL fixed
+that and cost the image `git`, which the `node:*-slim` base has not got and which both stages had
+to install. A registry range is the end of both problems: a tarball npm already knows how to
+fetch, something a bot can watch, and a Dockerfile with nothing in it about either package.
+
+agent-core's `openai` is a peer dependency, and a registry install is why that settles itself: one
+flattened copy for all three. The `file:` links did not — a linked sibling brought its own, and
+two copies of a class with a `#private` field are two nominal types, so an `OpenAI` the package
+built was not an `OpenAI` to us. That wanted a `paths` entry in `tsconfig.json` to force one
+resolution; it went with the links that needed it.
+
 **The LLM call retries only before the model has spoken.** `runTurn` in `@cubicecho/agent-core`
 owns the retry loop, not the OpenAI SDK, whose own retries are off: once a chunk has arrived the
 turn is unrepeatable, so a failure after that propagates. `requestTimeoutSeconds` is a silence
@@ -507,12 +535,13 @@ stray `·` wherever the middle of it was empty. There is one tone vocabulary —
 colours — in `status-badge.tsx`, and a page picks a tone rather than a Tailwind class. Anything
 drawn in two places belongs here; anything drawn once belongs where it is drawn.
 
-`row-card.tsx` is `disclosure-row.tsx` with nothing to open, which is what Agents, Roles and MCP
-are lists of, and `query-state.tsx` is the ladder every one of those pages climbs before it draws
-a row: failed, loading, empty. That last rung is why it is a component rather than three — six
-pages wrote the empty check two different ways, `data?.roles.length === 0` where the query is read
-straight and `shown.length === 0 && !isPending && !isError` where the list was already defaulted to
-`[]`, and both being correct is exactly what stops anybody fixing it. `enable-switch.tsx` is the
+A row with nothing to open is shadcn's `Item` itself, which is what Agents, Roles and MCP are
+lists of and what `disclosure-row.tsx` is built on, so the two line up down to the padding.
+`query-state.tsx` is the ladder every one of those pages climbs before it draws a row: failed,
+loading, empty. That last rung is why it is a component rather than three — six pages wrote the
+empty check two different ways, `data?.roles.length === 0` where the query is read straight and
+`shown.length === 0 && !isPending && !isError` where the list was already defaulted to `[]`, and
+both being correct is exactly what stops anybody fixing it. `enable-switch.tsx` is the
 on/off toggle Agents and MCP share, along with the two things about it worth remembering: a Radix
 switch needs its name said outright, and the label names the action rather than the state.
 `toastError` in `web/lib/toast.ts` is how a failed write is said — one line that was written

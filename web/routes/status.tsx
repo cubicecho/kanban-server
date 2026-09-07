@@ -11,7 +11,7 @@ import {
   RetryCardDocument,
   RunCardDocument,
 } from "@/__generated__/graphql";
-import { ActionButton } from "@/components/action-button";
+import { ActionButton } from "@/components/app-buttons";
 import { Page, useCurrentProject } from "@/components/app-shell";
 import { CardDialog } from "@/components/card-dialog";
 import { EmptyState, NoProject } from "@/components/empty-state";

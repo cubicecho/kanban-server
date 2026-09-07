@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo } from "react";
 import { ProjectsDocument, type ProjectsQuery } from "@/__generated__/graphql";
-import { ActionButton } from "@/components/action-button";
+import { ActionButton } from "@/components/app-buttons";
 import { StickyHeaderContentFooter } from "@/components/header-content-footer";
 import { LiveDot } from "@/components/live-dot";
 import { PageHeader } from "@/components/page-header";

@@ -401,7 +401,9 @@ event bus, the token arithmetic — is [`@cubicecho/agent-core`](https://github.
 and the MCP connections are [`@cubicecho/agent-mcp-pool`](https://github.com/cubicecho/agent-mcp-pool).
 Both were extracted from this server and two others that had each written the same thing
 separately, and the copies had drifted: the pool here was missing the reconcile queue that stops
-two interleaving syncs orphaning a child process.
+two interleaving syncs orphaning a child process. Both come from npm as ordinary versioned
+dependencies — before that they were git URLs, and before that `file:../` links to sibling
+checkouts the Docker build could not see.
 
 What is left under `runner/` is the seams, which are the parts that are actually about a kanban
 board. `mcp.ts` says where the server rows come from — a Drizzle select, because `mcp_servers` is
@@ -502,6 +504,13 @@ web/           vite + react + tanstack router/query + shadcn
                (new task, board, tasks, agents, runs, mcp servers, settings)
 tests/         vitest
 ```
+
+The endpoint-agnostic half of the runner is not here. `@cubicecho/agent-core` holds the tool
+loading, the schema compatibility, the one-shot side tasks, the run event bus, the pooled client
+and the retry rules; `@cubicecho/agent-mcp-pool` holds the MCP connections. Both were these
+files, and both were copied into two other servers before the copies drifted. Both are on npm
+now, so they are ordinary versioned dependencies — before that they were git URLs, and before
+that `file:../` links to sibling checkouts, which the Docker build could not see.
 
 ## GraphQL
 
