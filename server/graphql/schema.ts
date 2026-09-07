@@ -467,7 +467,10 @@ const RunEventType = new GraphQLObjectType({
       type: new GraphQLNonNull(GraphQLInt),
       description: "Per-run counter from 1, so a client can order and de-duplicate.",
     },
-    at: { type: new GraphQLNonNull(GraphQLDateTime) },
+    at: {
+      type: new GraphQLNonNull(GraphQLDateTime),
+      description: "When it happened. Epoch milliseconds on the bus, an ISO string on the wire.",
+    },
     kind: {
       type: new GraphQLNonNull(GraphQLString),
       description: "turn | thinking | output | tool-call | tool-result | notice | usage | done.",

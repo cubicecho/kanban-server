@@ -72,12 +72,14 @@ async function preselect(
   model: string,
   catalog: CatalogServer[],
   prompt: string,
-  signal?: AbortSignal,
+  signal: AbortSignal | undefined,
+  notice: (message: string) => void,
   onEvent?: (event: RunEventInput) => void,
 ): Promise<string[]> {
   const reply = await ask(config, model, PRESELECT_SYSTEM, preselectInput(catalog, prompt), {
     maxTokens: 256,
     signal,
+    onNotice: notice,
   });
   const chosen = preselection(parseJson<unknown>(reply), catalog);
   if (chosen.length) {
@@ -114,6 +116,18 @@ export async function runAgent({
 
   const client = getClient(config);
   const idleMs = timeoutMs(config);
+  /**
+   * Where agent-core's operator text goes.
+   *
+   * `runTurn`, `negotiate`, `ask` and `tryAsk` each report what they gave up on and none of them
+   * writes to a console — a library that picked one would be deciding for this server where its
+   * operator text goes, and this server has two places for it: the log, and the run the notice
+   * belongs to. A watcher seeing an unexplained pause is exactly who the second is for.
+   */
+  const notice = (text: string) => {
+    console.warn(`[agent] ${text}`);
+    onEvent?.({ kind: "notice", text });
+  };
   // What this endpoint has turned out not to support, kept per endpoint rather than per run:
   // a capability it refused once it will refuse again, and a laptop's llama.cpp saying so must
   // not cost a cloud agent its token counts.
@@ -141,8 +155,19 @@ export async function runAgent({
   const loaded = new Set<string>();
 
   const preselected = onDemand
-    ? ((await tryAsk("preselect", () =>
-        preselect(config, config.toolSelectModel || model, catalog, prompt, signal, onEvent),
+    ? ((await tryAsk(
+        "preselect",
+        () =>
+          preselect(
+            config,
+            config.toolSelectModel || model,
+            catalog,
+            prompt,
+            signal,
+            notice,
+            onEvent,
+          ),
+        { onNotice: notice },
       )) ?? [])
     : [];
   for (const name of preselected) loaded.add(name);
@@ -232,10 +257,7 @@ export async function runAgent({
           idleMs,
           onThinking: (text) => onEvent?.({ kind: "thinking", text }),
           onOutput: (text) => onEvent?.({ kind: "output", text }),
-          onNotice: (text) => {
-            console.warn(`[agent] ${text}`);
-            onEvent?.({ kind: "notice", text });
-          },
+          onNotice: notice,
         });
       } catch (error) {
         const detail = errorMessage(error);

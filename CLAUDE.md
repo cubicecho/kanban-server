@@ -408,7 +408,15 @@ watchdog that rearms on every chunk, not a deadline on the request. `agent.ts` h
 inner half of that loop — `capabilitiesFor(baseUrl)` latches what an endpoint turned out to
 accept, per endpoint rather than per process, so a second endpoint does not inherit the first
 one's refusals. What `agent.ts` keeps of the old loop is the `ContextOverflow` it throws when the
-endpoint's own refusal comes back, since the wording that names both numbers is this server's.
+endpoint's own refusal comes back, since the wording that names both numbers is this server's —
+`runTurn` will size a request itself if handed a `contextLimit`, and is deliberately not, because
+the guard here is the one that says where its figure came from.
+
+**agent-core prints nothing, and `notice` in `agent.ts` is where its words go.** `runTurn`,
+`negotiate`, `ask` and `tryAsk` each report what they gave up on through an `onNotice` with no
+default: a library that wrote to the console would be choosing for this server where operator text
+goes, and there are two places for it here — the log, and the run event bus, so a person watching
+an unexplained pause is told what caused it. Every one of those call sites is handed the same sink.
 
 **The context window is asked for, overridable, and read before the request goes out.** The
 OpenAI listing has no field for it, so agent-core's `listModels` takes whichever one a server adds

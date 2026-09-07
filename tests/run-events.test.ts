@@ -22,7 +22,7 @@ beforeAll(async () => {
   tables = await import("../server/db/schema.ts");
 });
 
-beforeEach(() => events.reset());
+beforeEach(() => events.resetEvents());
 
 afterAll(() => fs.rmSync(dir, { recursive: true, force: true }));
 

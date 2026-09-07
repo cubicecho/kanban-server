@@ -410,6 +410,11 @@ a table here. `llm.ts` resolves an agent against Settings by sentinel and hands 
 nothing here imports one. `agent.ts` is the loop itself: the pre-request context guard, the
 tool-picking model, and the turn-by-turn iteration, all of it in this server's words.
 
+Neither package writes to a console: what a turn gave up on — a capability the endpoint refused, a
+request worth sending again, a side task that failed — is reported through a callback, and
+`agent.ts` sends all of it to both the log and the run's own event stream. So a pause that would
+otherwise be unexplained says what caused it, to whoever is watching the run.
+
 ### The context window
 
 A card carries more than a chat message does — a system prompt in four layers, the notes and the
