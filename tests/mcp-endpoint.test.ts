@@ -183,6 +183,22 @@ test("offers the board tools, and only those", async () => {
   expect(names).not.toContain("delete_project");
 });
 
+test("introduces itself with the version it was built at", async () => {
+  // `clientInfo` and `serverInfo` are the whole of what either end of a handshake learns about
+  // the other, and a constant in that field is worse than an empty one — it is a
+  // plausible-looking lie. Both halves here come from the manifest, which the release stamps,
+  // so this is the guard against either drifting back to a literal somebody wrote down once.
+  const { version } = await import("../package.json", { with: { type: "json" } }).then(
+    (module) => module.default,
+  );
+  expect(client.getServerVersion()).toEqual({ name: "kanban-server", version });
+
+  // The unreleased marker is what a working tree says; anything the release cut is a real
+  // version. What must never come back is the `0.1.0` the manifest sat at from the first commit
+  // to v3.8.0, because nothing in the release ever wrote to it.
+  expect(version).not.toBe("0.1.0");
+});
+
 test("offers the prompts alongside the tools, and says so on the way in", async () => {
   // The capability is the half that is easy to lose: registering a prompt after the transport
   // is attached would still answer `prompts/list`, while `initialize` told the client there was

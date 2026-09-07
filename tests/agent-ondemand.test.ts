@@ -117,6 +117,20 @@ const run = async (over: Partial<Resolved> = {}) => {
 
 const namesOf = (request: ChatRequest) => (request.tools ?? []).map((tool) => tool.function.name);
 
+test("introduces this server to the servers it dials, by name and by version", async () => {
+  // `clientInfo` is all a dialled server is told about who called it, and the pool fills it in
+  // from what `mcp.ts` hands it. Both halves used to be somebody's constant — the pool's own
+  // `0.1.0` — which is a plausible-looking lie rather than a missing value, so this reads the
+  // handshake back off the server that received it.
+  const { mcp } = await import("../server/runner/mcp.ts");
+  const { version } = await import("../package.json", { with: { type: "json" } }).then(
+    (module) => module.default,
+  );
+
+  const said = await mcp.call("echo__whoami", {}, ["echo-1"]);
+  expect(JSON.parse(said)).toEqual({ name: "kanban-server", version });
+});
+
 test("the pool exposes a name-only catalogue and filters definitions by name", async () => {
   const { mcp } = await import("../server/runner/mcp.ts");
   const catalog = mcp.catalog(["echo-1"]);
@@ -125,6 +139,7 @@ test("the pool exposes a name-only catalogue and filters definitions by name", a
     "echo__ping",
     "echo__echo",
     "echo__add",
+    "echo__whoami",
   ]);
   const filtered = mcp
     .tools({ names: ["echo__add"], servers: ["echo-1"] })
@@ -195,6 +210,11 @@ test("eager mode sends every schema and asks no one which tools to use", async (
 
   expect(result.output).toBe("done");
   expect(sent).toHaveLength(1);
-  expect(namesOf(sent[0]).sort()).toEqual(["echo__add", "echo__echo", "echo__ping"]);
+  expect(namesOf(sent[0]).sort()).toEqual([
+    "echo__add",
+    "echo__echo",
+    "echo__ping",
+    "echo__whoami",
+  ]);
   expect(sent[0].messages[0].content).toBe("be brief");
 });

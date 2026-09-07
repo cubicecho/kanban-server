@@ -70,6 +70,17 @@ jobs:
             echo "version=${{ steps.semantic.outputs.new_release_version }}" >> "$GITHUB_OUTPUT"
           fi
 
+      # semantic-release stamps package.json itself on the automatic path, and
+      # the image is built from this working tree — so what `/mcp` and the MCP
+      # pool introduce themselves with is the version that was just cut. A
+      # manual dispatch skips semantic-release entirely, so it stamps its own,
+      # or the image would go out naming the unreleased `0.0.0-dev`.
+      - name: Stamp the dispatched version
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          VERSION: ${{ steps.publish.outputs.version }}
+        run: npm version --no-git-tag-version --allow-same-version "$VERSION"
+
       - name: Log in to GitHub Container Registry
         if: steps.publish.outputs.go == 'true'
         uses: docker/login-action@v4

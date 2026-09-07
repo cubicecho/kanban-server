@@ -52,7 +52,7 @@ docker compose up --build
 | **graphql-yoga** | Serves the query API and the `runEvents` subscription as SSE, which the browser reads with a plain `EventSource` |
 | **`@cubicecho/graphql-mcp`** | Projects the same schema as MCP tools. `server/mcp-endpoint.ts` curates which ones — see below |
 | **`@cubicecho/agent-core`** | The endpoint-agnostic half of the agent loop, extracted from this server and two others that had each written it separately: `runTurn` and its retries, `tool-loading`, `schema-compat`, the run event bus, `getClient`/`listModels`/`contextLimitFor`, `parseJson`. `server/runner/agent.ts` is what is left — the parts that are about a kanban board |
-| **`@cubicecho/agent-mcp-pool`** | The MCP connections, likewise. `server/runner/mcp.ts` is one `new McpPool({ load })` — where the rows come from is the only part of it this server owns |
+| **`@cubicecho/agent-mcp-pool`** | The MCP connections, likewise. `server/runner/mcp.ts` is one `new McpPool({ load, clientName, clientVersion })` — where the rows come from, and how this process introduces itself, are the only parts of it this server owns |
 | **Node type stripping** | The container runs `node server/index.ts`; `tsx` is a devDependency and is not in the image. Nothing under `server/` may use syntax that survives erasure — no enums, no parameter properties |
 | **Biome** | One formatter and linter. `noExplicitAny` and `noNonNullAssertion` are errors here, not warnings |
 
@@ -638,6 +638,14 @@ any of them and a `for` that resolves to nothing reads as wired and is not.
   organisation's shared secrets, and when they are absent those tags and the login are skipped
   rather than failing the release. A `workflow_dispatch` with a version publishes the images
   without cutting a release
+- **The version in `package.json` is the one the image reports, and the release stamps it.**
+  `@semantic-release/npm` sits in `.releaserc.json` with `npmPublish: false` purely for that:
+  it writes the cut version into the manifest before the image is built from the same working
+  tree. Without it the field sat at `0.1.0` from the first commit, and that constant was what
+  `/mcp` told every client and the MCP pool told every server it dialled — a plausible-looking
+  lie rather than a missing value. A working tree says `0.0.0-dev`, which reads as unreleased;
+  the manual `workflow_dispatch` path stamps the version it was given, since it runs no
+  semantic-release to do it
 
 ## Finding code
 

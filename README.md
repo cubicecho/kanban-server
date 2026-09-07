@@ -795,6 +795,12 @@ those two tags and publishes to GHCR alone rather than failing. Only `feat:`/`fi
 a version, so the Release workflow also takes a manual run with a version typed in, which
 publishes the images without tagging a release.
 
+That version is also the one the running server says out loud. `serverInfo` on `/mcp` and the
+`clientInfo` the MCP pool sends to every server it dials both come from `package.json`, so
+`@semantic-release/npm` is in the plugin list — with `npmPublish: false`, since nothing here goes
+to a registry — to stamp the manifest before the image is built from it. A checkout says
+`0.0.0-dev`, which is what an unreleased tree is; the manual run stamps the version it was given.
+
 ## Codegen
 
 The schema is built at runtime from the tables, so codegen needs it written out first:
