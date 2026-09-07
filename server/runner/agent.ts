@@ -14,6 +14,8 @@ import {
   LOAD_TOOLS,
   LOAD_TOOLS_DEFINITION,
   loadResult,
+  type ModelCapabilities,
+  modelCapabilitiesFor,
   PRESELECT_SYSTEM,
   parseJson,
   preselectInput,
@@ -99,7 +101,8 @@ async function preselect(
  *
  * What one turn costs, how a refused capability is negotiated away and what is worth sending
  * again are `@cubicecho/agent-core`'s — see `runTurn`. What is here is the part that knows what
- * the run is for: the tools this board's agent may reach, and the loop over them.
+ * the run is for: the tools this board's agent may reach, the loop over them, and which fields
+ * of the body a refusal is allowed to take away.
  */
 export async function runAgent({
   config,
@@ -130,7 +133,9 @@ export async function runAgent({
   };
   // What this endpoint has turned out not to support, kept per endpoint rather than per run:
   // a capability it refused once it will refuse again, and a laptop's llama.cpp saying so must
-  // not cost a cloud agent its token counts.
+  // not cost a cloud agent its token counts. What one *model* on it refused hangs off this by
+  // name — one key reaches every model a provider offers, so a refusal from the model somebody
+  // picked last must not speak for the one they pick next.
   const supports = capabilitiesFor(config.baseUrl);
   // The window, once anything wants to know it. An agent that names its own is answered from
   // the row; anything else costs a listing, so it is not asked for until a request is big
@@ -215,12 +220,25 @@ export async function runAgent({
 
     // Rebuilt on every attempt rather than held: what `runTurn` negotiates away changes what
     // goes in the body, and `relaxTools` has to apply to the schemas that were just sanitised.
-    const request = (supported: Capabilities): OpenAI.ChatCompletionCreateParamsStreaming => {
+    // Two levels of that, because the model is somebody's choice from a dropdown and not every
+    // one of them takes the same body: the endpoint refused `stream_options` or a grammar
+    // keyword, and this model spells its ceiling the other way or will not be given a
+    // temperature at all. Both arrive as a refused request and both latch — see `runTurn`.
+    const request = (
+      supported: Capabilities,
+      byModel: ModelCapabilities | undefined,
+    ): OpenAI.ChatCompletionCreateParamsStreaming => {
       const tools = supported.strictSchemas ? declared : relaxTools(declared);
       return {
         model,
-        max_tokens: config.maxTokens,
-        temperature: config.temperature,
+        ...(byModel?.legacyTokenLimit === false
+          ? { max_completion_tokens: config.maxTokens }
+          : { max_tokens: config.maxTokens }),
+        // Dropped rather than replaced with the one value it would accept: a reasoning model
+        // runs at the temperature it was built with, and sending that number back as though it
+        // were the operator's setting would have the agent page keep showing a figure that is
+        // no longer what happens.
+        ...(byModel?.chosenTemperature === false ? {} : { temperature: config.temperature }),
         messages,
         stream: true,
         ...(supported.usageInStream ? { stream_options: { include_usage: true } } : {}),
@@ -233,7 +251,7 @@ export async function runAgent({
     // what the window is, and where that figure came from. Only the plainly-over case is
     // stopped: the estimate is rough, and a run refused here that the endpoint would have taken
     // is worse than the endpoint's own complaint, which still arrives with everything below.
-    const needed = requestTokens(request(supports));
+    const needed = requestTokens(request(supports, modelCapabilitiesFor(supports, model)));
     if (!windowKnown && needed > SMALLEST_LIKELY_WINDOW) {
       contextLimit = await contextLimitFor(config, config.contextLength);
       windowKnown = true;
@@ -253,6 +271,7 @@ export async function runAgent({
       try {
         return await runTurn(client, supports, request, {
           maxRetries,
+          model,
           signal,
           idleMs,
           onThinking: (text) => onEvent?.({ kind: "thinking", text }),

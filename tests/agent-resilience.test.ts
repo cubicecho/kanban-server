@@ -17,10 +17,14 @@ type Reply =
   /** Headers, some tokens, then nothing at all — the endpoint that stops mid-answer. */
   | { kind: "stall"; after: string }
   /** Accepted, then silent. Nothing is ever produced, so it is safe to retry. */
-  | { kind: "silent" };
+  | { kind: "silent" }
+  /** A 400 naming a field of the body, which is how a model refuses one. */
+  | { kind: "refuse"; message: string };
 
 let replies: Reply[] = [];
 let requests = 0;
+/** Every body the fake endpoint was sent, so a downgrade can be read off the next one. */
+let sent: Record<string, unknown>[] = [];
 let server: http.Server;
 let baseUrl = "";
 const open: http.ServerResponse[] = [];
@@ -34,10 +38,19 @@ const completion = (content: string) => ({
 
 beforeAll(async () => {
   server = http.createServer((request, response) => {
-    request.resume();
+    let body = "";
+    request.on("data", (chunk) => {
+      body += chunk;
+    });
     request.on("end", () => {
       requests++;
+      if (body) sent.push(JSON.parse(body) as Record<string, unknown>);
       const reply = replies.shift() ?? { kind: "ok", content: "done" };
+      if (reply.kind === "refuse") {
+        response.writeHead(400, { "content-type": "application/json" });
+        response.end(JSON.stringify({ error: { message: reply.message } }));
+        return;
+      }
       if (reply.kind === "status") {
         response.writeHead(reply.code, { "content-type": "application/json" });
         response.end(JSON.stringify({ error: { message: `fake ${reply.code}` } }));
@@ -71,6 +84,7 @@ beforeAll(async () => {
 beforeEach(() => {
   replies = [];
   requests = 0;
+  sent = [];
   while (open.length) open.pop()?.destroy();
 });
 
@@ -157,4 +171,91 @@ test("an endpoint that stalls mid-answer gives up rather than repeating itself",
   // say them twice, so the timeout is fatal here where it was retryable above.
   await expect(run({ requestTimeoutSeconds: 1, maxRetries: 3 })).rejects.toThrow(/sent nothing/);
   expect(requests).toBe(1);
+});
+
+// Model-level negotiation. The endpoint's own refusals latch against the base URL; these latch
+// against one model on it, so each test names its own rather than resetting a module's memory —
+// which is the distinction being tested. See `modelCapabilitiesFor` in `@cubicecho/agent-core`.
+
+test("a model that spells its ceiling the other way is answered, not failed", async () => {
+  replies = [
+    {
+      kind: "refuse",
+      message:
+        "Unsupported parameter: 'max_tokens' is not supported with this model. " +
+        "Use 'max_completion_tokens' instead.",
+    },
+    { kind: "ok", content: "second time" },
+  ];
+
+  const result = await run({ model: "ceiling-model" });
+
+  expect(result.output).toBe("second time");
+  expect(requests).toBe(2);
+  expect(sent[0]).toMatchObject({ max_tokens: 256 });
+  expect(sent[0]).not.toHaveProperty("max_completion_tokens");
+  expect(sent[1]).toMatchObject({ max_completion_tokens: 256 });
+  expect(sent[1]).not.toHaveProperty("max_tokens");
+});
+
+test("a model that will not take our temperature is sent none", async () => {
+  replies = [
+    {
+      kind: "refuse",
+      message:
+        "'temperature' does not support 0.7 with this model. Only the default (1) is supported.",
+    },
+    { kind: "ok", content: "second time" },
+  ];
+
+  const result = await run({ model: "temperature-model", temperature: 0.7 });
+
+  expect(result.output).toBe("second time");
+  expect(sent[0]).toMatchObject({ temperature: 0.7 });
+  // Dropped rather than set to 1: the agent's own figure is what the settings page shows, and
+  // sending a different one back as though it were the operator's would make that a lie.
+  expect(sent[1]).not.toHaveProperty("temperature");
+});
+
+test("both refusals from one model are answered, and neither costs a retry", async () => {
+  replies = [
+    {
+      kind: "refuse",
+      message: "Unsupported parameter: 'max_tokens'. Use 'max_completion_tokens' instead.",
+    },
+    {
+      kind: "refuse",
+      message:
+        "'temperature' does not support 0.7 with this model. Only the default (1) is supported.",
+    },
+    { kind: "ok", content: "third time" },
+  ];
+
+  // maxRetries is zero: a downgrade is a different request rather than the same one again, so
+  // neither of these may spend an attempt.
+  const result = await run({ model: "reasoning-model", temperature: 0.7, maxRetries: 0 });
+
+  expect(result.output).toBe("third time");
+  expect(requests).toBe(3);
+  expect(sent[2]).toMatchObject({ max_completion_tokens: 256 });
+  expect(sent[2]).not.toHaveProperty("temperature");
+});
+
+test("what one model refused is not held against the next", async () => {
+  replies = [
+    {
+      kind: "refuse",
+      message: "Unsupported parameter: 'max_tokens'. Use 'max_completion_tokens' instead.",
+    },
+    { kind: "ok", content: "downgraded" },
+    { kind: "ok", content: "untouched" },
+  ];
+
+  await run({ model: "picky-model" });
+  await run({ model: "easygoing-model" });
+
+  // One API key reaches every model a provider offers. A flag on the endpoint would have the
+  // first of these stop the second ever being sent a `max_tokens` it takes perfectly well.
+  expect(sent[1]).toMatchObject({ max_completion_tokens: 256 });
+  expect(sent[2]).toMatchObject({ max_tokens: 256 });
 });

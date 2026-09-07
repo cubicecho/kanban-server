@@ -393,6 +393,23 @@ once a chunk has arrived the turn is unrepeatable, so only a failure *before* th
 is retried. `requestTimeoutSeconds` is a silence watchdog that rearms on every chunk, not a
 deadline on the request.
 
+Nested inside that loop is a second one, for a request the other end refuses a *field* of rather
+than losing. Some of those are facts about the endpoint — `stream_options`, a grammar keyword —
+and some are facts about the model: it spells its ceiling `max_completion_tokens`, or it runs at
+the temperature it was built with and will not be given ours. Either way the answer is to send a
+lesser request, and the refusal latches for the life of the process so it costs one failed call
+rather than one a run. A downgrade does not spend a retry: it is a different request, not the
+same one again.
+
+The two latch at different levels, and that is the point. One API key reaches every model a
+provider offers, so what the model somebody picked last refused must not be held against the one
+they pick next — a flag on the endpoint would quietly stop sending a `max_tokens` the next model
+takes perfectly well. So `capabilitiesFor(baseUrl)` holds the endpoint's, and what a model refused
+hangs off it under the name that endpoint knows the model by. What the board owns is which fields
+a refusal may take away: a refused temperature is dropped rather than replaced with the one value
+the model would accept, because the agent's own figure is what its page shows and sending a
+different number back as though it were the operator's setting would make that a lie.
+
 ### Where the agent loop lives
 
 Most of what is described above is not in this repository. The endpoint-agnostic half of an

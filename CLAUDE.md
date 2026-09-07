@@ -432,13 +432,27 @@ resolution; it went with the links that needed it.
 owns the retry loop, not the OpenAI SDK, whose own retries are off: once a chunk has arrived the
 turn is unrepeatable, so a failure after that propagates. `requestTimeoutSeconds` is a silence
 watchdog that rearms on every chunk, not a deadline on the request. `agent.ts` hands it a
-`request(supported)` builder rather than one request, because the capability negotiation is the
-inner half of that loop — `capabilitiesFor(baseUrl)` latches what an endpoint turned out to
+`request(supported, byModel)` builder rather than one request, because the capability negotiation
+is the inner half of that loop — `capabilitiesFor(baseUrl)` latches what an endpoint turned out to
 accept, per endpoint rather than per process, so a second endpoint does not inherit the first
 one's refusals. What `agent.ts` keeps of the old loop is the `ContextOverflow` it throws when the
 endpoint's own refusal comes back, since the wording that names both numbers is this server's —
 `runTurn` will size a request itself if handed a `contextLimit`, and is deliberately not, because
 the guard here is the one that says where its figure came from.
+
+**A refusal about the model is not a refusal about the endpoint.** `strictSchemas` and
+`usageInStream` are facts about a server; a ceiling spelled `max_completion_tokens` and a
+temperature that is not ours to pick are facts about one model on it. They cannot latch together,
+because one API key reaches every model a provider offers and the model is a dropdown on the agent
+page: a flag on the endpoint would let the first run on whatever was picked last stop the next
+model ever being sent a `max_tokens` it takes. So `runTurn` is given `model` and the builder's
+second argument is `modelCapabilitiesFor(supports, model)`, keyed `(endpoint, model)` by hanging
+off the endpoint's own. What is this server's to decide is which fields a refusal may take away:
+a refused temperature is *dropped* rather than re-sent as the one value the model would accept,
+since `config.temperature` is what the agent's page shows and answering with a different number
+would make that reading a lie. The sizing call passes the same object, so the estimate is of the
+body that actually goes. `tests/agent-resilience.test.ts` names a different model per test rather
+than resetting the module's memory — that the memory is per model is the thing under test.
 
 **agent-core prints nothing, and `notice` in `agent.ts` is where its words go.** `runTurn`,
 `negotiate`, `ask` and `tryAsk` each report what they gave up on through an `onNotice` with no
