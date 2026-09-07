@@ -475,11 +475,15 @@ was *built* with while serving it in a fraction of one — llama.cpp will load a
 the endpoint with somebody else's stack trace. So `agent.ts` refuses an over-large request before
 it is sent, in a message that says what the request measured, what the window is, and *where that
 figure came from*, since the whole difficulty of this failure is two numbers disagreeing.
-`requestTokens` is characters over four, there being no tokenizer here and no prospect of one;
-it runs low on tool schemas, which is the side to be wrong on — guessing high refuses a run that
-would have worked, and guessing low leaves us exactly where we were. `isOverflow` recognises the
-endpoint's own refusal and keeps its words, adding ours; either way it is a `ContextOverflow`,
-which `isTransient` will not retry, because the same request refused again is the same refusal.
+`requestTokens` is agent-core's, and it is characters over four with the request's own JSON put
+back — the keys only some messages carry, and one envelope per content part, because a transcript
+a client appends block by block is mostly parts and charging each only its text ran short in
+proportion to how finely the content was split. There is no tokenizer here and no prospect of
+one, so it still runs low on tool schemas, which is the side to be wrong on — guessing high
+refuses a run that would have worked, and guessing low leaves us exactly where we were.
+`isOverflow` recognises the endpoint's own refusal and keeps its words, adding ours; either way
+it is a `ContextOverflow`, which `isTransient` will not retry, because the same request refused
+again is the same refusal.
 
 **Agents inherit from Settings by sentinel.** Every numeric knob treats `0` as "inherit",
 except `temperature` and `maxRetries`, which use `-1` because `0` is a value someone may
