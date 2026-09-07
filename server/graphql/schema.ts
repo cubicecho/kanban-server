@@ -1,3 +1,4 @@
+import { fold, history, type RunEvent, watch } from "@cubicecho/agent-core";
 import { buildSchema, GraphQLDateTime } from "@vantreeseba/drizzle-graphql";
 import { applyPermissions } from "@vantreeseba/graphql-casl";
 import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
@@ -32,7 +33,6 @@ import {
   type TemplateLane,
   tasks,
 } from "../db/schema.ts";
-import { fold, history, type RunEvent, watch } from "../runner/events.ts";
 import { listModels, loadSettings } from "../runner/llm.ts";
 import { type McpConnection, mcp, probe } from "../runner/mcp.ts";
 import { EXPAND_CONTRACT, VERDICT_CONTRACT, WORK_CONTRACT } from "../runner/prompts.ts";
@@ -183,9 +183,10 @@ const { entities } = buildSchema(db, {
           "This run is still going. Stop it first, then delete it.",
         ),
     },
-    mcpServers: () => {
-      void mcp.sync().catch((error) => console.error("[mcp] sync failed:", error));
-    },
+    // Not `sync()`: this hook runs inside the mutation's transaction, so the pool would read
+    // the table as it stood before the write it is reacting to. `syncSoon` waits past the
+    // commit, and folds a batch of edits into one reconnect rather than one child process each.
+    mcpServers: () => mcp.syncSoon(),
   },
 });
 
@@ -691,7 +692,12 @@ const baseSchema = new GraphQLSchema({
           "Which of the configured MCP servers this one actually reached, and the tools it " +
           "found on each. A server that is enabled but absent here failed to connect, and its " +
           "tools are not offered to any agent linked to it.",
-        resolve: () => mcp.state(),
+        // "Add a server" then "did it connect?" arrive milliseconds apart, and the debounced
+        // reconnect the write queued has not run yet. Pay it off rather than answer as of before.
+        resolve: async () => {
+          await mcp.flush();
+          return mcp.state();
+        },
       },
       runEvents: {
         type: new GraphQLNonNull(new GraphQLList(new GraphQLNonNull(RunEventType))),

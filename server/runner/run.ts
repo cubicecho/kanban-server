@@ -1,3 +1,4 @@
+import { emit, parseJson } from "@cubicecho/agent-core";
 import { and, asc, desc, eq, inArray, isNull, notInArray } from "drizzle-orm";
 import { errorMessage } from "../../shared/errors.ts";
 import { db } from "../db/client.ts";
@@ -15,7 +16,6 @@ import {
   tasks,
 } from "../db/schema.ts";
 import { type AgentResult, runAgent } from "./agent.ts";
-import { emit } from "./events.ts";
 import { loadSettings, type Resolved, resolveAgentId, resolveRefineAgent } from "./llm.ts";
 import {
   cardPrompt,
@@ -24,7 +24,6 @@ import {
   REFINE_SYSTEM,
   systemPromptFor,
 } from "./prompts.ts";
-import { parseJson } from "./side-task.ts";
 
 /**
  * What is running right now, keyed by the thing it is running *on* — a card id, or a task id
@@ -162,7 +161,7 @@ async function execute(
 
   const controller = new AbortController();
   inFlight.set(subjectId, { runId: run.id, controller });
-  // Everything the run says as it goes, for anyone watching it — see `runner/events.ts`.
+  // Everything the run says as it goes, for anyone watching it — see the run event bus in `@cubicecho/agent-core`.
   const onEvent = (event: Parameters<typeof emit>[1]) => emit(run.id, event);
   onEvent({ kind: "notice", text: `${agent.name}: ${label}` });
 

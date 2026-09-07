@@ -19,7 +19,13 @@
     "types": ["node"],
     "paths": {
       "@/*": ["./web/*"],
-      "@server/*": ["./server/*"]
+      "@server/*": ["./server/*"],
+      // agent-core and mcp-pool are linked from sibling checkouts, so each brings its own
+      // `openai` alongside the one here. Two copies of a class with a `#private` field are two
+      // nominal types, and an `OpenAI` built by the package is then not an `OpenAI` to us. They
+      // declare it a peer dependency and mean it; this is where the peer is settled.
+      "openai": ["./node_modules/openai"],
+      "openai/*": ["./node_modules/openai/*"]
     }
   },
   "include": [

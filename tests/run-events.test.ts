@@ -8,7 +8,7 @@ import { afterAll, beforeAll, beforeEach, expect, test } from "vitest";
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "kanban-server-events-"));
 process.env.KANBAN_SERVER_DATA_DIR = dir;
 
-let events: typeof import("../server/runner/events.ts");
+let events: typeof import("@cubicecho/agent-core");
 let schema: import("graphql").GraphQLSchema;
 let db: typeof import("../server/db/client.ts").db;
 let tables: typeof import("../server/db/schema.ts");
@@ -16,7 +16,7 @@ let tables: typeof import("../server/db/schema.ts");
 beforeAll(async () => {
   const { ensureSchema } = await import("../server/db/migrate.ts");
   await ensureSchema();
-  events = await import("../server/runner/events.ts");
+  events = await import("@cubicecho/agent-core");
   schema = (await import("../server/graphql/schema.ts")).schema;
   db = (await import("../server/db/client.ts")).db;
   tables = await import("../server/db/schema.ts");
