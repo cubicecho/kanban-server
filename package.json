@@ -23,9 +23,9 @@
   },
   "dependencies": {
     "@casl/ability": "^7.0.1",
-    "@cubicecho/agent-core": "file:../agent-core",
+    "@cubicecho/agent-core": "git+https://github.com/cubicecho/agent-core.git",
+    "@cubicecho/agent-mcp-pool": "git+https://github.com/cubicecho/agent-mcp-pool.git",
     "@cubicecho/graphql-mcp": "^2.10.0",
-    "@cubicecho/mcp-pool": "file:../mcp-pool",
     "@electric-sql/pglite": "^0.5.8",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@tanstack/react-form": "^1.33.5",

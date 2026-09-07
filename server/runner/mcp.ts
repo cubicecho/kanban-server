@@ -1,4 +1,4 @@
-import { McpPool } from "@cubicecho/mcp-pool";
+import { McpPool } from "@cubicecho/agent-mcp-pool";
 import { db } from "../db/client.ts";
 import { mcpServers } from "../db/schema.ts";
 
@@ -7,13 +7,13 @@ export type {
   McpProbe,
   McpServerState,
   McpStatus,
-} from "@cubicecho/mcp-pool";
-export { probe } from "@cubicecho/mcp-pool";
+} from "@cubicecho/agent-mcp-pool";
+export { probe } from "@cubicecho/agent-mcp-pool";
 
 /**
  * This server's one pool of MCP connections.
  *
- * The pool itself is `@cubicecho/mcp-pool`; what is left here is the seam it asks for — where
+ * The pool itself is `@cubicecho/agent-mcp-pool`; what is left here is the seam it asks for — where
  * the rows come from, and what to call ourselves when we dial. It used to `import { db }`
  * itself, which is exactly why it could not be shared: the connection management is the same
  * everywhere and the table it reads is not.

@@ -51,7 +51,7 @@ docker compose up --build
 | **`@vantreeseba/drizzle-graphql`** | The API is generated from the tables — a new column is queryable as soon as it exists. Hand-written fields fill what CRUD cannot say |
 | **graphql-yoga** | Serves the query API and the `runEvents` subscription as SSE, which the browser reads with a plain `EventSource` |
 | **`@cubicecho/graphql-mcp`** | Projects the same schema as MCP tools. `server/mcp-endpoint.ts` curates which ones — see below |
-| **`@cubicecho/agent-core`, `@cubicecho/mcp-pool`** | The agent loop's endpoint-agnostic half and the MCP connection pool, extracted once three servers had drifting copies of both. Linked from sibling checkouts until they are published — see below |
+| **`@cubicecho/agent-core`, `@cubicecho/agent-mcp-pool`** | The agent loop's endpoint-agnostic half and the MCP connection pool, extracted once three servers had drifting copies of both. Git dependencies until they are published — see below |
 | **Node type stripping** | The container runs `node server/index.ts`; `tsx` is a devDependency and is not in the image. Nothing under `server/` may use syntax that survives erasure — no enums, no parameter properties |
 | **Biome** | One formatter and linter. `noExplicitAny` and `noNonNullAssertion` are errors here, not warnings |
 
@@ -401,7 +401,7 @@ timestamp advertising `ilike` is bytes an agent reads past on every column of ev
 **The agent loop and the MCP pool are packages now, and what is left here is the seam.**
 `@cubicecho/agent-core` is the endpoint-agnostic half — schema compatibility, on-demand tool
 loading, one-shot side tasks, the run event bus, the pooled client, and the rules about retrying
-— and `@cubicecho/mcp-pool` is the pool of long-lived MCP clients. Both were this server's own
+— and `@cubicecho/agent-mcp-pool` is the pool of long-lived MCP clients. Both were this server's own
 files, copied into `task_server` and `min-agent`, and the three copies had drifted; what made
 them uncopiable was one line each, an `import { db }` and a config type. So neither package
 imports a config type from a consumer: every function takes the narrowest shape it reads —
@@ -423,17 +423,24 @@ server" and "did it connect?" arrive milliseconds apart and the answer must not 
 write. `undefined` scope means every connected server and an *empty* scope means none of them:
 an agent with no servers linked to it wants the second, so the two must not collapse.
 
-**Neither package is published yet, and the image cannot be built until they are.** They are
-`file:../agent-core` and `file:../mcp-pool` — sibling checkouts, the same way `min-agent`
-consumes them — and the `Dockerfile` runs `npm ci` after copying only `package.json` and
-`package-lock.json`, so a dependency outside the build context is not there to install. The CI
-`docker` job is out with it. The fix is a version per dependency once they are on npm, and
-nothing else here changes.
+**Neither package is published yet, so both are git dependencies.**
+`git+https://github.com/cubicecho/agent-core.git` and the same for `agent-mcp-pool`, rather than
+the `file:../` links they started as: a sibling checkout is outside the Docker build context, so
+`npm ci` could not see it and the image could not be built at all. A git URL is a thing npm can
+fetch from anywhere, which is what puts the image and the CI `docker` job back in play. The lock
+pins a commit, so this is reproducible; `npm update @cubicecho/agent-core` is how it moves.
+Publishing turns each into a version and changes nothing else.
 
-Their `openai` is a peer dependency and `tsconfig.json` is where that peer is settled: a linked
-sibling brings its own copy along, and two copies of a class with a `#private` field are two
-nominal types, so an `OpenAI` the package built would not be an `OpenAI` to us. The `paths` entry
-points every resolution of it at this checkout's.
+That costs the image `git`, which the `node:*-slim` base has not got. The builder installs it and
+is thrown away; the runtime stage installs it, runs `npm ci --omit=dev`, and purges it in the
+same layer, because it is needed to fetch two dependencies and not worth carrying afterwards.
+
+Their `openai` is a peer dependency, and a git dependency is why that now settles itself: npm
+packs each package to its `files` and installs one flattened `openai` for all three. The `file:`
+links did not — a linked sibling brought its own copy, and two copies of a class with a
+`#private` field are two nominal types, so an `OpenAI` the package built was not an `OpenAI` to
+us. That wanted a `paths` entry in `tsconfig.json` to force one resolution; it is gone with the
+links that needed it.
 
 **The LLM call retries only before the model has spoken.** `server/runner/agent.ts` owns the
 retry loop — the rules it retries by are agent-core's — not the OpenAI SDK, whose own retries are
