@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import type { CardsStatusEnum } from "@/__generated__/graphql";
 import { FormField } from "@/components/form-field";
 import { MultiSelect, type MultiSelectOption } from "@/components/multi-select";
+import { CardStatusBadge } from "@/components/status-badge";
 import { cyclingCards, type DepGraph } from "@/lib/cards";
 
 /** A card as this field needs to know it, which is the same for a live one and an archived one. */
@@ -23,17 +24,16 @@ export interface DepCard {
  *
  * Two states the switches could not show, and they are why it needed replacing rather than
  * restyling. An **archived** dependency is invisible to the board query, so the dialog used to
- * load without it and drop it on the next save — it is offered here, marked in its own label,
- * and kept. And a card that would close a **loop** is not offered at all, rather than offered and
- * then refused by the server after the card has already been written.
+ * load without it and drop it on the next save — it is offered here, under its own heading, and
+ * kept. And a card that would close a **loop** is not offered at all, rather than offered and
+ * then refused by the server after the card has already been written; the reason is drawn under
+ * that card, which is where the answer is wanted — a count of them under the field said how many
+ * rows were greyed out and never which.
  *
- * Two things the old list said that this one does not, both being an option that is a row rather
- * than a string: which lane a card sits in, drawn as a heading over its group, and its status,
- * drawn as a badge on the end of it (cubicecho/cubeui#13). They are keywords on the option
- * meanwhile, so searching for a lane or for `done` still finds the cards in it. The reason a
- * looping card cannot be picked is the same shape of gap (cubicecho/cubeui#6) and is said once
- * under the field until an option can say it itself — which is better than nowhere, and was
- * where a count of them belonged anyway.
+ * An option is a row rather than a string, so a card is drawn here the way it is drawn
+ * everywhere else: under the lane it sits in, with its status on the end in the same badge the
+ * board uses. The heading is searched, so typing a lane's name still finds the cards in it; the
+ * badge is not, which is why the status is still a keyword.
  */
 export function CardDepsField({
   cardId,
@@ -62,34 +62,35 @@ export function CardDepsField({
 
   const options: MultiSelectOption[] = useMemo(
     () =>
-      cards.map((card) => ({
-        value: card.id,
-        // The archive is part of what the card *is* here rather than a decoration on it: it is
-        // the difference between a dependency you can find on the board and one you cannot.
-        label: card.archived ? `${card.title || "Untitled"} (archived)` : card.title || "Untitled",
-        keywords: [laneNames.get(card.laneId) ?? "Archived", card.status],
+      cards.map((card) => {
         // Never the ones already held: a card that has come to close a loop must still be one
         // you can stop waiting on, which is the only way out of it.
-        disabled: cycles.has(card.id) && !value.includes(card.id),
-      })),
+        const loops = cycles.has(card.id) && !value.includes(card.id);
+        return {
+          value: card.id,
+          // The archive is part of what the card *is* here rather than a decoration on it: it is
+          // the difference between a dependency you can find on the board and one you cannot.
+          // Said twice on purpose — the heading names the group in the list, and the suffix is
+          // what the chip on the trigger carries, a chip being a string and nothing else.
+          label: card.archived
+            ? `${card.title || "Untitled"} (archived)`
+            : card.title || "Untitled",
+          // Not the lane an archived card kept: that is where restoring would put it back, not
+          // somewhere you can go and find it.
+          group: card.archived ? "Archived" : (laneNames.get(card.laneId) ?? "Archived"),
+          meta: <CardStatusBadge status={card.status} />,
+          keywords: [card.status],
+          disabled: loops,
+          hint: loops ? "Already waits on this card, directly or through others." : undefined,
+        };
+      }),
     [cards, cycles, laneNames, value],
   );
-
-  const refused = options.filter((option) => option.disabled).length;
 
   return (
     <FormField
       label="Waits for"
-      description={
-        <>
-          This card is skipped until every one of these is done. An expanding station sets them from
-          the order it proposed; this is where a wrong one is corrected. Search matches the lane and
-          the status as well as the title.
-          {refused
-            ? ` ${refused} ${refused === 1 ? "card is" : "cards are"} greyed out: each already waits on this one, directly or through others.`
-            : null}
-        </>
-      }
+      description="This card is skipped until every one of these is done. An expanding station sets them from the order it proposed; this is where a wrong one is corrected. Search matches the lane and the status as well as the title."
       // The function form, because a `Popover` root renders no DOM of its own and a clone would
       // swallow the id and the description in silence.
       control={(wiring) => (

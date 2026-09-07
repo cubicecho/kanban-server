@@ -11,9 +11,8 @@ import {
   TestMcpServerDocument,
   UpdateMcpServerDocument,
 } from "@/__generated__/graphql";
-import { ActionButton } from "@/components/action-button";
+import { ActionButton, ConfirmButton } from "@/components/app-buttons";
 import { Page } from "@/components/app-shell";
-import { ConfirmButton } from "@/components/confirm-button";
 import { EmptyState } from "@/components/empty-state";
 import { EnableSwitch } from "@/components/enable-switch";
 import { McpDialog } from "@/components/mcp-dialog";

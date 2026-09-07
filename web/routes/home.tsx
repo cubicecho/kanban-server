@@ -371,10 +371,10 @@ function TaskComposer({ project }: { project: Project }) {
             }
             footerActions={
               <straight.AppForm>
-                {/* Not also disabled while the other tab is mid-turn: `SubmitButton` owns its
-                    own disabled state (cubicecho/cubeui#12), and the two tabs are two doors —
-                    writing a card straight to the board while a conversation is being refined
-                    was never the thing that could go wrong. */}
+                {/* `SubmitButton` takes a `disabled` of its own now, and this one deliberately
+                    does not pass `working`: the two tabs are two doors, and writing a card
+                    straight to the board while a conversation is being refined next door was
+                    never the thing that could go wrong. */}
                 <straight.SubmitButton pendingLabel="Adding…">
                   <SquarePlus className="size-4" />
                   Put it on the board
