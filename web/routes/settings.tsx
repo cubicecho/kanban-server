@@ -23,7 +23,7 @@ import { FormField } from "@/components/form-field";
 import { useLeaveGuard } from "@/components/leave-guard";
 import { ModelField } from "@/components/model-select";
 import { PasswordField } from "@/components/password-field";
-import { QueryError } from "@/components/query-error";
+import { QueryError } from "@/components/query-state";
 import { Button } from "@/components/ui/button";
 import { request } from "@/lib/gql";
 import { forPicker, idOrNone } from "@/lib/picker";

@@ -44,7 +44,7 @@ import { CardDialog } from "@/components/card-dialog";
 import { ConfirmButton } from "@/components/confirm-button";
 import { EmptyState, NoProject } from "@/components/empty-state";
 import { LaneDialog } from "@/components/lane-dialog";
-import { QueryError } from "@/components/query-error";
+import { QueryError } from "@/components/query-state";
 import { SaveTemplateDialog } from "@/components/save-template-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
