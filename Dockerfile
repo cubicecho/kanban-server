@@ -8,13 +8,6 @@ FROM node:26-slim AS builder
 
 WORKDIR /app
 
-# git, because agent-core and agent-mcp-pool are git dependencies until they are
-# published — npm clones them, and the slim base has no git. This stage is thrown
-# away, so it stays installed here.
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends git \
-  && rm -rf /var/lib/apt/lists/*
-
 # Manifests first so a source-only change reuses the install layer.
 COPY package.json package-lock.json ./
 RUN npm ci
@@ -39,14 +32,7 @@ ENV NODE_ENV=production
 # erasure. If that ever changes — an enum, a parameter property — the fix is to
 # move tsx into dependencies and make the CMD `npx tsx server/index.ts`.
 COPY package.json package-lock.json ./
-# git again for the two git dependencies, but taken back out in the same layer:
-# it is needed to fetch them and is not worth carrying in the runtime image.
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends git \
-  && npm ci --omit=dev \
-  && apt-get purge -y git && apt-get autoremove -y \
-  && rm -rf /var/lib/apt/lists/* \
-  && npm cache clean --force
+RUN npm ci --omit=dev && npm cache clean --force
 
 COPY server server
 # The error helpers both halves of the app share. server/ imports them at

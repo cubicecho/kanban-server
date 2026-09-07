@@ -423,24 +423,18 @@ server" and "did it connect?" arrive milliseconds apart and the answer must not 
 write. `undefined` scope means every connected server and an *empty* scope means none of them:
 an agent with no servers linked to it wants the second, so the two must not collapse.
 
-**Neither package is published yet, so both are git dependencies.**
-`git+https://github.com/cubicecho/agent-core.git` and the same for `agent-mcp-pool`, rather than
-the `file:../` links they started as: a sibling checkout is outside the Docker build context, so
-`npm ci` could not see it and the image could not be built at all. A git URL is a thing npm can
-fetch from anywhere, which is what puts the image and the CI `docker` job back in play. The lock
-pins a commit, so this is reproducible; `npm update @cubicecho/agent-core` is how it moves.
-Publishing turns each into a version and changes nothing else.
+**Both packages come from npm, and the two forms before it are worth remembering.** They started
+as `file:../` links to sibling checkouts, which the Docker build cannot see at all — a sibling is
+outside the build context, so `npm ci` could not find it and there was no image. A git URL fixed
+that and cost the image `git`, which the `node:*-slim` base has not got and which both stages had
+to install. `^0.1.0` is the end of both problems: a tarball npm already knows how to fetch, a
+semver range something can watch, and a Dockerfile with nothing in it about either package.
 
-That costs the image `git`, which the `node:*-slim` base has not got. The builder installs it and
-is thrown away; the runtime stage installs it, runs `npm ci --omit=dev`, and purges it in the
-same layer, because it is needed to fetch two dependencies and not worth carrying afterwards.
-
-Their `openai` is a peer dependency, and a git dependency is why that now settles itself: npm
-packs each package to its `files` and installs one flattened `openai` for all three. The `file:`
-links did not — a linked sibling brought its own copy, and two copies of a class with a
-`#private` field are two nominal types, so an `OpenAI` the package built was not an `OpenAI` to
-us. That wanted a `paths` entry in `tsconfig.json` to force one resolution; it is gone with the
-links that needed it.
+Their `openai` is a peer dependency, and a registry install is why that settles itself: one
+flattened copy for all three. The `file:` links did not — a linked sibling brought its own, and
+two copies of a class with a `#private` field are two nominal types, so an `OpenAI` the package
+built was not an `OpenAI` to us. That wanted a `paths` entry in `tsconfig.json` to force one
+resolution; it went with the links that needed it.
 
 **The LLM call retries only before the model has spoken.** `server/runner/agent.ts` owns the
 retry loop — the rules it retries by are agent-core's — not the OpenAI SDK, whose own retries are

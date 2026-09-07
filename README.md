@@ -481,10 +481,9 @@ tests/         vitest
 The endpoint-agnostic half of the runner is not here. `@cubicecho/agent-core` holds the tool
 loading, the schema compatibility, the one-shot side tasks, the run event bus, the pooled client
 and the retry rules; `@cubicecho/agent-mcp-pool` holds the MCP connections. Both were these
-files, and both were copied into two other servers before the copies drifted. Neither is
-published yet, so both are git dependencies on their GitHub repositories, with the lock pinning
-a commit. That is also why the image installs `git`: the slim base has none, and npm needs it to
-fetch them.
+files, and both were copied into two other servers before the copies drifted. Both are on npm
+now, so they are ordinary versioned dependencies — before that they were git URLs, and before
+that `file:../` links to sibling checkouts, which the Docker build could not see.
 
 ## GraphQL
 
