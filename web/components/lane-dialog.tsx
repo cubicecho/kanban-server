@@ -9,6 +9,7 @@ import {
 import {
   InputField,
   NumberField,
+  type SelectEntry,
   SelectField,
   SwitchField,
   TextareaField,
@@ -26,9 +27,9 @@ type Lane = BoardQuery["lanes"][number];
 const NONE = "__none__";
 // And so does "off the board", which is a pass target like any other rather than a switch
 // beside one: a card that passes either goes somewhere or is archived, never both, and one
-// picker with three kinds of answer is what makes that true by construction. It used to be set
-// apart by a `SelectSeparator`, which `SelectField` has no way to express (cubicecho/cubeui#10);
-// until it has, the label says what the rule said.
+// picker with three kinds of answer is what makes that true by construction. It is the one
+// answer that is not a lane, so a rule sets it apart from the lane names — without one it sits
+// flush against them and reads as another lane, which is what its label used to have to say.
 const ARCHIVE = "__archive__";
 
 /** What a lane of each kind does to a card, said in the dialog rather than found out from a run. */
@@ -116,10 +117,10 @@ export function LaneDialog({
     onSubmit: ({ value }) => save.mutateAsync(value).catch(toastError),
   });
 
-  const laneOptions = (empty: string, archive?: boolean) => [
+  const laneOptions = (empty: string, archive?: boolean): SelectEntry[] => [
     { value: NONE, label: empty },
     ...others.map((row) => ({ value: row.id, label: row.name })),
-    ...(archive ? [{ value: ARCHIVE, label: "Archive it — off the board" }] : []),
+    ...(archive ? [{ separator: true } as const, { value: ARCHIVE, label: "Archive it" }] : []),
   ];
 
   return (
@@ -144,13 +145,15 @@ export function LaneDialog({
               }}
             />
             {/*
-              `form.AppField` rather than the one-line form, because picking a kind for a lane
-              nobody has named yet names it — "New lane ▸ Review" is the whole gesture — and a
-              side effect of a change is a `listeners`, which the bound fields do not forward
-              (cubicecho/cubeui#11).
+              Picking a kind for a lane nobody has named yet names it — "New lane ▸ Review" is
+              the whole gesture. A side effect of a change is a `listeners`, which is a field
+              option like the validators beside it rather than a reason to reach for the render
+              prop.
             */}
-            <form.AppField
+            <SelectField
+              form={form}
               name="roleId"
+              label="Kind"
               listeners={{
                 onChange: ({ value }) => {
                   if (form.state.values.name.trim()) return;
@@ -158,20 +161,14 @@ export function LaneDialog({
                   if (kind) form.setFieldValue("name", kind.name);
                 },
               }}
-            >
-              {(field) => (
-                <field.SelectField
-                  label="Kind"
-                  options={[
-                    { value: NONE, label: "Cards just rest here" },
-                    ...(roles.data?.roles ?? []).map((row) => ({
-                      value: row.id,
-                      label: row.name,
-                    })),
-                  ]}
-                />
-              )}
-            </form.AppField>
+              options={[
+                { value: NONE, label: "Cards just rest here" },
+                ...(roles.data?.roles ?? []).map((row) => ({
+                  value: row.id,
+                  label: row.name,
+                })),
+              ]}
+            />
           </>
         }
       />

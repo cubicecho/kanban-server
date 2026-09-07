@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import type { CardsStatusEnum } from "@/__generated__/graphql";
 import { FormField } from "@/components/form-field";
 import { MultiSelect, type MultiSelectOption } from "@/components/multi-select";
+import { CardStatusBadge } from "@/components/status-badge";
 import { cyclingCards, type DepGraph } from "@/lib/cards";
 
 /** A card as this field needs to know it, which is the same for a live one and an archived one. */
@@ -23,15 +24,16 @@ export interface DepCard {
  *
  * Two states the switches could not show, and they are why it needed replacing rather than
  * restyling. An **archived** dependency is invisible to the board query, so the dialog used to
- * load without it and drop it on the next save — it is offered here, marked in its own label,
- * and kept. And a card that would close a **loop** is not offered at all, rather than offered and
- * then refused by the server after the card has already been written. Each of those says under
- * its own label why it cannot be picked, which is where the answer is wanted: a count of them
- * under the field told you how many rows were greyed out and never which.
+ * load without it and drop it on the next save — it is offered here, under its own heading, and
+ * kept. And a card that would close a **loop** is not offered at all, rather than offered and
+ * then refused by the server after the card has already been written; the reason is drawn under
+ * that card, which is where the answer is wanted — a count of them under the field said how many
+ * rows were greyed out and never which.
  *
- * What an option still cannot draw is a row rather than a string — the lane a card sits in as a
- * heading over its group, its status as a badge on the end of it (cubicecho/cubeui#13). They are
- * keywords meanwhile, so searching for a lane or for `done` finds the cards in it.
+ * An option is a row rather than a string, so a card is drawn here the way it is drawn
+ * everywhere else: under the lane it sits in, with its status on the end in the same badge the
+ * board uses. The heading is searched, so typing a lane's name still finds the cards in it; the
+ * badge is not, which is why the status is still a keyword.
  */
 export function CardDepsField({
   cardId,
@@ -68,10 +70,16 @@ export function CardDepsField({
           value: card.id,
           // The archive is part of what the card *is* here rather than a decoration on it: it is
           // the difference between a dependency you can find on the board and one you cannot.
+          // Said twice on purpose — the heading names the group in the list, and the suffix is
+          // what the chip on the trigger carries, a chip being a string and nothing else.
           label: card.archived
             ? `${card.title || "Untitled"} (archived)`
             : card.title || "Untitled",
-          keywords: [laneNames.get(card.laneId) ?? "Archived", card.status],
+          // Not the lane an archived card kept: that is where restoring would put it back, not
+          // somewhere you can go and find it.
+          group: card.archived ? "Archived" : (laneNames.get(card.laneId) ?? "Archived"),
+          meta: <CardStatusBadge status={card.status} />,
+          keywords: [card.status],
           disabled: loops,
           hint: loops ? "Already waits on this card, directly or through others." : undefined,
         };
