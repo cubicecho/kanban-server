@@ -9,7 +9,6 @@ const dir = fs.mkdtempSync(path.join(os.tmpdir(), "kanban-server-context-"));
 process.env.KANBAN_SERVER_DATA_DIR = dir;
 
 const { runAgent } = await import("../server/runner/agent.ts");
-const { contextLimitFor } = await import("../server/runner/llm.ts");
 type Resolved = import("../server/runner/llm.ts").Resolved;
 
 /**
@@ -88,26 +87,6 @@ const config = (over: Partial<Resolved> = {}): Resolved => ({
   maxRetries: 0,
   serverIds: [],
   ...over,
-});
-
-test("reads the window off the listing, whichever key the server spells it with", async () => {
-  expect(await contextLimitFor(config({ model: "roomy" }))).toBe(262144);
-  expect(await contextLimitFor(config({ model: "cramped" }))).toBe(16384);
-});
-
-test("a model the listing says nothing about has no window", async () => {
-  expect(await contextLimitFor(config({ model: "no-window" }))).toBe(0);
-  expect(await contextLimitFor(config({ model: "absent" }))).toBe(0);
-});
-
-test("the agent's own figure wins over the listing", async () => {
-  // The case this field exists for: a model built for 262k, served in a fraction of it, and
-  // listed as 262k regardless. Believing the endpoint here is how the run fails.
-  expect(await contextLimitFor(config({ model: "roomy", contextLength: 16384 }))).toBe(16384);
-});
-
-test("an endpoint that will not list models leaves the window unknown rather than failing", async () => {
-  expect(await contextLimitFor(config({ baseUrl: "http://127.0.0.1:1/v1" }))).toBe(0);
 });
 
 test("a prompt that cannot fit is refused before it is sent", async () => {

@@ -278,10 +278,10 @@ export function registerPrompts(server: McpServer): void {
     });
 
     // A prompt that takes no arguments is registered without a schema rather than with an empty
-    // one. The MCP schema makes `params.arguments` optional and a client with nothing to put
-    // there omits it, at which point an empty object schema is handed `undefined` and refuses it
-    // — "expected object, received undefined", for a prompt that wanted nothing. It is the same
-    // trap `connectServer` disarms for `tools/call`, and it is not disarmed here.
+    // one, which is what it means: there is nothing to send. It was once also the only way to
+    // call one — a client omits `params.arguments`, the MCP schema says it may, and an empty
+    // object schema was handed `undefined` and refused it — but `connectServer` now disarms
+    // `prompts/get` alongside `tools/call`, so this is no longer load-bearing.
     if (!prompt.args) {
       server.registerPrompt(prompt.name, config, () => render({}));
       continue;

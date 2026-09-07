@@ -5293,6 +5293,10 @@ type RunEvent {
 
   """Per-run counter from 1, so a client can order and de-duplicate."""
   seq: Int!
+
+  """
+  When it happened. Epoch milliseconds on the bus, an ISO string on the wire.
+  """
   at: DateTime!
 
   """

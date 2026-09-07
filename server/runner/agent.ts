@@ -1,17 +1,16 @@
 import {
   ask,
-  backoffMs,
+  type Capabilities,
   type CatalogServer,
   ContextOverflow,
+  capabilitiesFor,
   catalogPrompt,
   compact,
-  EndpointSilent,
+  contextLimitFor,
   expandNames,
   getClient,
   inCatalog,
-  isGrammarError,
   isOverflow,
-  isTransient,
   LOAD_TOOLS,
   LOAD_TOOLS_DEFINITION,
   loadResult,
@@ -23,31 +22,16 @@ import {
   relaxTools,
   requestedNames,
   requestTokens,
+  runTurn,
   SMALLEST_LIKELY_WINDOW,
   sanitizeTools,
-  sleep,
   timeoutMs,
   tryAsk,
 } from "@cubicecho/agent-core";
 import type OpenAI from "openai";
 import { errorMessage } from "../../shared/errors.ts";
-import { contextLimitFor, type Resolved } from "./llm.ts";
+import type { Resolved } from "./llm.ts";
 import { mcp } from "./mcp.ts";
-
-/**
- * llama.cpp-backed servers compile every tool schema into one grammar and reject keywords
- * their converter cannot express — one bad shape from one MCP server fails the whole request.
- * Once we have seen that, the advisory keywords stay off for the life of the process rather
- * than costing every later run a failed call first.
- */
-let strictSchemas = true;
-
-/**
- * `stream_options` is how a streamed request asks for its token counts, and a server that has
- * not heard of it rejects the whole request. Dropped for good once that happens: the counts are
- * worth one failed call to find out about, not one per run.
- */
-let usageInStream = true;
 
 export interface AgentResult {
   output: string;
@@ -64,132 +48,13 @@ export interface AgentOptions {
   systemPrompt?: string;
   prompt: string;
   signal?: AbortSignal;
-  /** Called as the run happens, for whoever is watching it. See the run event bus in `@cubicecho/agent-core`. */
+  /** Called as the run happens, for whoever is watching it. See `@cubicecho/agent-core`. */
   onEvent?: (event: RunEventInput) => void;
 }
-
-/** One streamed turn, put back together into the shape the loop and the history work with. */
-interface Step {
-  content: string;
-  toolCalls: OpenAI.ChatCompletionMessageToolCall[];
-  usage: { prompt: number; completion: number; total: number };
-}
-
-/** Reasoning deltas are not in the OpenAI types, and have two spellings in the wild. */
-type ReasoningDelta = OpenAI.ChatCompletionChunk.Choice.Delta & {
-  reasoning_content?: string | null;
-  reasoning?: string | null;
-};
 
 /** Long tool arguments and results are for the model; a watcher needs the gist. */
 const preview = (text: string, limit = 2000) =>
   text.length > limit ? `${text.slice(0, limit)}… (${text.length} chars)` : text;
-
-/**
- * Runs one turn as a stream, reporting tokens as they arrive and assembling them back into a
- * message.
- *
- * Streaming buys no speed here — nothing waits on the reply but the loop itself. It is what
- * makes a run watchable: a task that stalls, loops, or reaches for the wrong tool says so while
- * it is happening, instead of only in the row it leaves behind.
- */
-async function streamStep(
-  client: OpenAI,
-  body: OpenAI.ChatCompletionCreateParamsStreaming,
-  {
-    signal,
-    onEvent,
-    produced,
-    idleMs,
-  }: {
-    signal?: AbortSignal;
-    onEvent?: (event: RunEventInput) => void;
-    /** Set as soon as the server has said anything, so a failed call knows if it can be retried. */
-    produced: { any: boolean };
-    /** Silence allowed before the request is given up on. Undefined waits forever. */
-    idleMs?: number;
-  },
-): Promise<Step> {
-  // Silence, not duration: the timer is rearmed on every chunk, so a model that is still
-  // talking is never cut off however long it takes, and one that has stopped talking does not
-  // hang the run until someone notices. A request that never answers at all is the same case
-  // with no chunks in it.
-  const watchdog = new AbortController();
-  const linked = signal ? AbortSignal.any([signal, watchdog.signal]) : watchdog.signal;
-  let idle: NodeJS.Timeout | undefined;
-  const rearm = () => {
-    if (!idleMs) return;
-    clearTimeout(idle);
-    idle = setTimeout(() => watchdog.abort(), idleMs);
-  };
-
-  try {
-    rearm();
-    return await collect();
-  } catch (error) {
-    // The caller's own stop has to stay distinguishable from ours: one is a run that was
-    // called off, the other is an endpoint that stopped answering and may be worth retrying.
-    if (watchdog.signal.aborted && !signal?.aborted) {
-      throw new EndpointSilent(`the model endpoint sent nothing for ${(idleMs ?? 0) / 1000}s`);
-    }
-    throw error;
-  } finally {
-    clearTimeout(idle);
-  }
-
-  async function collect(): Promise<Step> {
-    const stream = await client.chat.completions.create(body, { signal: linked });
-    const content: string[] = [];
-    const calls = new Map<number, { id: string; name: string; arguments: string }>();
-    const usage = { prompt: 0, completion: 0, total: 0 };
-
-    for await (const chunk of stream) {
-      produced.any = true;
-      rearm();
-      if (chunk.usage) {
-        usage.prompt = chunk.usage.prompt_tokens ?? 0;
-        usage.completion = chunk.usage.completion_tokens ?? 0;
-        usage.total = chunk.usage.total_tokens ?? 0;
-      }
-      const delta = chunk.choices[0]?.delta as ReasoningDelta | undefined;
-      if (!delta) continue;
-
-      const thinking = delta.reasoning_content || delta.reasoning || "";
-      if (thinking) onEvent?.({ kind: "thinking", text: thinking });
-      if (delta.content) {
-        content.push(delta.content);
-        onEvent?.({ kind: "output", text: delta.content });
-      }
-      // Tool calls arrive in pieces, keyed by position: the name in one chunk, the arguments
-      // spread across the next several.
-      for (const part of delta.tool_calls ?? []) {
-        const call = calls.get(part.index) ?? { id: "", name: "", arguments: "" };
-        if (part.id) call.id = part.id;
-        if (part.function?.name) call.name += part.function.name;
-        if (part.function?.arguments) call.arguments += part.function.arguments;
-        calls.set(part.index, call);
-      }
-    }
-
-    // An aborted stream ends its iteration rather than throwing, so without this a turn cut
-    // off halfway — by the watchdog or by someone stopping the run — would come back looking
-    // like a complete one, and a truncated answer would be recorded as the task's output.
-    linked.throwIfAborted();
-
-    return {
-      content: content.join(""),
-      toolCalls: [...calls.entries()]
-        .sort(([a], [b]) => a - b)
-        .map(([index, call]) => ({
-          // A server that streams a call without an id still needs one for the result to answer.
-          id: call.id || `call_${index}`,
-          type: "function" as const,
-          function: { name: call.name, arguments: call.arguments },
-        })),
-      usage,
-    };
-  }
-}
 
 /**
  * Guesses the tools this task will need, before the run starts.
@@ -207,12 +72,14 @@ async function preselect(
   model: string,
   catalog: CatalogServer[],
   prompt: string,
-  signal?: AbortSignal,
+  signal: AbortSignal | undefined,
+  notice: (message: string) => void,
   onEvent?: (event: RunEventInput) => void,
 ): Promise<string[]> {
   const reply = await ask(config, model, PRESELECT_SYSTEM, preselectInput(catalog, prompt), {
     maxTokens: 256,
     signal,
+    onNotice: notice,
   });
   const chosen = preselection(parseJson<unknown>(reply), catalog);
   if (chosen.length) {
@@ -223,12 +90,16 @@ async function preselect(
 }
 
 /**
- * Runs one task to completion: send the prompt, execute whatever MCP tools the model asks
+ * Runs one card to completion: send the prompt, execute whatever MCP tools the model asks
  * for, loop until it stops asking, and return its final reply.
  *
- * Unlike a chat this is not streamed and keeps no history — a task run starts from nothing
- * every time, so the only state is the messages built up inside this call. That also means
- * nothing is learned between runs: whatever the model loads, it loads again next time.
+ * Unlike a chat this keeps no history — a run starts from nothing every time, so the only
+ * state is the messages built up inside this call. That also means nothing is learned between
+ * runs: whatever the model loads, it loads again next time.
+ *
+ * What one turn costs, how a refused capability is negotiated away and what is worth sending
+ * again are `@cubicecho/agent-core`'s — see `runTurn`. What is here is the part that knows what
+ * the run is for: the tools this board's agent may reach, and the loop over them.
  */
 export async function runAgent({
   config,
@@ -245,6 +116,22 @@ export async function runAgent({
 
   const client = getClient(config);
   const idleMs = timeoutMs(config);
+  /**
+   * Where agent-core's operator text goes.
+   *
+   * `runTurn`, `negotiate`, `ask` and `tryAsk` each report what they gave up on and none of them
+   * writes to a console — a library that picked one would be deciding for this server where its
+   * operator text goes, and this server has two places for it: the log, and the run the notice
+   * belongs to. A watcher seeing an unexplained pause is exactly who the second is for.
+   */
+  const notice = (text: string) => {
+    console.warn(`[agent] ${text}`);
+    onEvent?.({ kind: "notice", text });
+  };
+  // What this endpoint has turned out not to support, kept per endpoint rather than per run:
+  // a capability it refused once it will refuse again, and a laptop's llama.cpp saying so must
+  // not cost a cloud agent its token counts.
+  const supports = capabilitiesFor(config.baseUrl);
   // The window, once anything wants to know it. An agent that names its own is answered from
   // the row; anything else costs a listing, so it is not asked for until a request is big
   // enough for the answer to change what happens — see `SMALLEST_LIKELY_WINDOW`.
@@ -268,8 +155,19 @@ export async function runAgent({
   const loaded = new Set<string>();
 
   const preselected = onDemand
-    ? ((await tryAsk("preselect", () =>
-        preselect(config, config.toolSelectModel || model, catalog, prompt, signal, onEvent),
+    ? ((await tryAsk(
+        "preselect",
+        () =>
+          preselect(
+            config,
+            config.toolSelectModel || model,
+            catalog,
+            prompt,
+            signal,
+            notice,
+            onEvent,
+          ),
+        { onNotice: notice },
       )) ?? [])
     : [];
   for (const name of preselected) loaded.add(name);
@@ -309,44 +207,35 @@ export async function runAgent({
     // Normalising them here is cheap and cloud providers accept the result unchanged.
     const declared = sanitizeTools(
       routed
-        ? mcp.tools(preselected, config.serverIds)
+        ? mcp.tools({ names: preselected, servers: config.serverIds })
         : onDemand
-          ? [LOAD_TOOLS_DEFINITION, ...mcp.tools([...loaded], config.serverIds)]
-          : mcp.tools(undefined, config.serverIds),
+          ? [LOAD_TOOLS_DEFINITION, ...mcp.tools({ names: [...loaded], servers: config.serverIds })]
+          : mcp.tools({ servers: config.serverIds }),
     );
 
-    const request = (): OpenAI.ChatCompletionCreateParamsStreaming => {
-      const tools = strictSchemas ? declared : relaxTools(declared);
+    // Rebuilt on every attempt rather than held: what `runTurn` negotiates away changes what
+    // goes in the body, and `relaxTools` has to apply to the schemas that were just sanitised.
+    const request = (supported: Capabilities): OpenAI.ChatCompletionCreateParamsStreaming => {
+      const tools = supported.strictSchemas ? declared : relaxTools(declared);
       return {
         model,
         max_tokens: config.maxTokens,
         temperature: config.temperature,
         messages,
         stream: true,
-        ...(usageInStream ? { stream_options: { include_usage: true } } : {}),
+        ...(supported.usageInStream ? { stream_options: { include_usage: true } } : {}),
         ...(tools.length ? { tools } : {}),
       };
     };
 
-    // One turn, given as many attempts as the settings allow.
-    //
-    // Two different things are being recovered from here, and they nest. The inner one is a
-    // capability the endpoint turns out not to have: it is negotiated away and tried once more,
-    // and it latches for the life of the process so it costs one failed call rather than one a
-    // run. The outer one is the endpoint being unreachable, busy or silent, which is not about
-    // this request at all and is worth simply waiting out.
-    //
-    // Both are bounded by the same rule: nothing is retried once the server has started
-    // answering. The tokens are already out and on their way to whoever is watching, and a
-    // second attempt would say everything twice.
     // Before the request rather than after its refusal, because the refusal is a stack trace
     // from somebody else's server and this is the one place that knows what was in the request,
     // what the window is, and where that figure came from. Only the plainly-over case is
     // stopped: the estimate is rough, and a run refused here that the endpoint would have taken
     // is worse than the endpoint's own complaint, which still arrives with everything below.
-    const needed = requestTokens(request());
+    const needed = requestTokens(request(supports));
     if (!windowKnown && needed > SMALLEST_LIKELY_WINDOW) {
-      contextLimit = await contextLimitFor(config);
+      contextLimit = await contextLimitFor(config, config.contextLength);
       windowKnown = true;
     }
     const room = contextLimit - config.maxTokens;
@@ -358,30 +247,20 @@ export async function runAgent({
       );
     }
 
-    let step: Step | undefined;
-    for (let attempt = 0; ; attempt++) {
-      const produced = { any: false };
-      try {
-        step = await negotiate(produced);
-        break;
-      } catch (error) {
-        if (produced.any || signal?.aborted) throw error;
-        if (attempt >= maxRetries || !isTransient(error)) throw error;
-        const wait = backoffMs(attempt);
-        const detail = errorMessage(error);
-        const notice = `${detail} — retrying in ${Math.round(wait / 1000)}s (${attempt + 1}/${maxRetries})`;
-        console.warn(`[agent] ${notice}`);
-        onEvent?.({ kind: "notice", text: notice });
-        await sleep(wait, signal);
-      }
-    }
+    const step = await turn();
 
-    async function negotiate(produced: { any: boolean }): Promise<Step> {
+    async function turn() {
       try {
-        return await streamStep(client, request(), { signal, onEvent, produced, idleMs });
+        return await runTurn(client, supports, request, {
+          maxRetries,
+          signal,
+          idleMs,
+          onThinking: (text) => onEvent?.({ kind: "thinking", text }),
+          onOutput: (text) => onEvent?.({ kind: "output", text }),
+          onNotice: notice,
+        });
       } catch (error) {
         const detail = errorMessage(error);
-        if (produced.any) throw error;
         // The endpoint got there first — its window is smaller than anything we could read.
         // Kept in its own words, because they are the true ones, with ours added: the whole
         // difficulty of this failure is that the number in it disagrees with the model's.
@@ -392,18 +271,7 @@ export async function runAgent({
               : `${detail} — ${advice}`,
           );
         }
-        if (strictSchemas && isGrammarError(detail)) {
-          const notice = "server could not build a grammar; retrying without pattern/format";
-          console.warn(`[agent] ${notice}`);
-          onEvent?.({ kind: "notice", text: notice });
-          strictSchemas = false;
-        } else if (usageInStream && /stream_options/i.test(detail)) {
-          console.warn("[agent] server rejected stream_options; token counts will be unavailable");
-          usageInStream = false;
-        } else {
-          throw error;
-        }
-        return await streamStep(client, request(), { signal, onEvent, produced, idleMs });
+        throw error;
       }
     }
 

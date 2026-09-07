@@ -161,7 +161,7 @@ async function execute(
 
   const controller = new AbortController();
   inFlight.set(subjectId, { runId: run.id, controller });
-  // Everything the run says as it goes, for anyone watching it — see the run event bus in `@cubicecho/agent-core`.
+  // Everything the run says as it goes, for anyone watching it — see `@cubicecho/agent-core`.
   const onEvent = (event: Parameters<typeof emit>[1]) => emit(run.id, event);
   onEvent({ kind: "notice", text: `${agent.name}: ${label}` });
 

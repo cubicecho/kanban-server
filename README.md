@@ -371,7 +371,7 @@ is running.
 
 With several servers connected, tool definitions cost more per request than the card's own prompt
 — they are mostly JSON Schema, and every one is sent on every turn. There are two discovery modes
-(`@cubicecho/agent-core`):
+(`tool-loading` in `@cubicecho/agent-core`):
 
 - **eager** — every definition on every request. Simple, and fine with a handful of tools.
 - **on demand** — the system prompt carries a name-only catalogue and the model calls
@@ -380,17 +380,42 @@ With several servers connected, tool definitions cost more per request than the 
   model** reads the same catalogue and guesses the tools the work needs; when it guesses well the
   run opens with that shortlist alone. A wrong guess costs an unused definition for one run.
 
-MCP tool schemas are normalised before they reach the model (`@cubicecho/agent-core`):
+MCP tool schemas are normalised before they reach the model (`schema-compat` in
+`@cubicecho/agent-core`):
 llama.cpp-backed servers compile every tool into one grammar, so a single shape their converter
 dislikes — a `type: ["string", "null"]`, a lookaround `pattern`, a bare type name where a schema
 belongs — fails the whole request rather than the one tool. If the server still reports a grammar
 failure, the advisory `pattern` and `format` keywords are dropped and the call is retried once.
 Cloud providers accept all of it, so the retry never fires against them.
 
-The retry loop around the request is the runner's own, and the OpenAI SDK's is off: once a chunk
-has arrived the turn is unrepeatable, so only a failure *before* the model has spoken is retried.
-`requestTimeoutSeconds` is a silence watchdog that rearms on every chunk, not a deadline on the
-request.
+The retry loop around the request is `agent-core`'s `runTurn`, and the OpenAI SDK's own is off:
+once a chunk has arrived the turn is unrepeatable, so only a failure *before* the model has spoken
+is retried. `requestTimeoutSeconds` is a silence watchdog that rearms on every chunk, not a
+deadline on the request.
+
+### Where the agent loop lives
+
+Most of what is described above is not in this repository. The endpoint-agnostic half of an
+agent loop — the streaming turn and its retries, tool loading, schema compatibility, the run
+event bus, the token arithmetic — is [`@cubicecho/agent-core`](https://github.com/cubicecho/agent-core),
+and the MCP connections are [`@cubicecho/agent-mcp-pool`](https://github.com/cubicecho/agent-mcp-pool).
+Both were extracted from this server and two others that had each written the same thing
+separately, and the copies had drifted: the pool here was missing the reconcile queue that stops
+two interleaving syncs orphaning a child process. Both come from npm as ordinary versioned
+dependencies — before that they were git URLs, and before that `file:../` links to sibling
+checkouts the Docker build could not see.
+
+What is left under `runner/` is the seams, which are the parts that are actually about a kanban
+board. `mcp.ts` says where the server rows come from — a Drizzle select, because `mcp_servers` is
+a table here. `llm.ts` resolves an agent against Settings by sentinel and hands out a plain
+`{ baseUrl, apiKey, model, … }`, which satisfies the packages' config types structurally, so
+nothing here imports one. `agent.ts` is the loop itself: the pre-request context guard, the
+tool-picking model, and the turn-by-turn iteration, all of it in this server's words.
+
+Neither package writes to a console: what a turn gave up on — a capability the endpoint refused, a
+request worth sending again, a side task that failed — is reported through a callback, and
+`agent.ts` sends all of it to both the log and the run's own event stream. So a pause that would
+otherwise be unexplained says what caused it, to whoever is watching the run.
 
 ### The context window
 
@@ -422,7 +447,7 @@ gone by the time the row is written. So the runner streams its completions and r
 doing as it does it: reasoning and reply tokens, each tool call with its arguments, each result,
 and the turn boundaries of the agent loop.
 
-Those events go to an in-memory bus (`@cubicecho/agent-core`) and out over a GraphQL
+Those events go to an in-memory bus (`events` in `@cubicecho/agent-core`) and out over a GraphQL
 subscription, `runEvents(runId:)`, which yoga serves as SSE — the browser reads it with its own
 `EventSource`, so the client needs no library for it. A watcher that joins halfway through is
 replayed the run so far, so opening it late reads the same as having watched from the start.
@@ -466,8 +491,10 @@ seven is seven days of tokens, and it says so.
 server/
   db/          drizzle schema and client; migrate.ts applies drizzle/ and seeds on boot
   graphql/     the schema: drizzle-graphql entities plus the hand-written fields
-  runner/      agent loop, prompts, the agent/settings resolution, the MCP pool's
-               seam, and run.ts — refine a task, and work a card
+  runner/      the seams onto @cubicecho/agent-core and @cubicecho/agent-mcp-pool:
+               llm.ts resolves an agent's settings, mcp.ts says where the server rows
+               live, agent.ts is the loop, plus prompts and run.ts — refine a task,
+               and work a card
   scheduler/   cleanup.ts prunes old runs hourly
   worker/      loop.ts, the poll that moves cards on auto-run boards
   mcp-endpoint.ts  the curated /mcp tool surface
@@ -564,16 +591,14 @@ work on a board that already exists, and `triage_board` reads a board's lanes, c
 says what is stuck and what to do about each one. A client that renders prompts as slash commands
 gets them as `/kanban_guide` and friends; one that does not can fetch them like anything else.
 
-They live in `server/mcp-prompts.ts`, and having them is why `mcp-endpoint.ts` writes out
-`createHttpHandler`'s stateless path — a dozen lines of transport wiring — rather than calling it.
-Nothing in graphql-mcp hands a caller the `McpServer` a request is served by, and a prompt has to be
-registered on that server *before* it connects: the SDK declares `capabilities.prompts` as a side
-effect of the first registration and refuses to declare a capability once a transport is attached,
-so a server that registered late would answer `prompts/list` having told the client during
-`initialize` that it had none. `createServerFactory` and `connectServer` are still the driver's own,
-and the shared `tools/list` render and the argument guard are installed by the factory rather than
-by the handler, so nothing is lost by owning those lines. cubicecho/graphql-mcp#20 asks for a hook
-that would put it back to one call.
+They live in `server/mcp-prompts.ts` and reach the server through `decorateServer`, which
+graphql-mcp runs on each server it mints and *before* it connects. That window is the whole
+difficulty: the SDK declares `capabilities.prompts` as a side effect of the first registration and
+refuses to declare a capability once a transport is attached, so a server that registered late
+would answer `prompts/list` having told the client during `initialize` that it had none.
+`mcp-endpoint.ts` used to write out `createHttpHandler`'s stateless path — a dozen lines of
+transport wiring — because nothing handed a caller that server; cubicecho/graphql-mcp#20 landed as
+this hook, and the endpoint is one call again.
 
 `mutationHints: "byName"` reads the conventional `create`/`update`/`delete` prefixes off the field
 name, which settles most of the destructive/idempotent marks. The ones named after neither prefix

@@ -35,9 +35,17 @@ type DialogForm = {
  *
  * cubeui says there is no `FormDialog` — a form in a dialog is a `DialogLayout` with a `<form>`
  * as its `content` and the submit in `footerActions`, which is exactly what this is underneath.
- * What it adds is the guard over all four ways out: the shell's own `hasUnsavedChanges` covers
- * the three doors Radix owns and not the Cancel button, which is the most-clicked way out of
- * these seven (cubicecho/cubeui#2). When it can cover Cancel this file goes away.
+ * Cancel used to be the reason it was not: the shell's guard covered the three doors Radix owns
+ * and not the button people actually click. cubicecho/cubeui#2 landed as the function form of
+ * `footerActions`, so Cancel now takes the shell's own close and there is one way out rather
+ * than a shell's three and a caller's one.
+ *
+ * What is left is the ghost Cancel and the Save that says "Saving…", written once instead of
+ * seven times, and the answer to whether there is anything to lose. The shell asks for that as a
+ * `boolean`, which is a value nothing draws and so a store subscription per keystroke — and
+ * which the card dialog's dependency picker, being a resource of its own rather than a field,
+ * cannot answer at all. cubicecho/cubeui#40 is the ask; until it lands the guard is
+ * `useDiscardGuard` here, over a thunk, and the shell is told nothing.
  *
  * Whether there is anything to lose is the form's own answer — `isDefaultValue`, not `isDirty`,
  * because a field typed into and then typed back out of has nothing in it to throw away — and it
@@ -105,9 +113,11 @@ export function FormDialog({
           </form>
         }
         footer={aside}
-        footerActions={
+        // The function form: Cancel is handed the shell's own close, which is the one Escape and
+        // the overlay go through, so all four ways out are the same way out.
+        footerActions={(closeDialog) => (
           <>
-            <Button type="button" variant="ghost" onClick={close}>
+            <Button type="button" variant="ghost" onClick={closeDialog}>
               Cancel
             </Button>
             <form.AppForm>
@@ -116,7 +126,7 @@ export function FormDialog({
               </form.SubmitButton>
             </form.AppForm>
           </>
-        }
+        )}
       />
       {guard}
     </>

@@ -2,24 +2,14 @@ import { McpPool } from "@cubicecho/agent-mcp-pool";
 import { db } from "../db/client.ts";
 import { mcpServers } from "../db/schema.ts";
 
-export type {
-  McpConnection,
-  McpProbe,
-  McpServerState,
-  McpStatus,
-} from "@cubicecho/agent-mcp-pool";
-export { probe } from "@cubicecho/agent-mcp-pool";
-
 /**
- * This server's one pool of MCP connections.
+ * The MCP connections this server holds, shared by every agent on it.
  *
- * The pool itself is `@cubicecho/agent-mcp-pool`; what is left here is the seam it asks for — where
- * the rows come from, and what to call ourselves when we dial. It used to `import { db }`
- * itself, which is exactly why it could not be shared: the connection management is the same
- * everywhere and the table it reads is not.
- *
- * A module-level instance because there is one set of servers on this process and everything
- * from the agent loop to `mcpStatus` reaches for the same one.
+ * The pool itself is `@cubicecho/agent-mcp-pool` — connection management, tool naming and the
+ * per-run scope check are the same problem on every server that drives an agent loop, and the
+ * copy that used to live here had drifted from the one in `task_server`. What is left is the
+ * seam: where the rows come from. `mcp_servers` is a table here, and `load` is how the pool
+ * asks for it again after a write.
  */
 export const mcp = new McpPool({
   load: () => db.select().from(mcpServers),

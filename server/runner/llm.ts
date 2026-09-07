@@ -1,5 +1,4 @@
 import {
-  contextLimitFor as askWindow,
   type Endpoint,
   listModels as listEndpointModels,
   type ModelInfo,
@@ -107,20 +106,7 @@ export async function resolveRefineAgent(preferredId?: string | null): Promise<R
   return resolveAgent(agent, base);
 }
 
-/**
- * How much this agent's model will read, in tokens. Zero means nobody knows.
- *
- * The package asks the endpoint and caches the answer; what is added here is the one thing it
- * cannot know, which is that this server lets an operator declare the window on the agent row.
- * That number wins outright: an endpoint can report the window a model was *built* with while
- * serving it in a much smaller one — llama.cpp will happily load a 256k model at `-c 16384` and
- * go on listing it as 256k — and a run refused on the honest-looking number is a run that fails
- * at the endpoint instead.
- */
-export const contextLimitFor = (config: Resolved): Promise<number> =>
-  askWindow(config, config.contextLength);
-
-/** The endpoint Settings names, as the shape the client and the listing cache both want. */
+/** The endpoint Settings names, as the shape a client and the listing cache both want. */
 const settingsEndpoint = (base: Settings): Endpoint => ({
   baseUrl: base.baseUrl,
   apiKey: base.apiKey || process.env.OPENAI_API_KEY || "",

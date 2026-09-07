@@ -390,7 +390,7 @@ test("puts a single card on a board, with no task behind it", async () => {
 });
 
 test("hands a run's progress to a client that polls for it", async () => {
-  events.reset();
+  events.resetEvents();
   events.emit("run-mcp", { kind: "notice", text: 'working "write it"' });
   for (const piece of ["think", "ing ", "out ", "loud"]) {
     events.emit("run-mcp", { kind: "thinking", text: piece });
