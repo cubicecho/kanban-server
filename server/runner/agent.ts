@@ -1,22 +1,38 @@
-import OpenAI from "openai";
-import { errorMessage } from "../../shared/errors.ts";
-import type { RunEventInput } from "./events.ts";
-import { contextLimitFor, getClient, type Resolved, timeoutMs } from "./llm.ts";
-import { type CatalogServer, mcp } from "./mcp.ts";
-import { isGrammarError, relaxTools, sanitizeTools } from "./schema-compat.ts";
-import { ask, parseJson, tryAsk } from "./side-task.ts";
 import {
+  ask,
+  backoffMs,
+  type CatalogServer,
+  ContextOverflow,
   catalogPrompt,
+  compact,
+  EndpointSilent,
   expandNames,
+  getClient,
   inCatalog,
+  isGrammarError,
+  isOverflow,
+  isTransient,
   LOAD_TOOLS,
   LOAD_TOOLS_DEFINITION,
   loadResult,
   PRESELECT_SYSTEM,
+  parseJson,
   preselectInput,
   preselection,
+  type RunEventInput,
+  relaxTools,
   requestedNames,
-} from "./tool-loading.ts";
+  requestTokens,
+  SMALLEST_LIKELY_WINDOW,
+  sanitizeTools,
+  sleep,
+  timeoutMs,
+  tryAsk,
+} from "@cubicecho/agent-core";
+import type OpenAI from "openai";
+import { errorMessage } from "../../shared/errors.ts";
+import { contextLimitFor, type Resolved } from "./llm.ts";
+import { mcp } from "./mcp.ts";
 
 /**
  * llama.cpp-backed servers compile every tool schema into one grammar and reject keywords
@@ -48,104 +64,9 @@ export interface AgentOptions {
   systemPrompt?: string;
   prompt: string;
   signal?: AbortSignal;
-  /** Called as the run happens, for whoever is watching it. See `runner/events.ts`. */
+  /** Called as the run happens, for whoever is watching it. See the run event bus in `@cubicecho/agent-core`. */
   onEvent?: (event: RunEventInput) => void;
 }
-
-/** The endpoint stopped answering mid-request. Its own class so the retry can recognise it. */
-class EndpointSilent extends Error {
-  override readonly name = "EndpointSilent";
-}
-
-/**
- * The request was bigger than the model will read. Its own class so nothing retries it: sending
- * the same too-large request again is the same refusal, one round trip later.
- */
-export class ContextOverflow extends Error {
-  override readonly name = "ContextOverflow";
-}
-
-/** Rough token count — good enough to decide whether a request has any hope of fitting. */
-const estimateTokens = (text: string) => Math.ceil(text.length / 4);
-
-/** 1234 → "1.2k". The numbers in an overflow message are large and nobody reads the units digit. */
-const compact = (tokens: number) =>
-  tokens >= 1000 ? `${(tokens / 1000).toFixed(1)}k` : String(tokens);
-
-/**
- * What this request will cost the window, in tokens, near enough.
- *
- * Characters over four, because there is no tokenizer here and there is not going to be one:
- * a server that will not say how big its window is will not lend us its vocabulary either.
- * The estimate runs low on tool schemas — JSON packs more tokens into a character than prose
- * does — and that is the side to be wrong on, since the cost of guessing high is a run refused
- * that would have worked, and the cost of guessing low is the endpoint's own refusal, which is
- * where we were before this existed.
- */
-const requestTokens = (body: OpenAI.ChatCompletionCreateParamsStreaming) =>
-  estimateTokens(JSON.stringify(body.messages)) +
-  (body.tools?.length ? estimateTokens(JSON.stringify(body.tools)) : 0);
-
-/**
- * Servers refuse an over-long request in their own words; these are the ones worth reading as
- * that rather than as a broken request. Matched loosely — every one of them is some
- * arrangement of "context" and "too long", and the arrangement is the part that varies.
- */
-const OVERFLOW = [
-  /context (size|length|window)/i,
-  /exceeds? the (available|maximum)/i,
-  /too (long|large) for/i,
-  /reduce the length/i,
-];
-
-const isOverflow = (detail: string) =>
-  OVERFLOW.some((pattern) => pattern.test(detail)) && /token|context/i.test(detail);
-
-/**
- * Below this, the window is nobody's business and is not asked for.
- *
- * Finding out what a model reads costs a listing against its endpoint, and a run whose whole
- * request is a few thousand tokens fits anything anyone serves — spending a round trip to
- * confirm that, on every run of every card, would be the cost of the guard falling on the
- * runs that never needed it. A model in a window smaller than this exists, and a request that
- * overruns one is left to the endpoint's own complaint, which reads properly now either way.
- */
-const SMALLEST_LIKELY_WINDOW = 8192;
-
-/**
- * Whether a failed request is worth trying again.
- *
- * The question is whether the request was *refused or lost*, rather than answered with a
- * complaint about its contents: a connection that never landed, a server too busy or too broken
- * to answer, an endpoint that went quiet. A 400 for a malformed tool schema would fail exactly
- * the same way on every attempt, and the two capability cases below are negotiated rather than
- * retried blindly.
- */
-function isTransient(error: unknown): boolean {
-  if (error instanceof EndpointSilent) return true;
-  if (error instanceof OpenAI.APIConnectionError) return true;
-  if (!(error instanceof OpenAI.APIError)) return false;
-  const { status } = error;
-  return status === 408 || status === 409 || status === 429 || (status ?? 0) >= 500;
-}
-
-/** Exponential, with jitter so several tasks failing at once do not return in lockstep. */
-const backoffMs = (attempt: number) =>
-  Math.min(8000, 2 ** attempt * 500) * (0.5 + Math.random() / 2);
-
-const sleep = (ms: number, signal?: AbortSignal) =>
-  new Promise<void>((resolve, reject) => {
-    const timer = setTimeout(() => {
-      signal?.removeEventListener("abort", onAbort);
-      resolve();
-    }, ms);
-    const onAbort = () => {
-      clearTimeout(timer);
-      reject(signal?.reason ?? new Error("aborted"));
-    };
-    if (signal?.aborted) return onAbort();
-    signal?.addEventListener("abort", onAbort, { once: true });
-  });
 
 /** One streamed turn, put back together into the shape the loop and the history work with. */
 interface Step {
@@ -388,10 +309,10 @@ export async function runAgent({
     // Normalising them here is cheap and cloud providers accept the result unchanged.
     const declared = sanitizeTools(
       routed
-        ? mcp.tools(config.serverIds, preselected)
+        ? mcp.tools(preselected, config.serverIds)
         : onDemand
-          ? [LOAD_TOOLS_DEFINITION, ...mcp.tools(config.serverIds, [...loaded])]
-          : mcp.tools(config.serverIds),
+          ? [LOAD_TOOLS_DEFINITION, ...mcp.tools([...loaded], config.serverIds)]
+          : mcp.tools(undefined, config.serverIds),
     );
 
     const request = (): OpenAI.ChatCompletionCreateParamsStreaming => {
@@ -535,7 +456,7 @@ export async function runAgent({
           // A model that skips `load_tools` and calls a catalogued tool straight from its name
           // is right about what it wants; load it and run it rather than erroring.
           if (onDemand && !loaded.has(name) && inCatalog(catalog, name)) loaded.add(name);
-          content = await mcp.call(config.serverIds, name, args);
+          content = await mcp.call(name, args, config.serverIds);
         }
       } catch (error) {
         content = errorMessage(error);

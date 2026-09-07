@@ -371,7 +371,7 @@ is running.
 
 With several servers connected, tool definitions cost more per request than the card's own prompt
 — they are mostly JSON Schema, and every one is sent on every turn. There are two discovery modes
-(`runner/tool-loading.ts`):
+(`@cubicecho/agent-core`):
 
 - **eager** — every definition on every request. Simple, and fine with a handful of tools.
 - **on demand** — the system prompt carries a name-only catalogue and the model calls
@@ -380,7 +380,7 @@ With several servers connected, tool definitions cost more per request than the 
   model** reads the same catalogue and guesses the tools the work needs; when it guesses well the
   run opens with that shortlist alone. A wrong guess costs an unused definition for one run.
 
-MCP tool schemas are normalised before they reach the model (`runner/schema-compat.ts`):
+MCP tool schemas are normalised before they reach the model (`@cubicecho/agent-core`):
 llama.cpp-backed servers compile every tool into one grammar, so a single shape their converter
 dislikes — a `type: ["string", "null"]`, a lookaround `pattern`, a bare type name where a schema
 belongs — fails the whole request rather than the one tool. If the server still reports a grammar
@@ -422,7 +422,7 @@ gone by the time the row is written. So the runner streams its completions and r
 doing as it does it: reasoning and reply tokens, each tool call with its arguments, each result,
 and the turn boundaries of the agent loop.
 
-Those events go to an in-memory bus (`server/runner/events.ts`) and out over a GraphQL
+Those events go to an in-memory bus (`@cubicecho/agent-core`) and out over a GraphQL
 subscription, `runEvents(runId:)`, which yoga serves as SSE — the browser reads it with its own
 `EventSource`, so the client needs no library for it. A watcher that joins halfway through is
 replayed the run so far, so opening it late reads the same as having watched from the start.
@@ -466,8 +466,8 @@ seven is seven days of tokens, and it says so.
 server/
   db/          drizzle schema and client; migrate.ts applies drizzle/ and seeds on boot
   graphql/     the schema: drizzle-graphql entities plus the hand-written fields
-  runner/      llm client, MCP pool, tool loading + schema compat, agent loop,
-               prompts, and run.ts — refine a task, and work a card
+  runner/      agent loop, prompts, the agent/settings resolution, the MCP pool's
+               seam, and run.ts — refine a task, and work a card
   scheduler/   cleanup.ts prunes old runs hourly
   worker/      loop.ts, the poll that moves cards on auto-run boards
   mcp-endpoint.ts  the curated /mcp tool surface
@@ -477,6 +477,13 @@ web/           vite + react + tanstack router/query + shadcn
                (new task, board, tasks, agents, runs, mcp servers, settings)
 tests/         vitest
 ```
+
+The endpoint-agnostic half of the runner is not here. `@cubicecho/agent-core` holds the tool
+loading, the schema compatibility, the one-shot side tasks, the run event bus, the pooled client
+and the retry rules; `@cubicecho/agent-mcp-pool` holds the MCP connections. Both were these
+files, and both were copied into two other servers before the copies drifted. Both are on npm
+now, so they are ordinary versioned dependencies — before that they were git URLs, and before
+that `file:../` links to sibling checkouts, which the Docker build could not see.
 
 ## GraphQL
 

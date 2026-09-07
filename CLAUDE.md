@@ -51,6 +51,7 @@ docker compose up --build
 | **`@vantreeseba/drizzle-graphql`** | The API is generated from the tables — a new column is queryable as soon as it exists. Hand-written fields fill what CRUD cannot say |
 | **graphql-yoga** | Serves the query API and the `runEvents` subscription as SSE, which the browser reads with a plain `EventSource` |
 | **`@cubicecho/graphql-mcp`** | Projects the same schema as MCP tools. `server/mcp-endpoint.ts` curates which ones — see below |
+| **`@cubicecho/agent-core`, `@cubicecho/agent-mcp-pool`** | The agent loop's endpoint-agnostic half and the MCP connection pool, extracted once three servers had drifting copies of both. Git dependencies until they are published — see below |
 | **Node type stripping** | The container runs `node server/index.ts`; `tsx` is a devDependency and is not in the image. Nothing under `server/` may use syntax that survives erasure — no enums, no parameter properties |
 | **Biome** | One formatter and linter. `noExplicitAny` and `noNonNullAssertion` are errors here, not warnings |
 
@@ -397,14 +398,53 @@ reading its layout, because that layout is the conversion of the week and has ch
 without the surface changing at all — and it asserts the operators a column offers, since a
 timestamp advertising `ilike` is bytes an agent reads past on every column of every tool.
 
+**The agent loop and the MCP pool are packages now, and what is left here is the seam.**
+`@cubicecho/agent-core` is the endpoint-agnostic half — schema compatibility, on-demand tool
+loading, one-shot side tasks, the run event bus, the pooled client, and the rules about retrying
+— and `@cubicecho/agent-mcp-pool` is the pool of long-lived MCP clients. Both were this server's own
+files, copied into `task_server` and `min-agent`, and the three copies had drifted; what made
+them uncopiable was one line each, an `import { db }` and a config type. So neither package
+imports a config type from a consumer: every function takes the narrowest shape it reads —
+`Endpoint`, `ModelParams`, `ToolPolicy`, `RetryPolicy` — which `Resolved` satisfies structurally
+without being named anywhere, and the pool asks for its rows through `options.load` instead of
+reaching for a database.
+
+What stayed is what is ours. `server/runner/mcp.ts` is twenty-five lines: one `McpPool`, told
+where the rows are and what to call itself when it dials. `contextLimitFor` in `llm.ts` is a
+wrapper over the package's, because the operator's declared window is a column on `agents` and
+the package cannot know that. `agent.ts` still owns the loop — the orchestration, the prompts,
+and what the run is about — because that is the part that differs between one server and the
+next, and it is the part that is not general.
+
+The pool's debounce is the one behaviour that changed with the move. `syncSoon()` waits past the
+transaction the write hook runs inside, where `sync()` read the table as it stood *before* the
+edit it was reacting to and folded nothing; `mcpStatus` calls `flush()` first, because "add a
+server" and "did it connect?" arrive milliseconds apart and the answer must not predate the
+write. `undefined` scope means every connected server and an *empty* scope means none of them:
+an agent with no servers linked to it wants the second, so the two must not collapse.
+
+**Both packages come from npm, and the two forms before it are worth remembering.** They started
+as `file:../` links to sibling checkouts, which the Docker build cannot see at all — a sibling is
+outside the build context, so `npm ci` could not find it and there was no image. A git URL fixed
+that and cost the image `git`, which the `node:*-slim` base has not got and which both stages had
+to install. `^0.1.0` is the end of both problems: a tarball npm already knows how to fetch, a
+semver range something can watch, and a Dockerfile with nothing in it about either package.
+
+Their `openai` is a peer dependency, and a registry install is why that settles itself: one
+flattened copy for all three. The `file:` links did not — a linked sibling brought its own, and
+two copies of a class with a `#private` field are two nominal types, so an `OpenAI` the package
+built was not an `OpenAI` to us. That wanted a `paths` entry in `tsconfig.json` to force one
+resolution; it went with the links that needed it.
+
 **The LLM call retries only before the model has spoken.** `server/runner/agent.ts` owns the
-retry loop, not the OpenAI SDK, whose own retries are off: once a chunk has arrived the turn
+retry loop — the rules it retries by are agent-core's — not the OpenAI SDK, whose own retries are
+off: once a chunk has arrived the turn
 is unrepeatable, so a failure after that propagates. `requestTimeoutSeconds` is a silence
 watchdog that rearms on every chunk, not a deadline on the request, and an aborted stream ends
 its iteration rather than throwing — hence the `throwIfAborted()` after the loop.
 
 **The context window is asked for, overridable, and read before the request goes out.** The
-OpenAI listing has no field for it, so `CONTEXT_KEYS` in `server/runner/llm.ts` takes whichever
+OpenAI listing has no field for it, so `CONTEXT_KEYS` in agent-core's `client.ts` takes whichever
 one a server adds — `context_length`, `max_context_window`, `max_model_len`, `context_window`,
 `n_ctx` — off `models.list()`, cached per endpoint because two endpoints are two different sets
 of models. `contextLimitFor` answers with the agent's own `contextLength` first and the listing
