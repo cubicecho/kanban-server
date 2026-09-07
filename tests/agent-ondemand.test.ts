@@ -127,7 +127,7 @@ test("the pool exposes a name-only catalogue and filters definitions by name", a
     "echo__add",
   ]);
   const filtered = mcp
-    .tools(["echo-1"], ["echo__add"])
+    .tools(["echo__add"], ["echo-1"])
     .flatMap((tool) => (tool.type === "function" ? [tool.function.name] : []));
   expect(filtered).toEqual(["echo__add"]);
 });

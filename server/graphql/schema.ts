@@ -1,3 +1,5 @@
+import { fold, history, type RunEvent, watch } from "@cubicecho/agent-core";
+import type { McpConnection } from "@cubicecho/agent-mcp-pool";
 import { buildSchema, GraphQLDateTime } from "@vantreeseba/drizzle-graphql";
 import { applyPermissions } from "@vantreeseba/graphql-casl";
 import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
@@ -32,9 +34,8 @@ import {
   type TemplateLane,
   tasks,
 } from "../db/schema.ts";
-import { fold, history, type RunEvent, watch } from "../runner/events.ts";
 import { listModels, loadSettings } from "../runner/llm.ts";
-import { type McpConnection, mcp, probe } from "../runner/mcp.ts";
+import { mcp } from "../runner/mcp.ts";
 import { EXPAND_CONTRACT, VERDICT_CONTRACT, WORK_CONTRACT } from "../runner/prompts.ts";
 import {
   blockers,
@@ -1268,7 +1269,7 @@ const baseSchema = new GraphQLSchema({
           "can be checked before an agent depends on it.",
         args: { config: { type: new GraphQLNonNull(McpConnectionInput) } },
         resolve: (_source, args: { config: Partial<McpConnection> }) =>
-          probe({
+          mcp.probe({
             transport: args.config.transport === "http" ? "http" : "stdio",
             command: args.config.command ?? "",
             args: args.config.args ?? null,

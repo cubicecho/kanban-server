@@ -4,7 +4,7 @@ import type { Card, Project } from "../db/schema.ts";
  * What the three built-in kinds of lane are told, plus the refiner, which is not one.
  *
  * Two of these need an answer a program can act on rather than prose, so both ask for JSON and
- * both are parsed forgivingly — see `side-task.ts`. Being strict about the wrapper would fail
+ * both are parsed forgivingly — see `parseJson` in `@cubicecho/agent-core`. Being strict about the wrapper would fail
  * runs over a model's habit of saying "here you go:" first, which is not a thing worth failing
  * a run over.
  */

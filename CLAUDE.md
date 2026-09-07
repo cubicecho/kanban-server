@@ -51,6 +51,8 @@ docker compose up --build
 | **`@vantreeseba/drizzle-graphql`** | The API is generated from the tables — a new column is queryable as soon as it exists. Hand-written fields fill what CRUD cannot say |
 | **graphql-yoga** | Serves the query API and the `runEvents` subscription as SSE, which the browser reads with a plain `EventSource` |
 | **`@cubicecho/graphql-mcp`** | Projects the same schema as MCP tools. `server/mcp-endpoint.ts` curates which ones — see below |
+| **`@cubicecho/agent-core`** | The endpoint-agnostic half of the agent loop, extracted from this server and two others that had each written it separately: `runTurn` and its retries, `tool-loading`, `schema-compat`, the run event bus, `getClient`/`listModels`/`contextLimitFor`, `parseJson`. `server/runner/agent.ts` is what is left — the parts that are about a kanban board |
+| **`@cubicecho/agent-mcp-pool`** | The MCP connections, likewise. `server/runner/mcp.ts` is one `new McpPool({ load })` — where the rows come from is the only part of it this server owns |
 | **Node type stripping** | The container runs `node server/index.ts`; `tsx` is a devDependency and is not in the image. Nothing under `server/` may use syntax that survives erasure — no enums, no parameter properties |
 | **Biome** | One formatter and linter. `noExplicitAny` and `noNonNullAssertion` are errors here, not warnings |
 
@@ -398,19 +400,24 @@ reading its layout, because that layout is the conversion of the week and has ch
 without the surface changing at all — and it asserts the operators a column offers, since a
 timestamp advertising `ilike` is bytes an agent reads past on every column of every tool.
 
-**The LLM call retries only before the model has spoken.** `server/runner/agent.ts` owns the
-retry loop, not the OpenAI SDK, whose own retries are off: once a chunk has arrived the turn
-is unrepeatable, so a failure after that propagates. `requestTimeoutSeconds` is a silence
-watchdog that rearms on every chunk, not a deadline on the request, and an aborted stream ends
-its iteration rather than throwing — hence the `throwIfAborted()` after the loop.
+**The LLM call retries only before the model has spoken.** `runTurn` in `@cubicecho/agent-core`
+owns the retry loop, not the OpenAI SDK, whose own retries are off: once a chunk has arrived the
+turn is unrepeatable, so a failure after that propagates. `requestTimeoutSeconds` is a silence
+watchdog that rearms on every chunk, not a deadline on the request. `agent.ts` hands it a
+`request(supported)` builder rather than one request, because the capability negotiation is the
+inner half of that loop — `capabilitiesFor(baseUrl)` latches what an endpoint turned out to
+accept, per endpoint rather than per process, so a second endpoint does not inherit the first
+one's refusals. What `agent.ts` keeps of the old loop is the `ContextOverflow` it throws when the
+endpoint's own refusal comes back, since the wording that names both numbers is this server's.
 
 **The context window is asked for, overridable, and read before the request goes out.** The
-OpenAI listing has no field for it, so `CONTEXT_KEYS` in `server/runner/llm.ts` takes whichever
-one a server adds — `context_length`, `max_context_window`, `max_model_len`, `context_window`,
-`n_ctx` — off `models.list()`, cached per endpoint because two endpoints are two different sets
-of models. `contextLimitFor` answers with the agent's own `contextLength` first and the listing
-second, and a listing that fails is an unknown window rather than a failed run: nothing here may
-stop a turn that would otherwise have worked.
+OpenAI listing has no field for it, so agent-core's `listModels` takes whichever one a server adds
+— `context_length`, `max_context_window`, `max_model_len`, `context_window`, `n_ctx` — off
+`models.list()`, cached per endpoint because two endpoints are two different sets of models.
+`contextLimitFor(config, declared)` answers with `declared` first and the listing second, and
+`llm.ts` passes the agent's own `contextLength` as that figure: the package has no idea this
+server keeps one, and the precedence is the caller's to state. A listing that fails is an unknown
+window rather than a failed run: nothing here may stop a turn that would otherwise have worked.
 
 The override is the point of the field, not a convenience. A server can report the window a model
 was *built* with while serving it in a fraction of one — llama.cpp will load a 256k model at

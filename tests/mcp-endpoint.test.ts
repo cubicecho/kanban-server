@@ -15,7 +15,7 @@ import { stop } from "./fixtures/teardown.ts";
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "kanban-server-mcp-"));
 process.env.KANBAN_SERVER_DATA_DIR = dir;
 
-let events: typeof import("../server/runner/events.ts");
+let events: typeof import("@cubicecho/agent-core");
 let server: Server;
 let endpoint: URL;
 let client: Client;
@@ -23,7 +23,7 @@ let client: Client;
 beforeAll(async () => {
   const { ensureSchema } = await import("../server/db/migrate.ts");
   await ensureSchema();
-  events = await import("../server/runner/events.ts");
+  events = await import("@cubicecho/agent-core");
   const { mountMcp } = await import("../server/mcp-endpoint.ts");
 
   // The same mount the server uses, so what a client meets here is what it meets in production.
