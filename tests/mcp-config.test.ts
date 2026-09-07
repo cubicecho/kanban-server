@@ -33,6 +33,11 @@ test("env and headers survive the round trip", () => {
   expect(JSON.parse(config.env)).toEqual({ TOKEN: "x" });
 });
 
+test("a pasted cwd is kept, since a config that names one means it", () => {
+  expect(parseMcpJson(JSON.stringify({ fs: { ...stdio, cwd: "/srv" } })).cwd).toBe("/srv");
+  expect(parseMcpJson(JSON.stringify(stdio)).cwd).toBe("");
+});
+
 test("says so when the paste is not JSON, or holds no server", () => {
   expect(() => parseMcpJson("not json")).toThrow(/valid JSON/);
   expect(() => parseMcpJson("{}")).toThrow(/No server/);

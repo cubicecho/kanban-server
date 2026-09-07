@@ -432,6 +432,8 @@ const McpConnectionInput = new GraphQLInputObjectType({
     env: { type: GraphQLJSON },
     url: { type: GraphQLString },
     headers: { type: GraphQLJSON },
+    cwd: { type: GraphQLString },
+    connectTimeoutMs: { type: GraphQLInt },
   },
 });
 
@@ -1285,6 +1287,11 @@ const baseSchema = new GraphQLSchema({
             env: args.config.env ?? null,
             url: args.config.url ?? "",
             headers: args.config.headers ?? null,
+            cwd: args.config.cwd ?? null,
+            // The row's own patience reaches the button as well as the pool, which is the whole
+            // point of the field: a server that needs two minutes to start needs them here too,
+            // or the probe reports a failure for a server that works.
+            connectTimeoutMs: args.config.connectTimeoutMs ?? null,
           }),
       },
       reconnectMcp: {

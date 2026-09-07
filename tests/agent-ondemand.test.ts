@@ -79,6 +79,8 @@ beforeAll(async () => {
       env: null,
       url: "",
       headers: null,
+      cwd: null,
+      connectTimeoutMs: null,
     } satisfies McpServerRow,
   ]);
 });
@@ -140,6 +142,7 @@ test("the pool exposes a name-only catalogue and filters definitions by name", a
     "echo__echo",
     "echo__add",
     "echo__whoami",
+    "echo__pwd",
   ]);
   const filtered = mcp
     .tools({ names: ["echo__add"], servers: ["echo-1"] })
@@ -214,6 +217,7 @@ test("eager mode sends every schema and asks no one which tools to use", async (
     "echo__add",
     "echo__echo",
     "echo__ping",
+    "echo__pwd",
     "echo__whoami",
   ]);
   expect(sent[0].messages[0].content).toBe("be brief");

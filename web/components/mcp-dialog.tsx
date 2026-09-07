@@ -10,7 +10,13 @@ import {
   TestMcpServerDocument,
   UpdateMcpServerDocument,
 } from "@/__generated__/graphql";
-import { InputField, SelectField, SwitchField, useAppForm } from "@/components/app-form";
+import {
+  InputField,
+  NumberField,
+  SelectField,
+  SwitchField,
+  useAppForm,
+} from "@/components/app-form";
 import { FieldRow } from "@/components/field-row";
 import { FormDialog } from "@/components/form-dialog";
 import { FormField } from "@/components/form-field";
@@ -35,6 +41,8 @@ interface Draft {
   env: string;
   url: string;
   headers: string;
+  cwd: string;
+  connectTimeoutMs: number | null;
 }
 
 const json = (value: unknown, fallback: string) =>
@@ -48,6 +56,12 @@ const connectionOf = (draft: Draft) => ({
   env: parseJson<Record<string, string>>(draft.env, "Env", {}),
   url: draft.url.trim(),
   headers: parseJson<Record<string, string>>(draft.headers, "Headers", {}),
+  // Both columns are nullable, and null is the pool's own answer — this process's directory, and
+  // the pool's connect bound. So an empty box and a zero are written as null rather than as
+  // themselves: a cwd of `""` is not a directory, and the pool reads a `connectTimeoutMs` of 0 as
+  // a server given no time at all rather than as one given the default.
+  cwd: draft.cwd.trim() || null,
+  connectTimeoutMs: (draft.connectTimeoutMs ?? 0) > 0 ? draft.connectTimeoutMs : null,
 });
 
 export function McpDialog({
@@ -91,6 +105,8 @@ export function McpDialog({
       env: json(server?.env, "{}"),
       url: server?.url ?? "",
       headers: json(server?.headers, "{}"),
+      cwd: server?.cwd ?? "",
+      connectTimeoutMs: (server?.connectTimeoutMs ?? 0) as number | null,
     } satisfies Draft,
     onSubmit: ({ value }) => save.mutateAsync(value).catch(toastError),
   });
@@ -117,6 +133,7 @@ export function McpDialog({
       form.setFieldValue("env", config.env);
       form.setFieldValue("url", config.url);
       form.setFieldValue("headers", config.headers);
+      form.setFieldValue("cwd", config.cwd);
       setPaste("");
       toast.success("Config applied");
     } catch (error) {
@@ -152,7 +169,7 @@ export function McpDialog({
       }
     >
       {/*
-        Not a form field: it is never saved and never read back, it is a way of filling six that
+        Not a form field: it is never saved and never read back, it is a way of filling seven that
         are. So it stays a `useState` and a presentational `FormField`, and Apply writes the
         fields it names.
       */}
@@ -250,6 +267,14 @@ export function McpDialog({
                 className="font-mono text-xs"
                 placeholder='{ "API_TOKEN": "…" }'
               />
+              <InputField
+                form={form}
+                name="cwd"
+                label="Working directory"
+                description="Where the child is started. Empty is this server's own directory."
+                className="font-mono text-xs"
+                placeholder="/srv/projects"
+              />
             </>
           ) : (
             <>
@@ -276,6 +301,14 @@ export function McpDialog({
           )
         }
       </form.Subscribe>
+
+      <NumberField
+        form={form}
+        name="connectTimeoutMs"
+        label="Connect timeout (ms)"
+        description="How long this server gets to answer the handshake. 0 uses the pool's own bound."
+        min={0}
+      />
 
       <SwitchField
         form={form}

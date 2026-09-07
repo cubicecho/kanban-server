@@ -157,6 +157,22 @@ export const mcpServers = pgTable("mcp_servers", {
   env: jsonb().$type<Record<string, string>>(),
   url: text().notNull().default(""),
   headers: jsonb().$type<Record<string, string>>(),
+  /**
+   * Working directory for a stdio child. Null is this process's own.
+   *
+   * Several servers resolve a relative path against their cwd rather than against an argument —
+   * a filesystem root, a sqlite file — so where the child is started is part of what it does.
+   */
+  cwd: text(),
+  /**
+   * How long *this* server gets to answer the handshake, overriding the pool's own bound.
+   *
+   * Connect cost belongs to the server rather than to the pool: a local `node` child is up in
+   * milliseconds and `uvx some-server@latest` on a cold cache downloads a package before it says
+   * anything. One number for all of them has to be the slowest, which leaves the quick ones with
+   * no useful bound at all. Null is the pool's, which is what every row written before this says.
+   */
+  connectTimeoutMs: integer(),
 });
 
 /**

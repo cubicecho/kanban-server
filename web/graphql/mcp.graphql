@@ -10,6 +10,8 @@ query McpServers {
     env
     url
     headers
+    cwd
+    connectTimeoutMs
   }
   mcpStatus {
     id

@@ -371,6 +371,8 @@ type McpServer {
   env: JSON
   url: String!
   headers: JSON
+  cwd: String
+  connectTimeoutMs: Int
 
   """
   Opaque cursor of this row's position in the query's ordering. Pass it as `after` to resume from here. Only set on rows returned by a list query.
@@ -406,10 +408,20 @@ scalar JSON @specifiedBy(url: "http://www.ecma-international.org/publications/fi
 
 type McpServerAggregate {
   count: Int!
+  avg: McpServerAvgAggregate
+  sum: McpServerSumAggregate
   min: McpServerMinAggregate
   max: McpServerMaxAggregate
   countNonNull: McpServerCountNonNullAggregate
   countDistinct: McpServerCountDistinctAggregate
+}
+
+type McpServerAvgAggregate {
+  connectTimeoutMs: Float
+}
+
+type McpServerSumAggregate {
+  connectTimeoutMs: Float
 }
 
 type McpServerMinAggregate {
@@ -419,6 +431,8 @@ type McpServerMinAggregate {
   transport: McpServersTransportEnum
   command: String
   url: String
+  cwd: String
+  connectTimeoutMs: Int
 }
 
 type McpServerMaxAggregate {
@@ -428,6 +442,8 @@ type McpServerMaxAggregate {
   transport: McpServersTransportEnum
   command: String
   url: String
+  cwd: String
+  connectTimeoutMs: Int
 }
 
 type McpServerCountNonNullAggregate {
@@ -441,6 +457,8 @@ type McpServerCountNonNullAggregate {
   env: Int!
   url: Int!
   headers: Int!
+  cwd: Int!
+  connectTimeoutMs: Int!
 }
 
 type McpServerCountDistinctAggregate {
@@ -450,11 +468,15 @@ type McpServerCountDistinctAggregate {
   transport: Int!
   command: Int!
   url: Int!
+  cwd: Int!
+  connectTimeoutMs: Int!
 }
 
 type McpServerGroupBy {
   group: McpServerGroupKeys!
   count: Int!
+  avg: McpServerAvgAggregate
+  sum: McpServerSumAggregate
   min: McpServerMinAggregate
   max: McpServerMaxAggregate
   countNonNull: McpServerCountNonNullAggregate
@@ -471,6 +493,8 @@ type McpServerGroupKeys {
   transport: McpServersTransportEnum
   command: String
   url: String
+  cwd: String
+  connectTimeoutMs: Int
   enabled: Boolean
 }
 
@@ -2674,6 +2698,8 @@ input CreateMcpServerInput {
   env: JSON
   url: String
   headers: JSON
+  cwd: String
+  connectTimeoutMs: Int
 }
 
 input UpdateMcpServerInput {
@@ -2687,6 +2713,8 @@ input UpdateMcpServerInput {
   env: JSON
   url: String
   headers: JSON
+  cwd: String
+  connectTimeoutMs: Int
 }
 
 """
@@ -2709,6 +2737,8 @@ input McpServerFilters {
   env: JSONFilter
   url: StringFilter
   headers: JSONFilter
+  cwd: StringFilter
+  connectTimeoutMs: IntFilter
   agents: AgentServerListRelationFilter
 
   """At least one branch matches; ANDed with any sibling fields"""
@@ -2860,14 +2890,36 @@ input McpServerOrderBy {
   env: InnerOrder
   url: InnerOrder
   headers: InnerOrder
+  cwd: InnerOrder
+  connectTimeoutMs: InnerOrder
 }
 
 """Filters McpServer groups by their aggregated values"""
 input McpServerHaving {
   """Filters groups by how many rows they contain"""
   count: AggregateNumberFilter
+  avg: McpServerAvgHaving
+  sum: McpServerSumHaving
+  min: McpServerMinHaving
+  max: McpServerMaxHaving
   countNonNull: McpServerCountNonNullHaving
   countDistinct: McpServerCountDistinctHaving
+}
+
+input McpServerAvgHaving {
+  connectTimeoutMs: AggregateNumberFilter
+}
+
+input McpServerSumHaving {
+  connectTimeoutMs: AggregateNumberFilter
+}
+
+input McpServerMinHaving {
+  connectTimeoutMs: AggregateNumberFilter
+}
+
+input McpServerMaxHaving {
+  connectTimeoutMs: AggregateNumberFilter
 }
 
 input McpServerCountNonNullHaving {
@@ -2881,6 +2933,8 @@ input McpServerCountNonNullHaving {
   env: AggregateNumberFilter
   url: AggregateNumberFilter
   headers: AggregateNumberFilter
+  cwd: AggregateNumberFilter
+  connectTimeoutMs: AggregateNumberFilter
 }
 
 input McpServerCountDistinctHaving {
@@ -2890,6 +2944,8 @@ input McpServerCountDistinctHaving {
   transport: AggregateNumberFilter
   command: AggregateNumberFilter
   url: AggregateNumberFilter
+  cwd: AggregateNumberFilter
+  connectTimeoutMs: AggregateNumberFilter
 }
 
 input CreateAgentServerInput {
@@ -5033,6 +5089,8 @@ enum McpServerDistinctColumn {
   env
   url
   headers
+  cwd
+  connectTimeoutMs
 }
 
 """Columns of McpServer that a query can group by"""
@@ -5044,6 +5102,8 @@ enum McpServerGroupByColumn {
   transport
   command
   url
+  cwd
+  connectTimeoutMs
 }
 
 """Columns of AgentServer that a query can group by"""
@@ -5598,6 +5658,8 @@ input McpConnectionInput {
   env: JSON
   url: String
   headers: JSON
+  cwd: String
+  connectTimeoutMs: Int
 }
 
 type Subscription {
