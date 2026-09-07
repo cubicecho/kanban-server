@@ -557,16 +557,14 @@ work on a board that already exists, and `triage_board` reads a board's lanes, c
 says what is stuck and what to do about each one. A client that renders prompts as slash commands
 gets them as `/kanban_guide` and friends; one that does not can fetch them like anything else.
 
-They live in `server/mcp-prompts.ts`, and having them is why `mcp-endpoint.ts` writes out
-`createHttpHandler`'s stateless path — a dozen lines of transport wiring — rather than calling it.
-Nothing in graphql-mcp hands a caller the `McpServer` a request is served by, and a prompt has to be
-registered on that server *before* it connects: the SDK declares `capabilities.prompts` as a side
-effect of the first registration and refuses to declare a capability once a transport is attached,
-so a server that registered late would answer `prompts/list` having told the client during
-`initialize` that it had none. `createServerFactory` and `connectServer` are still the driver's own,
-and the shared `tools/list` render and the argument guard are installed by the factory rather than
-by the handler, so nothing is lost by owning those lines. cubicecho/graphql-mcp#20 asks for a hook
-that would put it back to one call.
+They live in `server/mcp-prompts.ts` and reach the server through `decorateServer`, which
+graphql-mcp runs on each server it mints and *before* it connects. That window is the whole
+difficulty: the SDK declares `capabilities.prompts` as a side effect of the first registration and
+refuses to declare a capability once a transport is attached, so a server that registered late
+would answer `prompts/list` having told the client during `initialize` that it had none.
+`mcp-endpoint.ts` used to write out `createHttpHandler`'s stateless path — a dozen lines of
+transport wiring — because nothing handed a caller that server; cubicecho/graphql-mcp#20 landed as
+this hook, and the endpoint is one call again.
 
 `mutationHints: "byName"` reads the conventional `create`/`update`/`delete` prefixes off the field
 name, which settles most of the destructive/idempotent marks. The ones named after neither prefix
