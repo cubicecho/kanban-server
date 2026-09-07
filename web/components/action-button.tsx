@@ -27,6 +27,21 @@ type ActionButtonProps = Omit<ComponentProps<typeof Button>, "aria-label"> & {
   side?: ComponentProps<typeof TooltipContent>["side"];
   /** Off, the button keeps its accessible name and drops the tooltip. */
   tooltip?: boolean;
+  /**
+   * How long the pointer must rest before the tooltip opens, in milliseconds.
+   *
+   * Here rather than on the app's root provider because this component renders its own, and a
+   * nested provider *replaces* the one above it rather than merging with it. See the component
+   * note: an app with a root delay has to repeat it here, and there is no way for the button to
+   * read it.
+   */
+  delayDuration?: ComponentProps<typeof TooltipProvider>["delayDuration"];
+  /**
+   * How long after one tooltip closes that the next opens with no delay — what makes a row of
+   * these feel like one control rather than several. Grouping only spans a single provider, so
+   * it groups the buttons under this one, which is one button.
+   */
+  skipDelayDuration?: ComponentProps<typeof TooltipProvider>["skipDelayDuration"];
 };
 
 /**
@@ -64,16 +79,50 @@ type ActionButtonProps = Omit<ComponentProps<typeof Button>, "aria-label"> & {
  *
  * **The provider.** shadcn's `Tooltip` needs a `TooltipProvider` above it and throws without
  * one, so this renders its own — a component installed from a registry cannot assume the app it
- * lands in has already put one at the root. Radix nests providers happily. The cost is that
- * `skipDelayDuration` no longer groups a row of these, so moving along a toolbar re-waits at
- * each button rather than opening instantly after the first; an app that minds can still put a
- * provider at its root and pass `delayDuration={0}` here.
+ * lands in has already put one at the root. Radix nests providers happily.
+ *
+ * What nesting does *not* do is merge. A provider replaces the one above it for everything below,
+ * so an app whose root is `<TooltipProvider delayDuration={300}>` gets 300ms everywhere except on
+ * these buttons, which take shadcn's provider default of `0` and open the instant the pointer
+ * crosses them. On a toolbar of them that reads as a flicker while every other control on the
+ * screen waits. `skipDelayDuration` is lost the same way: grouping spans one provider, and this
+ * one contains a single button, so moving along a row re-waits at each.
+ *
+ * Both are therefore props here, forwarded to the provider this renders. `delayDuration={300}`
+ * matches an app's root; a wrapper that passes it once is how a project says it in one place.
+ *
+ * There is no inheriting the root's value automatically: Radix exposes no way to ask whether a
+ * provider is already above you, so the button cannot render one only when it is needed, and
+ * cannot read what the outer one was set to. Leaving these unset keeps shadcn's `0` rather than
+ * finding the app's number.
+ *
+ * **It is `type="button"` unless you say otherwise.** A `<button>` with no type is a submit
+ * button, and these live inside forms by the dozen — a row of icon buttons beside the fields
+ * they act on. Untyped, the trash icon beside a cron box both removes the row *and* submits the
+ * form, and a stray Enter in that box submits through the first submit button in tree order,
+ * which is the trash. Neither is visible in review: the call site reads as a button with an
+ * `onClick`.
+ *
+ * `disabled` makes it worse rather than better. The click path is refused in the handler, and
+ * implicit submission never goes through a click — so a disabled `ActionButton` was still a live
+ * submit button for the Enter key.
+ *
+ * A caller who wants one of these to submit can still say `type="submit"`, and now has to.
  */
 export function ActionButton({
   label,
   hint,
+  type = "button",
   side = "top",
   tooltip = true,
+  // The one divergence from the registry copy, and the reason the props exist: `main.tsx` puts a
+  // `TooltipProvider delayDuration={300}` at the root, and the provider this renders *replaces*
+  // it rather than inheriting from it — so every icon button on this server was opening at
+  // shadcn's `0` while every other tooltip waited, which on a card's row of eight reads as a
+  // flicker. Defaulted here rather than passed at thirty-one call sites. A re-install from the
+  // registry drops these two lines; the diff is where you find out.
+  delayDuration = 300,
+  skipDelayDuration = 300,
   disabled,
   className,
   onClick,
@@ -89,6 +138,7 @@ export function ActionButton({
 
   const button = (
     <Button
+      type={type}
       aria-label={label}
       // Not `disabled`: the attribute is what removes the hover and the tab stop, and with them
       // the explanation. `opacity-50` is what `disabled:opacity-50` would have drawn.
@@ -129,7 +179,7 @@ export function ActionButton({
   }
 
   return (
-    <TooltipProvider>
+    <TooltipProvider delayDuration={delayDuration} skipDelayDuration={skipDelayDuration}>
       <Tooltip>
         <TooltipTrigger asChild>{button}</TooltipTrigger>
         <TooltipContent side={side}>{hint ?? label}</TooltipContent>
