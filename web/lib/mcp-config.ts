@@ -10,6 +10,7 @@ export interface PastedConfig {
   env: string;
   url: string;
   headers: string;
+  cwd: string;
 }
 
 /** Parses a JSON field from the form, naming the field when it will not parse. */
@@ -26,7 +27,7 @@ export function parseJson<T>(text: string, field: string, fallback: T): T {
  * Reads a `.mcp.json`-shaped paste into the form.
  *
  * People have this config already — in `.mcp.json`, in a README, in another tool's settings —
- * and retyping it into six fields is where the typos come from. All three nestings are
+ * and retyping it into seven fields is where the typos come from. All three nestings are
  * accepted, since which one you get depends on how much of the file was copied:
  *
  *   { "mcpServers": { "fs": { … } } }   the whole file
@@ -63,6 +64,7 @@ export function parseMcpJson(text: string): PastedConfig {
     env: JSON.stringify(body.env ?? {}),
     url,
     headers: JSON.stringify(body.headers ?? {}),
+    cwd: typeof body.cwd === "string" ? body.cwd : "",
   };
 }
 
@@ -80,5 +82,7 @@ export function toConnection(server: McpServersQuery["mcpServers"][number]): Mcp
     env: server.env ?? {},
     url: server.url,
     headers: server.headers ?? {},
+    cwd: server.cwd,
+    connectTimeoutMs: server.connectTimeoutMs,
   };
 }

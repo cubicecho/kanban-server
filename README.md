@@ -86,7 +86,11 @@ key from the environment instead of the UI.
   the delete is refused server-side until it has stopped.
 - **mcp server** — a stdio or http MCP server whose tools an agent can reach, exposed to the
   model as `slug__tool-name`. Which agents see which servers is a separate choice — see
-  **Agents and their tools**.
+  **Agents and their tools**. A stdio row may also say where its child runs (**working
+  directory**, empty being this server's own) and how long it gets to answer the handshake
+  (**connect timeout**, empty being the pool's own bound) — a local `node` child is up in
+  milliseconds and `uvx some-server@latest` downloads a package on a cold cache before it says
+  anything, and one number for both has to be the slow one's.
 - **settings** — one row: the fallback endpoint, key and model, the token and temperature
   limits, the tool-iteration cap, how MCP tools are discovered, how long runs are kept and how
   often the worker looks for work.

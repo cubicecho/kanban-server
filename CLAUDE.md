@@ -415,6 +415,20 @@ milliseconds apart and the answer must not predate the write. `undefined` scope 
 connected server and an *empty* scope means none of them: an agent with no servers linked to it
 wants the second, so the two must not collapse.
 
+**A connection cost belongs to the server, not to the pool.** `mcp_servers.cwd` and
+`mcp_servers.connectTimeoutMs` are both nullable, and null is the pool's own answer — this
+process's directory, and whatever bound the pool was built with. They are columns rather than
+`McpPool` options because neither is one number for every server: several stdio servers resolve a
+relative path against their cwd rather than against an argument, and a local `node` child answers
+the handshake in milliseconds where `uvx some-server@latest` on a cold cache downloads a package
+first, so a pool-wide timeout has to be the slowest server's and leaves the quick ones unbounded.
+`mcp.ts` is untouched by either — the rows go through `load` — and the only code that had to
+know is `testMcpServer`, which passes both to `mcp.probe` so the button dials the way the pool
+will; a probe that ignored the row's patience would report a working server as broken. The form
+writes an empty box and a `0` back as null, because the pool reads a `connectTimeoutMs` of 0 as
+a server given no time at all rather than as one given the default — the one numeric knob here
+that is not the agents' `0` sentinel, since the column itself is nullable.
+
 **Both packages come from npm, and the two forms before it are worth remembering.** They started
 as `file:../` links to sibling checkouts, which the Docker build cannot see at all — a sibling is
 outside the build context, so `npm ci` could not find it and there was no image. A git URL fixed

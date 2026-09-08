@@ -2,7 +2,7 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 
-/** A stdio MCP server with four trivial tools, for the runner tests to connect to. */
+/** A stdio MCP server with five trivial tools, for the runner tests to connect to. */
 const tools = [
   { name: "ping", description: "replies pong", inputSchema: { type: "object", properties: {} } },
   {
@@ -28,6 +28,13 @@ const tools = [
     description: "reports the clientInfo it was handed in the handshake",
     inputSchema: { type: "object", properties: {} },
   },
+  {
+    // Same argument as `whoami`: where a child was started is only visible from inside it, and a
+    // test that read the row back would be asking the database what it just wrote.
+    name: "pwd",
+    description: "reports the working directory it was started in",
+    inputSchema: { type: "object", properties: {} },
+  },
 ];
 
 const server = new Server({ name: "echo", version: "0.0.1" }, { capabilities: { tools: {} } });
@@ -36,12 +43,15 @@ server.setRequestHandler(CallToolRequestSchema, (request) => ({
   content: [
     {
       type: "text",
-      text:
-        request.params.name === "whoami"
-          ? JSON.stringify(server.getClientVersion() ?? null)
-          : `${request.params.name}(${JSON.stringify(request.params.arguments ?? {})})`,
+      text: reply(request.params.name, request.params.arguments ?? {}),
     },
   ],
 }));
+
+function reply(name, args) {
+  if (name === "whoami") return JSON.stringify(server.getClientVersion() ?? null);
+  if (name === "pwd") return process.cwd();
+  return `${name}(${JSON.stringify(args)})`;
+}
 
 await server.connect(new StdioServerTransport());
