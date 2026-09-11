@@ -66,23 +66,25 @@ beforeAll(async () => {
   baseUrl = `http://127.0.0.1:${typeof address === "object" && address ? address.port : 0}/v1`;
 
   // One real stdio MCP server, so the catalogue and the tool calls are the genuine article.
+  // Typed as the row rather than checked against it, because that is how a row reaches the pool
+  // from `load`: a fresh literal carrying both transports' columns is refused by the pool's
+  // config union, and a `mcp_servers` row always carries both.
+  const echo: McpServerRow = {
+    id: "echo-1",
+    slug: "echo",
+    label: "Echo",
+    enabled: true,
+    transport: "stdio",
+    command: process.execPath,
+    args: [fileURLToPath(new URL("./fixtures/mcp-echo.mjs", import.meta.url))],
+    env: null,
+    url: "",
+    headers: null,
+    cwd: null,
+    connectTimeoutMs: null,
+  };
   const { mcp } = await import("../server/runner/mcp.ts");
-  await mcp.sync([
-    {
-      id: "echo-1",
-      slug: "echo",
-      label: "Echo",
-      enabled: true,
-      transport: "stdio",
-      command: process.execPath,
-      args: [fileURLToPath(new URL("./fixtures/mcp-echo.mjs", import.meta.url))],
-      env: null,
-      url: "",
-      headers: null,
-      cwd: null,
-      connectTimeoutMs: null,
-    } satisfies McpServerRow,
-  ]);
+  await mcp.sync([echo]);
 });
 
 afterAll(async () => {

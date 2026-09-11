@@ -1,5 +1,4 @@
 import { fold, history, type RunEvent, watch } from "@cubicecho/agent-core";
-import type { McpConnection } from "@cubicecho/agent-mcp-pool";
 import { buildSchema, GraphQLDateTime } from "@vantreeseba/drizzle-graphql";
 import { applyPermissions } from "@vantreeseba/graphql-casl";
 import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
@@ -436,6 +435,21 @@ const McpConnectionInput = new GraphQLInputObjectType({
     connectTimeoutMs: { type: GraphQLInt },
   },
 });
+
+/**
+ * What `McpConnectionInput` arrives as: both arms' boxes, and only the transport required. It is
+ * not the pool's `McpConnection`, which is a union a form cannot fill in one go.
+ */
+type McpConnectionArgs = {
+  transport: string;
+  command?: string | null;
+  args?: string[] | null;
+  env?: Record<string, string> | null;
+  url?: string | null;
+  headers?: Record<string, string> | null;
+  cwd?: string | null;
+  connectTimeoutMs?: number | null;
+};
 
 const McpProbeType = new GraphQLObjectType({
   name: "McpProbe",
@@ -1279,20 +1293,31 @@ const baseSchema = new GraphQLSchema({
           "Connects to a config that need not be saved yet and lists its tools, so a server " +
           "can be checked before an agent depends on it.",
         args: { config: { type: new GraphQLNonNull(McpConnectionInput) } },
-        resolve: (_source, args: { config: Partial<McpConnection> }) =>
-          mcp.probe({
-            transport: args.config.transport === "http" ? "http" : "stdio",
-            command: args.config.command ?? "",
-            args: args.config.args ?? null,
-            env: args.config.env ?? null,
-            url: args.config.url ?? "",
-            headers: args.config.headers ?? null,
-            cwd: args.config.cwd ?? null,
-            // The row's own patience reaches the button as well as the pool, which is the whole
-            // point of the field: a server that needs two minutes to start needs them here too,
-            // or the probe reports a failure for a server that works.
-            connectTimeoutMs: args.config.connectTimeoutMs ?? null,
-          }),
+        resolve: (_source, { config }: { config: McpConnectionArgs }) => {
+          // The row's own patience reaches the button as well as the pool, which is the whole
+          // point of the field: a server that needs two minutes to start needs them here too,
+          // or the probe reports a failure for a server that works.
+          const connectTimeoutMs = config.connectTimeoutMs ?? null;
+          // One arm or the other, never both: the form sends every box it has, and the pool's
+          // config is a union whose http arm has no `command` and whose stdio arm has no `url`.
+          return mcp.probe(
+            config.transport === "http"
+              ? {
+                  transport: "http",
+                  url: config.url ?? "",
+                  headers: config.headers ?? null,
+                  connectTimeoutMs,
+                }
+              : {
+                  transport: "stdio",
+                  command: config.command ?? "",
+                  args: config.args ?? null,
+                  env: config.env ?? null,
+                  cwd: config.cwd ?? null,
+                  connectTimeoutMs,
+                },
+          );
+        },
       },
       reconnectMcp: {
         type: new GraphQLNonNull(new GraphQLList(new GraphQLNonNull(McpServerStatusType))),
