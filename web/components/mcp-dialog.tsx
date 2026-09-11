@@ -43,10 +43,18 @@ interface Draft {
   headers: string;
   cwd: string;
   connectTimeoutMs: number | null;
+  callTimeoutMs: number | null;
 }
 
 const json = (value: unknown, fallback: string) =>
   value === null || value === undefined ? fallback : JSON.stringify(value);
+
+/**
+ * A timeout box as its nullable column wants it. Null is the pool's own bound, and the pool reads
+ * a 0 as a server given no time at all rather than as one given the default — so a zero, and an
+ * empty box, are written as null rather than as themselves.
+ */
+const bound = (ms: number | null) => ((ms ?? 0) > 0 ? ms : null);
 
 /** The connection half of the draft, as the API wants it. Throws on malformed JSON. */
 const connectionOf = (draft: Draft) => ({
@@ -56,12 +64,9 @@ const connectionOf = (draft: Draft) => ({
   env: parseJson<Record<string, string>>(draft.env, "Env", {}),
   url: draft.url.trim(),
   headers: parseJson<Record<string, string>>(draft.headers, "Headers", {}),
-  // Both columns are nullable, and null is the pool's own answer — this process's directory, and
-  // the pool's connect bound. So an empty box and a zero are written as null rather than as
-  // themselves: a cwd of `""` is not a directory, and the pool reads a `connectTimeoutMs` of 0 as
-  // a server given no time at all rather than as one given the default.
+  // Nullable, and null is this process's own directory: a cwd of `""` is not a directory.
   cwd: draft.cwd.trim() || null,
-  connectTimeoutMs: (draft.connectTimeoutMs ?? 0) > 0 ? draft.connectTimeoutMs : null,
+  connectTimeoutMs: bound(draft.connectTimeoutMs),
 });
 
 export function McpDialog({
@@ -80,6 +85,8 @@ export function McpDialog({
     mutationFn: async (draft: Draft) => {
       const values = {
         ...connectionOf(draft),
+        // Not part of the connection: a probe lists tools and never calls one.
+        callTimeoutMs: bound(draft.callTimeoutMs),
         slug: draft.slug.trim(),
         label: draft.label.trim(),
         enabled: draft.enabled,
@@ -107,6 +114,7 @@ export function McpDialog({
       headers: json(server?.headers, "{}"),
       cwd: server?.cwd ?? "",
       connectTimeoutMs: (server?.connectTimeoutMs ?? 0) as number | null,
+      callTimeoutMs: (server?.callTimeoutMs ?? 0) as number | null,
     } satisfies Draft,
     onSubmit: ({ value }) => save.mutateAsync(value).catch(toastError),
   });
@@ -307,6 +315,14 @@ export function McpDialog({
         name="connectTimeoutMs"
         label="Connect timeout (ms)"
         description="How long this server gets to answer the handshake. 0 uses the pool's own bound."
+        min={0}
+      />
+
+      <NumberField
+        form={form}
+        name="callTimeoutMs"
+        label="Call timeout (ms)"
+        description="How long one tool call gets before it is abandoned. 0 uses the default, a minute."
         min={0}
       />
 

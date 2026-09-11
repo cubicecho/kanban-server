@@ -90,7 +90,9 @@ key from the environment instead of the UI.
   directory**, empty being this server's own) and how long it gets to answer the handshake
   (**connect timeout**, empty being the pool's own bound) — a local `node` child is up in
   milliseconds and `uvx some-server@latest` downloads a package on a cold cache before it says
-  anything, and one number for both has to be the slow one's.
+  anything, and one number for both has to be the slow one's. Any row may bound a single tool
+  call the same way (**call timeout**, empty being the MCP SDK's own minute), since a file read
+  and a research server that thinks for minutes cannot share one either.
 - **settings** — one row: the fallback endpoint, key and model, the token and temperature
   limits, the tool-iteration cap, how MCP tools are discovered, how long runs are kept and how
   often the worker looks for work.
