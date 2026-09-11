@@ -424,10 +424,16 @@ the handshake in milliseconds where `uvx some-server@latest` on a cold cache dow
 first, so a pool-wide timeout has to be the slowest server's and leaves the quick ones unbounded.
 `mcp.ts` is untouched by either — the rows go through `load` — and the only code that had to
 know is `testMcpServer`, which passes both to `mcp.probe` so the button dials the way the pool
-will; a probe that ignored the row's patience would report a working server as broken. The form
-writes an empty box and a `0` back as null, because the pool reads a `connectTimeoutMs` of 0 as
-a server given no time at all rather than as one given the default — the one numeric knob here
-that is not the agents' `0` sentinel, since the column itself is nullable.
+will; a probe that ignored the row's patience would report a working server as broken.
+
+`mcp_servers.callTimeoutMs` is the same argument for one tool call — a filesystem read and a
+research server that thinks for minutes cannot share a number either — and needs even less: the
+pool reads it at call time, so an edit applies to the next call without a reconnect, and
+`testMcpServer` does not pass it, a probe listing tools and calling none. Null there is the MCP
+SDK's own minute, the pool being built with no `callTimeoutMs` of its own. The form writes an
+empty box and a `0` back as null for both timeouts, because the pool reads 0 as a server given
+no time at all rather than as one given the default — the numeric knobs here that are not the
+agents' `0` sentinel, since the columns themselves are nullable.
 
 **Both packages come from npm, and the two forms before it are worth remembering.** They started
 as `file:../` links to sibling checkouts, which the Docker build cannot see at all — a sibling is

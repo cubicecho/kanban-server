@@ -22,6 +22,7 @@ const row = (over: Partial<McpServerRow> & Pick<McpServerRow, "id" | "slug">): M
   headers: null,
   cwd: null,
   connectTimeoutMs: null,
+  callTimeoutMs: null,
   ...over,
 });
 
@@ -67,5 +68,18 @@ test("a server that never answers is given up on at the row's own bound", async 
     .then(() => mcp.state());
 
   expect(state.status).toBe("error");
+  expect(Date.now() - started).toBeLessThan(15_000);
+});
+
+test("a tool that never answers is given up on at the row's own bound", async () => {
+  const { mcp } = await import("../server/runner/mcp.ts");
+  await mcp.sync([
+    row({ id: "stuck", slug: "stuck", args: [fixture("mcp-stuck.mjs")], callTimeoutMs: 300 }),
+  ]);
+
+  // As above: the pool has no `callTimeoutMs` of its own, so without the column this call waits
+  // out the SDK's minute, and the elapsed time is what says the row's number was the one used.
+  const started = Date.now();
+  await expect(mcp.call("stuck__wait", {}, ["stuck"])).rejects.toThrow();
   expect(Date.now() - started).toBeLessThan(15_000);
 });

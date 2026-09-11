@@ -173,6 +173,15 @@ export const mcpServers = pgTable("mcp_servers", {
    * no useful bound at all. Null is the pool's, which is what every row written before this says.
    */
   connectTimeoutMs: integer(),
+  /**
+   * How long one tool call against *this* server gets before it is abandoned.
+   *
+   * The same argument as `connectTimeoutMs` with a different spread: a filesystem read answers in
+   * milliseconds and a research server may think for minutes. Null is the pool's, which, the pool
+   * being built with none, is the MCP SDK's own minute. Read at call time, so an edit applies to
+   * the next call without a reconnect.
+   */
+  callTimeoutMs: integer(),
 });
 
 /**

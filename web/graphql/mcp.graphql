@@ -12,6 +12,7 @@ query McpServers {
     headers
     cwd
     connectTimeoutMs
+    callTimeoutMs
   }
   mcpStatus {
     id
