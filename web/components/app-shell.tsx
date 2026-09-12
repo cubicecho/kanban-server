@@ -287,6 +287,7 @@ export function Page({
   description,
   actions,
   wide,
+  footer,
   children,
 }: {
   title: string;
@@ -300,6 +301,8 @@ export function Page({
   actions?: React.ReactNode;
   /** For pages that go sideways — the board is as wide as the lanes it has. */
   wide?: boolean;
+  /** Pinned under the scroller, the way the heading is pinned over it: a form's save bar. */
+  footer?: React.ReactNode;
   children: React.ReactNode;
 }) {
   // The tab said "kanban-server" on all nine pages, which is no help at all to somebody with
@@ -330,6 +333,7 @@ export function Page({
         </>
       }
       contentClassName="p-6"
+      footer={footer}
       content={
         <div className={cn("mx-auto flex flex-col gap-4", wide ? "max-w-none" : "max-w-3xl")}>
           {children}

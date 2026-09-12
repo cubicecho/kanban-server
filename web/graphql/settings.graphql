@@ -1,26 +1,32 @@
+fragment SettingsFields on Setting {
+  id
+  baseUrl
+  model
+  maxTokens
+  contextLength
+  temperature
+  maxToolIterations
+  toolDiscovery
+  toolSelectModel
+  requestTimeoutSeconds
+  maxRetries
+  runRetentionDays
+  workerIntervalSeconds
+  refineAgentId
+  refinePrompt
+}
+
 query Settings {
   settings {
-    id
-    baseUrl
-    model
-    maxTokens
-    contextLength
-    temperature
-    maxToolIterations
-    toolDiscovery
-    toolSelectModel
-    requestTimeoutSeconds
-    maxRetries
-    runRetentionDays
-    workerIntervalSeconds
-    refineAgentId
-    refinePrompt
+    ...SettingsFields
   }
 }
 
+# Reads the row back so the page can reseed from what was written, rather than wait for a refetch
+# and spend the gap comparing the form against the row as it was before the save.
 mutation UpdateSettings($set: UpdateSettingInput!) {
   updateSetting(where: { id: { eq: "default" } }, set: $set) {
-    id
+    ...SettingsFields
   }
 }
 
