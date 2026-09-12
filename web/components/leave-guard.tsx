@@ -30,7 +30,8 @@ import {
  */
 export function useLeaveGuard(dirty: () => boolean) {
   const blocker = useBlocker({
-    shouldBlockFn: dirty,
+    // A change of search alone is the page moving between its own tabs, not leaving it.
+    shouldBlockFn: ({ current, next }) => current.pathname !== next.pathname && dirty(),
     enableBeforeUnload: dirty,
     withResolver: true,
   });
