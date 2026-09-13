@@ -191,6 +191,20 @@ test("a card's run is handed what the hooks recall, and remembered once it is do
     expect.objectContaining({ event: "beforeTurn", hookId: "recall", tokens: expect.any(Number) }),
   ]);
 
+  // A watcher sees what was recalled while the run is going, not only that something was.
+  const { history } = await import("@cubicecho/agent-core");
+  const hookEvents = history(run.id).filter((event) => event.name === "hook");
+  expect(hookEvents).toEqual([
+    expect.objectContaining({
+      kind: "notice",
+      ok: true,
+      text: expect.stringMatching(
+        /^memory\/recall \(beforeTurn\) added ~\d+ tokens of context\n\n/,
+      ),
+    }),
+  ]);
+  expect(hookEvents[0].text).toContain(`The owner prefers tabs. (session ${card.id})`);
+
   await runner.hooksSettled();
   const calls = await memoryCalls();
   expect(calls.map((call) => call.name)).toEqual(["recall", "remember", "remember"]);

@@ -564,9 +564,14 @@ const RunEventType = new GraphQLObjectType({
     text: { type: new GraphQLNonNull(GraphQLString) },
     name: {
       type: new GraphQLNonNull(GraphQLString),
-      description: "Tool name, where there is one.",
+      description:
+        "Tool name on the tool kinds. `hook` on a notice about an MCP server's hook, whose " +
+        "text is a summary line and then, after a blank line, the context it added to the run.",
     },
-    ok: { type: GraphQLBoolean },
+    ok: {
+      type: GraphQLBoolean,
+      description: "Whether it worked, on `tool-result`, `done` and a `hook` notice.",
+    },
     usage: {
       type: RunUsageType,
       description:
