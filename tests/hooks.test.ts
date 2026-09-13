@@ -193,7 +193,10 @@ test("a card's run is handed what the hooks recall, and remembered once it is do
 
   // A watcher sees what was recalled while the run is going, not only that something was.
   const { history } = await import("@cubicecho/agent-core");
-  const hookEvents = history(run.id).filter((event) => event.name === "hook");
+  // The run's own hooks, that is: the ones that remember it may already be noting themselves.
+  const hookEvents = history(run.id).filter(
+    (event) => event.name === "hook" && event.text?.includes("(beforeTurn)"),
+  );
   expect(hookEvents).toEqual([
     expect.objectContaining({
       kind: "notice",
@@ -210,6 +213,17 @@ test("a card's run is handed what the hooks recall, and remembered once it is do
   expect(calls.map((call) => call.name)).toEqual(["recall", "remember", "remember"]);
   expect(calls[1].args).toEqual({ session: card.id, reply: "done it", project: projectId });
   expect(calls[2].args).toEqual({ status: "ok" });
+
+  // A hook that files something and adds nothing is still on the row, so a person can tell a
+  // memory server that remembered from one that was never asked.
+  const [stored] = await db.select().from(tables.runs).where(eq(tables.runs.id, run.id));
+  expect(stored.hooks).toEqual([
+    expect.objectContaining({ event: "beforeTurn", hookId: "recall" }),
+    expect.objectContaining({ event: "afterTurn", hookId: "remember" }),
+    expect.objectContaining({ event: "sessionEnd", hookId: "ended" }),
+  ]);
+  const { hookSummary } = await import("../shared/hooks.ts");
+  expect(hookSummary(stored.hooks[1])).toMatch(/^memory\/remember \(afterTurn\) ran/);
 
   const deleted = await gql(
     `mutation Delete($id: String!) { deleteCard(where: { id: { eq: $id } }) { id } }`,

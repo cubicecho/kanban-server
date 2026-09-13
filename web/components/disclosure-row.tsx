@@ -98,7 +98,7 @@ export function DisclosureRow({
       {isOpen ? (
         <ItemFooter
           id={contentId}
-          className={cn("flex-col items-stretch gap-2 border-t pt-3", contentClassName)}
+          className={cn("min-w-0 flex-col items-stretch gap-2 border-t pt-3", contentClassName)}
         >
           {content}
         </ItemFooter>

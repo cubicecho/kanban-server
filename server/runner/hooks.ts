@@ -4,7 +4,9 @@ import {
   type HookContext,
   type HookEvent,
   type HookNote,
+  type HookOutcome,
   type HookRunner,
+  INJECT_EVENTS,
   notify as notifyHooks,
   type RunEventInput,
 } from "@cubicecho/agent-core";
@@ -82,6 +84,46 @@ const runner =
 const toEvents = (onEvent: HookOptions["onEvent"]) =>
   onEvent ? (note: HookNote) => onEvent(hookEvent(note)) : undefined;
 
+/** The most of a non-injecting hook's answer kept on its note: enough to read, not a transcript. */
+const ANSWER_CHARS = 2000;
+
+/**
+ * The runner, keeping every outcome it hands back so the ones agent-core does not note can be.
+ *
+ * agent-core notes a failure and a hook that added context, and nothing else — "a remember that
+ * succeeded is not news". Here it is: a memory server that files nothing and says nothing looks
+ * exactly like one that is not configured, and the only way to tell is to see that it ran.
+ */
+const recording = (scope: readonly string[] | undefined) => {
+  const outcomes: HookOutcome[] = [];
+  const run: HookRunner = async (event, context, options) => {
+    const answered = await runner(scope)(event, context, options);
+    outcomes.push(...answered);
+    return answered;
+  };
+  /** A note for each hook that worked but is not among `noted`. */
+  const unnoted = (noted: readonly HookNote[]): HookNote[] => {
+    const seen = new Set(noted.map((note) => `${note.event}\0${note.source}\0${note.hookId}`));
+    return outcomes
+      .filter(
+        (outcome) =>
+          outcome.ok && !seen.has(`${outcome.event}\0${outcome.label}\0${outcome.hookId}`),
+      )
+      .map((outcome) => {
+        // What an injecting hook returned and did not inject never reached the model, and a note
+        // carrying it would read as context; a later hook's answer is the receipt worth seeing.
+        const answer = INJECT_EVENTS.has(outcome.event) ? "" : (outcome.text?.trim() ?? "");
+        return {
+          event: outcome.event,
+          source: outcome.label,
+          hookId: outcome.hookId,
+          ...(answer ? { text: answer.slice(0, ANSWER_CHARS) } : {}),
+        };
+      });
+  };
+  return { run, unnoted };
+};
+
 /**
  * Runs the injecting events' hooks ahead of a run and builds what they add to its prompt.
  *
@@ -89,24 +131,37 @@ const toEvents = (onEvent: HookOptions["onEvent"]) =>
  * `signal` ends all of them, and agent-core caps the blocks in total so a generous server cannot
  * crowd out the card.
  */
-export const gather = (
+export async function gather(
   events: readonly HookEvent[],
   context: HookContext,
   { scope, signal, onEvent }: HookOptions,
-): Promise<Gathered> =>
-  gatherHooks(runner(scope), events, context, { signal, onNote: toEvents(onEvent) });
+): Promise<Gathered> {
+  const { run, unnoted } = recording(scope);
+  const onNote = toEvents(onEvent);
+  const gathered = await gatherHooks(run, events, context, { signal, onNote });
+  const ran = unnoted(gathered.notes);
+  for (const note of ran) onNote?.(note);
+  return { ...gathered, notes: [...gathered.notes, ...ran] };
+}
 
 /**
- * Runs the hooks for an event that reads what happened and adds nothing to a request. The notes
- * are only ever failures, and it never rejects.
+ * Runs the hooks for an event that reads what happened and adds nothing to a request: a note for
+ * every hook, what it answered or why it failed. It never rejects.
  *
  * No signal: a run that has finished is not asking for the finish not to be remembered.
  */
-export const notify = (
+export async function notify(
   event: HookEvent,
   context: HookContext,
   { scope, onEvent }: Omit<HookOptions, "signal"> = {},
-): Promise<HookNote[]> => notifyHooks(runner(scope), event, context, toEvents(onEvent));
+): Promise<HookNote[]> {
+  const { run, unnoted } = recording(scope);
+  const onNote = toEvents(onEvent);
+  const failed = await notifyHooks(run, event, context, onNote);
+  const ran = unnoted(failed);
+  for (const note of ran) onNote?.(note);
+  return [...failed, ...ran];
+}
 
 /**
  * Cards or tasks were deleted. Tells every server that keeps anything under their ids — every

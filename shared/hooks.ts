@@ -20,10 +20,14 @@ export type { HookEvent, HookNote, ToolHook };
  * One hook note in a line: what it added, or why it did not. Shared so the live stream, which
  * only ever carries text, and the stored run say the same thing about the same hook.
  */
-export const hookSummary = (note: HookNote) =>
-  note.error
-    ? `${note.source}/${note.hookId} (${note.event}) failed: ${note.error}`
-    : `${note.source}/${note.hookId} (${note.event}) added ~${note.tokens ?? 0} tokens of context`;
+export const hookSummary = (note: HookNote) => {
+  const name = `${note.source}/${note.hookId} (${note.event})`;
+  if (note.error) return `${name} failed: ${note.error}`;
+  // Only an injected note carries tokens. Any other that did not fail is a hook that ran, and
+  // its text — if any — is what it answered rather than anything the model read.
+  if (note.tokens != null) return `${name} added ~${note.tokens} tokens of context`;
+  return note.text ? `${name} ran and answered` : `${name} ran`;
+};
 
 /**
  * Every event, and when this server fires it. A card or a task is the session; each run is one
