@@ -1839,6 +1839,196 @@ type RunGroupKeys {
   totalTokens: Int
 }
 
+type Artifact {
+  id: String!
+  projectId: String!
+  cardId: String
+  runId: String
+  location: String!
+  title: String!
+  description: String!
+  mediaType: String
+  action: ArtifactsActionEnum!
+  source: ArtifactsSourceEnum!
+  serverId: String
+  serverSlug: String!
+  serverLabel: String!
+  transport: String!
+  tool: String!
+  sizeBytes: Int
+  createdAt: DateTime!
+  updatedAt: DateTime!
+
+  """
+  Opaque cursor of this row's position in the query's ordering. Pass it as `after` to resume from here. Only set on rows returned by a list query.
+  """
+  cursor: String
+  card(where: CardFilters): Card
+  run(where: RunFilters): Run
+}
+
+enum ArtifactsActionEnum {
+  """Value: created"""
+  created
+
+  """Value: updated"""
+  updated
+
+  """Value: moved"""
+  moved
+
+  """Value: deleted"""
+  deleted
+}
+
+enum ArtifactsSourceEnum {
+  """Value: declared"""
+  declared
+
+  """Value: detected"""
+  detected
+
+  """Value: client"""
+  client
+}
+
+type ArtifactAggregate {
+  count: Int!
+  avg: ArtifactAvgAggregate
+  sum: ArtifactSumAggregate
+  min: ArtifactMinAggregate
+  max: ArtifactMaxAggregate
+  countNonNull: ArtifactCountNonNullAggregate
+  countDistinct: ArtifactCountDistinctAggregate
+}
+
+type ArtifactAvgAggregate {
+  sizeBytes: Float
+}
+
+type ArtifactSumAggregate {
+  sizeBytes: Float
+}
+
+type ArtifactMinAggregate {
+  id: String
+  projectId: String
+  cardId: String
+  runId: String
+  location: String
+  title: String
+  description: String
+  mediaType: String
+  action: ArtifactsActionEnum
+  source: ArtifactsSourceEnum
+  serverId: String
+  serverSlug: String
+  serverLabel: String
+  transport: String
+  tool: String
+  sizeBytes: Int
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
+type ArtifactMaxAggregate {
+  id: String
+  projectId: String
+  cardId: String
+  runId: String
+  location: String
+  title: String
+  description: String
+  mediaType: String
+  action: ArtifactsActionEnum
+  source: ArtifactsSourceEnum
+  serverId: String
+  serverSlug: String
+  serverLabel: String
+  transport: String
+  tool: String
+  sizeBytes: Int
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
+type ArtifactCountNonNullAggregate {
+  id: Int!
+  projectId: Int!
+  cardId: Int!
+  runId: Int!
+  location: Int!
+  title: Int!
+  description: Int!
+  mediaType: Int!
+  action: Int!
+  source: Int!
+  serverId: Int!
+  serverSlug: Int!
+  serverLabel: Int!
+  transport: Int!
+  tool: Int!
+  sizeBytes: Int!
+  createdAt: Int!
+  updatedAt: Int!
+}
+
+type ArtifactCountDistinctAggregate {
+  id: Int!
+  projectId: Int!
+  cardId: Int!
+  runId: Int!
+  location: Int!
+  title: Int!
+  description: Int!
+  mediaType: Int!
+  action: Int!
+  source: Int!
+  serverId: Int!
+  serverSlug: Int!
+  serverLabel: Int!
+  transport: Int!
+  tool: Int!
+  sizeBytes: Int!
+  createdAt: Int!
+  updatedAt: Int!
+}
+
+type ArtifactGroupBy {
+  group: ArtifactGroupKeys!
+  count: Int!
+  avg: ArtifactAvgAggregate
+  sum: ArtifactSumAggregate
+  min: ArtifactMinAggregate
+  max: ArtifactMaxAggregate
+  countNonNull: ArtifactCountNonNullAggregate
+  countDistinct: ArtifactCountDistinctAggregate
+}
+
+"""
+The grouped column values of one Artifact group. A column the query did not group by is null.
+"""
+type ArtifactGroupKeys {
+  id: String
+  projectId: String
+  cardId: String
+  runId: String
+  location: String
+  title: String
+  description: String
+  mediaType: String
+  action: ArtifactsActionEnum
+  source: ArtifactsSourceEnum
+  serverId: String
+  serverSlug: String
+  serverLabel: String
+  transport: String
+  tool: String
+  sizeBytes: Int
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
 type BoardTemplate {
   id: String!
   name: String!
@@ -4373,6 +4563,197 @@ input RunCountDistinctHaving {
   totalTokens: AggregateNumberFilter
 }
 
+input ArtifactFilters {
+  id: StringFilter
+  projectId: StringFilter
+  cardId: StringFilter
+  runId: StringFilter
+  location: StringFilter
+  title: StringFilter
+  description: StringFilter
+  mediaType: StringFilter
+  action: ArtifactsActionEnumFilter
+  source: ArtifactsSourceEnumFilter
+  serverId: StringFilter
+  serverSlug: StringFilter
+  serverLabel: StringFilter
+  transport: StringFilter
+  tool: StringFilter
+  sizeBytes: IntFilter
+  createdAt: DateTimeFilter
+  updatedAt: DateTimeFilter
+
+  """Matches rows whose card matches these filters"""
+  card: CardFilters
+
+  """Matches rows whose run matches these filters"""
+  run: RunFilters
+
+  """At least one branch matches; ANDed with any sibling fields"""
+  OR: [ArtifactFilters!]
+
+  """Every branch matches"""
+  AND: [ArtifactFilters!]
+
+  """Negates the nested filters"""
+  NOT: ArtifactFilters
+}
+
+input ArtifactsActionEnumFilter {
+  """Equal to"""
+  eq: ArtifactsActionEnum
+
+  """Not equal to"""
+  ne: ArtifactsActionEnum
+
+  """Matches any one of these values (SQL `IN`)"""
+  inArray: [ArtifactsActionEnum!]
+
+  """Matches none of these values (SQL `NOT IN`)"""
+  notInArray: [ArtifactsActionEnum!]
+
+  """When true, matches rows where the column is NULL"""
+  isNull: Boolean
+
+  """When true, matches rows where the column is not NULL"""
+  isNotNull: Boolean
+
+  """At least one branch matches; ANDed with any sibling operators"""
+  OR: [ArtifactsActionEnumFilter!]
+
+  """Every branch matches"""
+  AND: [ArtifactsActionEnumFilter!]
+
+  """Negates the nested operators"""
+  NOT: ArtifactsActionEnumFilter
+}
+
+input ArtifactsSourceEnumFilter {
+  """Equal to"""
+  eq: ArtifactsSourceEnum
+
+  """Not equal to"""
+  ne: ArtifactsSourceEnum
+
+  """Matches any one of these values (SQL `IN`)"""
+  inArray: [ArtifactsSourceEnum!]
+
+  """Matches none of these values (SQL `NOT IN`)"""
+  notInArray: [ArtifactsSourceEnum!]
+
+  """When true, matches rows where the column is NULL"""
+  isNull: Boolean
+
+  """When true, matches rows where the column is not NULL"""
+  isNotNull: Boolean
+
+  """At least one branch matches; ANDed with any sibling operators"""
+  OR: [ArtifactsSourceEnumFilter!]
+
+  """Every branch matches"""
+  AND: [ArtifactsSourceEnumFilter!]
+
+  """Negates the nested operators"""
+  NOT: ArtifactsSourceEnumFilter
+}
+
+input ArtifactOrderBy {
+  id: InnerOrder
+  projectId: InnerOrder
+  cardId: InnerOrder
+  runId: InnerOrder
+  location: InnerOrder
+  title: InnerOrder
+  description: InnerOrder
+  mediaType: InnerOrder
+  action: InnerOrder
+  source: InnerOrder
+  serverId: InnerOrder
+  serverSlug: InnerOrder
+  serverLabel: InnerOrder
+  transport: InnerOrder
+  tool: InnerOrder
+  sizeBytes: InnerOrder
+  createdAt: InnerOrder
+  updatedAt: InnerOrder
+
+  """Order by columns of the related card row"""
+  card: CardOrderBy
+
+  """Order by columns of the related run row"""
+  run: RunOrderBy
+}
+
+"""Filters Artifact groups by their aggregated values"""
+input ArtifactHaving {
+  """Filters groups by how many rows they contain"""
+  count: AggregateNumberFilter
+  avg: ArtifactAvgHaving
+  sum: ArtifactSumHaving
+  min: ArtifactMinHaving
+  max: ArtifactMaxHaving
+  countNonNull: ArtifactCountNonNullHaving
+  countDistinct: ArtifactCountDistinctHaving
+}
+
+input ArtifactAvgHaving {
+  sizeBytes: AggregateNumberFilter
+}
+
+input ArtifactSumHaving {
+  sizeBytes: AggregateNumberFilter
+}
+
+input ArtifactMinHaving {
+  sizeBytes: AggregateNumberFilter
+}
+
+input ArtifactMaxHaving {
+  sizeBytes: AggregateNumberFilter
+}
+
+input ArtifactCountNonNullHaving {
+  id: AggregateNumberFilter
+  projectId: AggregateNumberFilter
+  cardId: AggregateNumberFilter
+  runId: AggregateNumberFilter
+  location: AggregateNumberFilter
+  title: AggregateNumberFilter
+  description: AggregateNumberFilter
+  mediaType: AggregateNumberFilter
+  action: AggregateNumberFilter
+  source: AggregateNumberFilter
+  serverId: AggregateNumberFilter
+  serverSlug: AggregateNumberFilter
+  serverLabel: AggregateNumberFilter
+  transport: AggregateNumberFilter
+  tool: AggregateNumberFilter
+  sizeBytes: AggregateNumberFilter
+  createdAt: AggregateNumberFilter
+  updatedAt: AggregateNumberFilter
+}
+
+input ArtifactCountDistinctHaving {
+  id: AggregateNumberFilter
+  projectId: AggregateNumberFilter
+  cardId: AggregateNumberFilter
+  runId: AggregateNumberFilter
+  location: AggregateNumberFilter
+  title: AggregateNumberFilter
+  description: AggregateNumberFilter
+  mediaType: AggregateNumberFilter
+  action: AggregateNumberFilter
+  source: AggregateNumberFilter
+  serverId: AggregateNumberFilter
+  serverSlug: AggregateNumberFilter
+  serverLabel: AggregateNumberFilter
+  transport: AggregateNumberFilter
+  tool: AggregateNumberFilter
+  sizeBytes: AggregateNumberFilter
+  createdAt: AggregateNumberFilter
+  updatedAt: AggregateNumberFilter
+}
+
 input BoardTemplateFilters {
   id: StringFilter
   name: StringFilter
@@ -4953,6 +5334,32 @@ type Query {
     """Filters the groups after they are aggregated."""
     having: RunHaving
   ): [RunGroupBy!]!
+  artifacts(
+    offset: Int
+    limit: Int
+    orderBy: ArtifactOrderBy
+    where: ArtifactFilters
+
+    """
+    Keyset pagination: only return rows strictly after this cursor (a row's `cursor` field from a previous page, under the same orderBy).
+    """
+    after: String
+    distinct: [ArtifactDistinctColumn!]
+  ): [Artifact!]!
+  artifact(offset: Int, orderBy: ArtifactOrderBy, where: ArtifactFilters): Artifact
+  artifactsAggregate(where: ArtifactFilters): ArtifactAggregate!
+  artifactsGroupBy(
+    """
+    Columns to group by. One result row per distinct combination of their values.
+    """
+    groupBy: [ArtifactGroupByColumn!]!
+
+    """Filters the rows before they are grouped."""
+    where: ArtifactFilters
+
+    """Filters the groups after they are aggregated."""
+    having: ArtifactHaving
+  ): [ArtifactGroupBy!]!
   boardTemplates(
     offset: Int
     limit: Int
@@ -5284,6 +5691,50 @@ enum RunGroupByColumn {
   promptTokens
   completionTokens
   totalTokens
+}
+
+"""Columns of Artifact that a query can be made distinct on"""
+enum ArtifactDistinctColumn {
+  id
+  projectId
+  cardId
+  runId
+  location
+  title
+  description
+  mediaType
+  action
+  source
+  serverId
+  serverSlug
+  serverLabel
+  transport
+  tool
+  sizeBytes
+  createdAt
+  updatedAt
+}
+
+"""Columns of Artifact that a query can group by"""
+enum ArtifactGroupByColumn {
+  id
+  projectId
+  cardId
+  runId
+  location
+  title
+  description
+  mediaType
+  action
+  source
+  serverId
+  serverSlug
+  serverLabel
+  transport
+  tool
+  sizeBytes
+  createdAt
+  updatedAt
 }
 
 """Columns of BoardTemplate that a query can be made distinct on"""
@@ -5635,6 +6086,11 @@ type Mutation {
   Puts an archived card back on the board, at the end of the lane it was archived from. Its status is left as it was found — a card archived as `error` comes back as one, and `retryCard` is still the way to put that back in play — because what the card was is the reason someone archived it. The end of the lane rather than its old position, which the cards added since have long taken.
   """
   restoreCard(cardId: String!): Card!
+
+  """
+  Attaches something you produced to a card — a file you wrote, a page you published, an object you uploaded — so the card and the board's artifact list show it. Record where it lives and how it got there, never its content: `location` is the path or URI as the tool that stored it was given it, and `server` is the MCP server slug it went through, if any. Recording the same location on the same card again updates that record rather than adding a second. Card runs on this board record their own; read them with `artifacts(where: { cardId: { eq: "…" } })`.
+  """
+  recordArtifact(cardId: String!, location: String!, title: String, description: String, mediaType: String, server: String): Artifact!
 
   """
   Writes a note on a card. Everything ever said about a card is a note — the report an agent leaves when it has worked one, the verdict a reviewing station rules, and this, a standing note somebody wants taken into account. Every note on the card is handed to the next agent that works it, under "Notes on this card", so this is how you tell one something the card's body does not say without editing the card out from under whoever wrote it. Reports and verdicts are written by the runner and cannot be written here: a note says who wrote it, and that has to be true. Read them with `card_notes(where: { cardId: { eq: "…" } })`.

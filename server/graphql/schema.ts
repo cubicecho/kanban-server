@@ -15,6 +15,7 @@ import {
   GraphQLString,
 } from "graphql";
 import { GraphQLJSON } from "graphql-scalars";
+import { recordArtifact } from "../db/artifacts.ts";
 import { db } from "../db/client.ts";
 import { addNote, cardMarks, recordMove } from "../db/history.ts";
 import {
@@ -33,6 +34,7 @@ import {
   type TemplateLane,
   tasks,
 } from "../db/schema.ts";
+import { declaredArtifact } from "../runner/artifacts.ts";
 import { hookProblems, subjectsDeleted } from "../runner/hooks.ts";
 import { listModels, loadSettings } from "../runner/llm.ts";
 import { mcp } from "../runner/mcp.ts";
@@ -78,18 +80,28 @@ const { entities } = buildSchema(db, {
     // reason: a note says who wrote it, and a generated insert would let anybody write one
     // signed by an agent. `addCardNote` and its two neighbours below are the way in, and they
     // only ever write the one kind a person is entitled to.
+    //
+    // Artifacts are the same argument again: `source` says how the board came to know of one,
+    // and a generated insert could claim a runner detected a file nobody wrote. `recordArtifact`
+    // is the door, and it only ever writes `client`.
     insert: (table) =>
       table !== "runs" &&
       table !== "settings" &&
       table !== "boardTemplates" &&
       table !== "cardEvents" &&
-      table !== "cardNotes",
+      table !== "cardNotes" &&
+      table !== "artifacts",
     update: (table) =>
       table !== "runs" &&
       table !== "boardTemplates" &&
       table !== "cardEvents" &&
-      table !== "cardNotes",
-    delete: (table) => table !== "settings" && table !== "cardEvents" && table !== "cardNotes",
+      table !== "cardNotes" &&
+      table !== "artifacts",
+    delete: (table) =>
+      table !== "settings" &&
+      table !== "cardEvents" &&
+      table !== "cardNotes" &&
+      table !== "artifacts",
   },
   exclude: {
     // Keys travel one way. They are excluded from the output types, so no client can read one
@@ -1111,6 +1123,50 @@ const baseSchema = new GraphQLSchema({
             .returning();
           await recordMove({ cardId: card.id, toLaneId: card.laneId, actor: "user" });
           return restored;
+        },
+      },
+      recordArtifact: {
+        type: new GraphQLNonNull(generatedType("Artifact")),
+        description:
+          "Attaches something you produced to a card — a file you wrote, a page you published, " +
+          "an object you uploaded — so the card and the board's artifact list show it. Record " +
+          "where it lives and how it got there, never its content: `location` is the path or " +
+          "URI as the tool that stored it was given it, and `server` is the MCP server slug it " +
+          "went through, if any. Recording the same location on the same card again updates " +
+          "that record rather than adding a second. Card runs on this board record their own; " +
+          'read them with `artifacts(where: { cardId: { eq: "…" } })`.',
+        args: {
+          cardId: { type: new GraphQLNonNull(GraphQLString) },
+          location: { type: new GraphQLNonNull(GraphQLString) },
+          title: { type: GraphQLString },
+          description: { type: GraphQLString },
+          mediaType: { type: GraphQLString },
+          server: { type: GraphQLString },
+        },
+        resolve: async (
+          _source,
+          args: {
+            cardId: string;
+            location: string;
+            title?: string | null;
+            description?: string | null;
+            mediaType?: string | null;
+            server?: string | null;
+          },
+        ) => {
+          // An archived card is not refused: the work happened, and an expansion archives the
+          // parent a client may well have been working from.
+          const card = await cardOrThrow(args.cardId);
+          const draft = declaredArtifact({ ...args });
+          if (!draft) {
+            throw new GraphQLError("An artifact needs a location.", {
+              extensions: { code: "EMPTY_LOCATION" },
+            });
+          }
+          return recordArtifact(
+            { ...draft, source: "client" },
+            { projectId: card.projectId, cardId: card.id, runId: null },
+          );
         },
       },
       addCardNote: {

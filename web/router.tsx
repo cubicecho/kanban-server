@@ -87,6 +87,12 @@ const archiveRoute = createRoute({
   component: lazyRouteComponent(() => import("@/routes/archive"), "ArchiveRoute"),
 });
 
+const artifactsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/artifacts",
+  component: lazyRouteComponent(() => import("@/routes/artifacts"), "ArtifactsRoute"),
+});
+
 const mcpRoute = createRoute({
   getParentRoute: () => rootRoute,
   // Not `/mcp`: that path is the MCP endpoint the server answers on, and in dev the vite
@@ -115,6 +121,7 @@ export const router = createRouter({
     rolesRoute,
     runsRoute,
     archiveRoute,
+    artifactsRoute,
     mcpRoute,
     settingsRoute,
   ]),

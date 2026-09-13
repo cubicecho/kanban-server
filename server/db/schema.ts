@@ -649,6 +649,65 @@ export const runs = pgTable(
 );
 
 /**
+ * Something the work left behind, somewhere other than on the board: a file a card run wrote
+ * through a filesystem server, an object it put in a bucket, a page a client published.
+ *
+ * An artifact is a record, not a copy. What is kept is *where* the thing is and *how* it got
+ * there — never its content, which lives wherever the server that stored it put it, and may be
+ * a markdown file on a NAS this process cannot read at all.
+ *
+ * `source` says how the board learned of it: `declared` is an agent calling `record_artifact`,
+ * `detected` is the runner recognising a write in a tool call the agent made without saying so,
+ * and `client` is an outside caller on `/mcp`. The server columns are snapshots rather than a
+ * join, for the reason `card_notes.author` is: "stored via the fs server over stdio" has to
+ * stay true after that server is renamed or deleted.
+ *
+ * Nothing prunes these, and a deleted card or a pruned run leaves the row standing — deleting a
+ * card does not delete the file it wrote, and a board that forgot the file would be the worse
+ * account of the two.
+ */
+export const artifacts = pgTable(
+  "artifacts",
+  {
+    id: id(),
+    projectId: text()
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    cardId: text().references(() => cards.id, { onDelete: "set null" }),
+    /** The run that produced it; null for a client's, and again once the run is pruned. */
+    runId: text().references(() => runs.id, { onDelete: "set null" }),
+    /** A path or URI, exactly as the tool was handed it — relative to whatever the server says. */
+    location: text().notNull(),
+    title: text().notNull().default(""),
+    description: text().notNull().default(""),
+    /** Declared, or guessed from the extension; null when neither said anything. */
+    mediaType: text(),
+    action: text({ enum: ["created", "updated", "moved", "deleted"] })
+      .notNull()
+      .default("created"),
+    source: text({ enum: ["declared", "detected", "client"] })
+      .notNull()
+      .default("declared"),
+    serverId: text().references(() => mcpServers.id, { onDelete: "set null" }),
+    /** Empty when nothing said which server stored it. */
+    serverSlug: text().notNull().default(""),
+    serverLabel: text().notNull().default(""),
+    /** `stdio` or `http` as the server was configured when it stored this; empty when unknown. */
+    transport: text().notNull().default(""),
+    /** The server's own tool name that wrote it, or empty. */
+    tool: text().notNull().default(""),
+    /** The length of the content the tool was handed, when it was handed one. */
+    sizeBytes: integer(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    index("artifacts_project_idx").on(table.projectId, table.createdAt),
+    index("artifacts_card_idx").on(table.cardId),
+  ],
+);
+
+/**
  * One lane of a saved board: everything that makes a lane a station, without the board.
  *
  * The arrows are indexes into the list they belong to rather than ids, because a template has
@@ -756,6 +815,7 @@ export const schema = {
   cardNotes,
   cardEvents,
   runs,
+  artifacts,
   boardTemplates,
   settings,
 };
@@ -841,6 +901,13 @@ export const relations = defineRelations(schema, (r) => ({
     // Which station this ran at — the timeline names it, and a rename since must not rewrite it.
     lane: r.one.lanes({ from: r.runs.laneId, to: r.lanes.id }),
   },
+  // One way only, and only what the board page draws: every relation is another branch in the
+  // generated filters of both tables it joins, and the MCP tool listing pays for it in bytes on
+  // every tool that reaches either — see `tests/mcp-endpoint.test.ts`.
+  artifacts: {
+    card: r.one.cards({ from: r.artifacts.cardId, to: r.cards.id }),
+    run: r.one.runs({ from: r.artifacts.runId, to: r.runs.id }),
+  },
 }));
 
 export type Role = typeof roles.$inferSelect;
@@ -856,5 +923,6 @@ export type CardDep = typeof cardDeps.$inferSelect;
 export type CardNote = typeof cardNotes.$inferSelect;
 export type CardEvent = typeof cardEvents.$inferSelect;
 export type Run = typeof runs.$inferSelect;
+export type Artifact = typeof artifacts.$inferSelect;
 export type BoardTemplate = typeof boardTemplates.$inferSelect;
 export type Settings = typeof settings.$inferSelect;

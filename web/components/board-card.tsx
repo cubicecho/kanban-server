@@ -56,7 +56,7 @@ type Lane = BoardQuery["lanes"][number];
 type BoardCard = BoardQuery["cards"][number];
 
 /** Which face of the card dialog to open on. */
-export type CardTab = "details" | "deps" | "notes" | "history";
+export type CardTab = "details" | "deps" | "notes" | "artifacts" | "history";
 
 /** What a card looks like while it is under the cursor, and nothing it can be clicked with. */
 export function CardGhost({ card }: { card: BoardCard }) {

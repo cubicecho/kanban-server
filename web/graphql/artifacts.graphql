@@ -1,0 +1,48 @@
+fragment ArtifactFields on Artifact {
+  id
+  cardId
+  runId
+  location
+  title
+  description
+  mediaType
+  action
+  source
+  serverSlug
+  serverLabel
+  transport
+  tool
+  sizeBytes
+  createdAt
+  updatedAt
+}
+
+# What one card left behind, oldest first — a card's own lists read as a story, as its history does.
+query CardArtifacts($cardId: String!) {
+  artifacts(
+    where: { cardId: { eq: $cardId } }
+    orderBy: { createdAt: { direction: asc, priority: 1 } }
+  ) {
+    ...ArtifactFields
+  }
+}
+
+# Everything the board has made, newest first. The card comes with it so a row can say whose it
+# is, and whether that card is still on the board to be opened.
+query ProjectArtifacts($projectId: String!, $limit: Int!) {
+  artifacts(
+    limit: $limit
+    where: { projectId: { eq: $projectId } }
+    orderBy: { createdAt: { direction: desc, priority: 1 } }
+  ) {
+    ...ArtifactFields
+    card {
+      id
+      title
+      archivedAt
+      lane {
+        name
+      }
+    }
+  }
+}

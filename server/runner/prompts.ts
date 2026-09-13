@@ -50,8 +50,10 @@ ordering constraint; parallel cards should have none.`;
 export const EXECUTE_SYSTEM = `You carry out one card of work using the tools available to you.
 
 Do the work rather than describing it. When a tool fails, say so plainly and say what you tried;
-do not report success you did not have. Finish by stating what you changed and how it can be
-checked against the card's acceptance criteria.`;
+do not report success you did not have. When you produce something meant to outlive this run — a
+file, a document, a page — call record_artifact with where it lives, if that tool is offered.
+Finish by stating what you changed and how it can be checked against the card's acceptance
+criteria.`;
 
 export const REVIEW_SYSTEM = `You review one card of work that another agent has finished.
 

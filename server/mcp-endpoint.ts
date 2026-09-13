@@ -15,7 +15,7 @@ import { registerPrompts } from "./mcp-prompts.ts";
  * `server/graphql/permissions.ts`, which is what makes it true of `/graphql` too — both doors
  * are one token and one schema, so a rule bolted onto this list would say nothing about the
  * same field reached over the query endpoint. This list is about an agent's context, which is
- * worth spending deliberately: thirty-six tools it will read is a different question from the
+ * worth spending deliberately: thirty-eight tools it will read is a different question from the
  * ninety-eighth mutation it must not call.
  *
  * The schema has fifty-odd root fields — aggregates, group-bys, bulk writes, the settings row
@@ -39,6 +39,7 @@ const TOOLS = [
   "Query.runEvents",
   "Query.cardEvents",
   "Query.cardNotes",
+  "Query.artifacts",
   "Query.blockers",
   "Query.agents",
   "Query.roles",
@@ -58,6 +59,7 @@ const TOOLS = [
   "Mutation.addCardNote",
   "Mutation.updateCardNote",
   "Mutation.deleteCardNote",
+  "Mutation.recordArtifact",
   "Mutation.moveCard",
   "Mutation.retryCard",
   "Mutation.archiveCard",
@@ -114,6 +116,14 @@ const HINTS: Record<string, string> = {
     "pruned. Every note of kind `note` is handed to the next agent that works the card, which " +
     "is what `add_card_note` is for; a report and a verdict are an account of what happened " +
     "and only the runner writes those. Filter by `cardId`.",
+  artifacts:
+    "What the work left behind, somewhere other than on the board: a file a card run wrote, a " +
+    "page it published, an object it uploaded. A record of where it lives, never its content — " +
+    "`location` is the path or URI as the storing tool was given it, and `serverSlug`, " +
+    "`serverLabel`, `transport` and `tool` say how it got there, kept as they were at the time. " +
+    "`source` is how the board learned of it: `declared` by the agent that made it, `detected` " +
+    "from a write in one of its tool calls, or `client` from `record_artifact`. `runId` is the " +
+    "run that made it. Filter by `cardId`, or by `projectId` for the whole board.",
   card_events:
     "A card's ledger: every move it has made, in `createdAt` order. `noteId` points at what " +
     "was said about the move — a reviewer's verdict in its own words, or what a person wrote " +
@@ -289,6 +299,8 @@ const WRITE_HINTS: Record<string, { destructiveHint?: boolean; idempotentHint?: 
   // what was there, which is the destructive half, and the convention cannot read that off a
   // name that starts with `set`.
   set_card_deps: { destructiveHint: true, idempotentHint: true },
+  // An account of work already done, and recording a location twice updates the one record.
+  record_artifact: { destructiveHint: false, idempotentHint: true },
   stop_card: { idempotentHint: true },
   stop_task: { idempotentHint: true },
   // Both replace rather than add, and both land the same way twice: saving the same board

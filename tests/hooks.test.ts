@@ -186,7 +186,11 @@ test("a card's run is handed what the hooks recall, and remembered once it is do
   const user = sent[0].messages.find((message) => message.role === "user")?.content ?? "";
   expect(user).toContain(`The owner prefers tabs. (session ${card.id})`);
   expect(user.indexOf("prefers tabs")).toBeLessThan(user.indexOf("indent the file"));
-  expect((sent[0].tools ?? []).map((tool) => tool.function.name)).toEqual(["memory__recall"]);
+  // `record_artifact` is the runner's own, offered to any card run that has tools to store with.
+  expect((sent[0].tools ?? []).map((tool) => tool.function.name)).toEqual([
+    "memory__recall",
+    "record_artifact",
+  ]);
   expect(run.hooks).toEqual([
     expect.objectContaining({ event: "beforeTurn", hookId: "recall", tokens: expect.any(Number) }),
   ]);

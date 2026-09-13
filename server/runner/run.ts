@@ -3,6 +3,7 @@ import type { HookContext } from "@cubicecho/agent-mcp-pool";
 import { and, asc, desc, eq, inArray, isNull, notInArray } from "drizzle-orm";
 import { errorMessage } from "../../shared/errors.ts";
 import type { HookNote } from "../../shared/hooks.ts";
+import { recordArtifact } from "../db/artifacts.ts";
 import { db } from "../db/client.ts";
 import { addNote, lastMoveNote, recordMove, saidAbout } from "../db/history.ts";
 import {
@@ -18,6 +19,7 @@ import {
   tasks,
 } from "../db/schema.ts";
 import { type AgentResult, runAgent } from "./agent.ts";
+import type { ArtifactDraft } from "./artifacts.ts";
 import { gather, HOST, notify } from "./hooks.ts";
 import { loadSettings, type Resolved, resolveAgentId, resolveRefineAgent } from "./llm.ts";
 import {
@@ -227,6 +229,16 @@ async function execute(
     ),
   } satisfies HookContext;
   const hookOptions = { scope: agent.serverIds, onEvent };
+  // Written as each one happens rather than with the outcome, so a run that is stopped or dies
+  // halfway still leaves the files it had already written on the card.
+  const keepArtifact = (cardId: string) => async (draft: ArtifactDraft) => {
+    const row = await recordArtifact(draft, {
+      projectId: options.projectId,
+      cardId,
+      runId: run.id,
+    });
+    onEvent({ kind: "notice", text: `artifact ${row.action}: ${row.location}` });
+  };
   let notes: HookNote[] = [];
 
   /**
@@ -280,6 +292,7 @@ async function execute(
       context: gathered.context,
       signal: controller.signal,
       onEvent,
+      onArtifact: options.cardId ? keepArtifact(options.cardId) : undefined,
     });
     onEvent({ kind: "done", ok: true, text: "finished" });
     const finished = await finish(run.id, {

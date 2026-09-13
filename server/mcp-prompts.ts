@@ -100,6 +100,10 @@ account (\`note\`). The last of those is the one you may write, with \`add_card_
 one of them is handed to the next agent that works the card — so it is how you tell that agent
 something the card's body does not say, without editing the card out from under whoever wrote it.
 
+What the work left *behind* — a file, a page, an upload — is in \`artifacts\`, one row per thing
+per run, saying where it lives and which server stored it. Card runs record their own; if you did
+work for a card yourself, \`record_artifact\` attaches what you made.
+
 ## When something has gone wrong
 
 Read \`runs\` for the project, ordered by \`startedAt\` descending: a finished run carries its
