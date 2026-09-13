@@ -87,6 +87,7 @@ query CardRuns($cardId: String!) {
     finishedAt
     output
     error
+    hooks
     totalTokens
     agent {
       name

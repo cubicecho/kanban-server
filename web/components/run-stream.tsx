@@ -1,5 +1,6 @@
 import { memo, useEffect, useRef, useState } from "react";
 import { RunEventsDocument, type RunEventsSubscription } from "@/__generated__/graphql";
+import { HookLine } from "@/components/hook-line";
 import { LiveDot } from "@/components/live-dot";
 import { TokenStats, type Usage } from "@/components/token-stats";
 import { subscribe } from "@/lib/gql";
@@ -226,8 +227,21 @@ const BlockView = memo(function BlockView({ block }: { block: Block }) {
           {block.text}
         </p>
       );
+    case "notice":
+      if (block.name === "hook") {
+        // The server's `hookEvent`: a summary line, then the context after a blank line.
+        const split = block.text.indexOf("\n\n");
+        return (
+          <HookLine
+            summary={split < 0 ? block.text : block.text.slice(0, split)}
+            context={split < 0 ? undefined : block.text.slice(split + 2)}
+            failed={block.ok === false}
+          />
+        );
+      }
+      return <p className="wrap-anywhere text-xs text-muted-foreground">{block.text}</p>;
     default:
-      // `notice` and `done`: the runner speaking rather than the model.
+      // `done`: the runner speaking rather than the model.
       return <p className="wrap-anywhere text-xs text-muted-foreground">{block.text}</p>;
   }
 });

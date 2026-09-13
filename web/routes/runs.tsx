@@ -13,6 +13,7 @@ import { ActionButton, ConfirmButton } from "@/components/app-buttons";
 import { Page, useCurrentProject } from "@/components/app-shell";
 import { DisclosureRow } from "@/components/disclosure-row";
 import { EmptyState, NoProject } from "@/components/empty-state";
+import { HookNotes } from "@/components/hook-line";
 import { MetaLine } from "@/components/meta-line";
 import { QueryState } from "@/components/query-state";
 import { RunStream } from "@/components/run-stream";
@@ -25,7 +26,6 @@ import { request } from "@/lib/gql";
 import { useProjectId } from "@/lib/project";
 import { compactTokens, duration } from "@/lib/runs";
 import { toastError } from "@/lib/toast";
-import type { HookNote } from "../../shared/hooks.ts";
 
 type Run = RunsQuery["runs"][number];
 
@@ -58,42 +58,6 @@ function ToolChips({ calls }: { calls: unknown }) {
           {tool.name}
         </span>
       ))}
-    </div>
-  );
-}
-
-/**
- * What the MCP servers' hooks did about this run: the context each added, and the ones that
- * failed. A hook that worked and added nothing is not here — a remember that succeeded is not news.
- * The after-the-run hooks land a moment after the run does, so a run just finished may gain a line.
- */
-function HookNotes({ notes }: { notes: unknown }) {
-  const list = (Array.isArray(notes) ? notes : []) as HookNote[];
-  if (list.length === 0) return null;
-  return (
-    <div className="flex flex-col gap-1 text-xs">
-      {list.map((note, index) => {
-        const name = `${note.source}/${note.hookId} · ${note.event}`;
-        return note.error ? (
-          <p
-            // biome-ignore lint/suspicious/noArrayIndexKey: one hook may note twice, and the list is only appended to
-            key={index}
-            className="font-mono text-destructive"
-          >
-            {name} failed: {note.error}
-          </p>
-        ) : (
-          // biome-ignore lint/suspicious/noArrayIndexKey: as above
-          <details key={index}>
-            <summary className="cursor-pointer font-mono text-muted-foreground">
-              {name} added {note.tokens ?? 0} tokens of context
-            </summary>
-            <pre className="mt-1 overflow-x-auto whitespace-pre-wrap rounded-md border p-2">
-              {note.text}
-            </pre>
-          </details>
-        );
-      })}
     </div>
   );
 }

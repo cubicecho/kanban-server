@@ -3,6 +3,7 @@ import { ArrowDownUp, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { CardRunsDocument, type CardRunsQuery } from "@/__generated__/graphql";
 import { FormField } from "@/components/form-field";
+import { HookNotes } from "@/components/hook-line";
 import { MetaLine } from "@/components/meta-line";
 import { RunStream } from "@/components/run-stream";
 import { RunStatusBadge, VerdictBadge } from "@/components/status-badge";
@@ -149,9 +150,12 @@ export function CardHistory({ cardId }: { cardId: string }) {
                   running ? (
                     <RunStream runId={run.id} />
                   ) : (
-                    <pre className="max-h-48 overflow-auto rounded-md bg-muted/30 p-2 text-xs whitespace-pre-wrap">
-                      {run.error || run.output || "(no output)"}
-                    </pre>
+                    <>
+                      <HookNotes notes={run.hooks} />
+                      <pre className="max-h-48 overflow-auto rounded-md bg-muted/30 p-2 text-xs whitespace-pre-wrap">
+                        {run.error || run.output || "(no output)"}
+                      </pre>
+                    </>
                   )
                 ) : null}
               </div>

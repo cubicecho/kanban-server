@@ -9,6 +9,7 @@ import {
   type RunEventInput,
 } from "@cubicecho/agent-core";
 import { validateHooks } from "@cubicecho/agent-mcp-pool";
+import { hookSummary } from "../../shared/hooks.ts";
 import { mcp } from "./mcp.ts";
 
 /**
@@ -47,11 +48,17 @@ export const PREFACE =
   "background nobody on the board wrote and may not be relevant. What you are asked to do " +
   "follows them.";
 
-/** The line a watcher sees for a note, on the run's event stream. */
-const describe = (note: HookNote) =>
-  note.error
-    ? `hook ${note.source}/${note.hookId} (${note.event}) failed: ${note.error}`
-    : `hook ${note.source}/${note.hookId} added ${note.tokens ?? 0} tokens of context`;
+/**
+ * A note as a run event: a `notice` named `hook`, its summary on the first line and the context
+ * the model was given after a blank line. The context is the point — a watcher told only that a
+ * hook added 300 tokens cannot see what the model was reading while the run is still going.
+ */
+export const hookEvent = (note: HookNote): RunEventInput => ({
+  kind: "notice",
+  name: "hook",
+  ok: !note.error,
+  text: note.text ? `${hookSummary(note)}\n\n${note.text}` : hookSummary(note),
+});
 
 /** Where a set of hooks is told to report, and whose servers they run on. */
 export interface HookOptions {
@@ -73,7 +80,7 @@ const runner =
     });
 
 const toEvents = (onEvent: HookOptions["onEvent"]) =>
-  onEvent ? (note: HookNote) => onEvent({ kind: "notice", text: describe(note) }) : undefined;
+  onEvent ? (note: HookNote) => onEvent(hookEvent(note)) : undefined;
 
 /**
  * Runs the injecting events' hooks ahead of a run and builds what they add to its prompt.

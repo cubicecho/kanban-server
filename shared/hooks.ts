@@ -17,6 +17,15 @@ import type { HookEvent, ToolHook } from "@cubicecho/agent-mcp-pool";
 export type { HookEvent, HookNote, ToolHook };
 
 /**
+ * One hook note in a line: what it added, or why it did not. Shared so the live stream, which
+ * only ever carries text, and the stored run say the same thing about the same hook.
+ */
+export const hookSummary = (note: HookNote) =>
+  note.error
+    ? `${note.source}/${note.hookId} (${note.event}) failed: ${note.error}`
+    : `${note.source}/${note.hookId} (${note.event}) added ~${note.tokens ?? 0} tokens of context`;
+
+/**
  * Every event, and when this server fires it. A card or a task is the session; each run is one
  * turn of it. `beforeCompact` is accepted so a row copied from min-agent saves, but nothing here
  * compacts — a run starts from nothing every time.
