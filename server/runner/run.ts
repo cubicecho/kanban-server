@@ -232,7 +232,7 @@ async function execute(
   /**
    * The hooks that read what happened, once it has. Not awaited by the run: the outcome is on the
    * row and the card has moved on by the time a slow memory server answers, and what these say —
-   * only ever failures — is added to the row when they do.
+   * that each hook ran, what it answered, or why it failed — is added to the row when they do.
    */
   const after = (status: "ok" | "stopped" | "error", output = "") => {
     const reply = output && options.answer ? options.answer(output) : output;

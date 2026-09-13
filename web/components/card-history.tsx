@@ -15,6 +15,9 @@ import { plural } from "@/lib/text";
 import { cn } from "@/lib/utils";
 
 type Run = CardRunsQuery["runs"][number];
+
+/** How long after a run ends its `afterTurn` and `sessionEnd` hooks are given to land. */
+const SETTLING_MS = 15_000;
 type Move = CardRunsQuery["cardEvents"][number];
 
 /** One line of the story: a run, the move it caused, or a move nothing ran for. */
@@ -72,9 +75,16 @@ export function CardHistory({ cardId }: { cardId: string }) {
   const history = useQuery({
     queryKey: ["card-runs", cardId],
     queryFn: () => request(CardRunsDocument, { cardId }),
-    // A card open while an agent is working it is the one time this changes under the reader.
+    // A card open while an agent is working it is the one time this changes under the reader —
+    // and a little after, since the hooks that remember a run note themselves once it is over.
     refetchInterval: (query) =>
-      query.state.data?.runs.some((run) => run.status === "running") ? 3000 : false,
+      query.state.data?.runs.some(
+        (run) =>
+          run.status === "running" ||
+          (run.finishedAt && Date.now() - new Date(run.finishedAt).getTime() < SETTLING_MS),
+      )
+        ? 3000
+        : false,
   });
 
   const entries = merge(history.data?.runs ?? [], history.data?.cardEvents ?? []);
@@ -109,7 +119,7 @@ export function CardHistory({ cardId }: { cardId: string }) {
             // read without opening anything. The rest is behind the click, with the output.
             const reason = event?.note?.body.split("\n")[0] ?? "";
             return (
-              <div key={id} className="flex flex-col gap-1">
+              <div key={id} className="flex min-w-0 flex-col gap-1">
                 <button
                   type="button"
                   className="flex w-full items-center gap-2 text-left"
@@ -152,7 +162,7 @@ export function CardHistory({ cardId }: { cardId: string }) {
                   ) : (
                     <>
                       <HookNotes notes={run.hooks} />
-                      <pre className="max-h-48 overflow-auto rounded-md bg-muted/30 p-2 text-xs whitespace-pre-wrap">
+                      <pre className="max-h-48 overflow-auto rounded-md bg-muted/30 p-2 text-xs whitespace-pre-wrap wrap-anywhere">
                         {run.error || run.output || "(no output)"}
                       </pre>
                     </>
