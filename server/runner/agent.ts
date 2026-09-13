@@ -32,6 +32,7 @@ import {
 } from "@cubicecho/agent-core";
 import type OpenAI from "openai";
 import { errorMessage } from "../../shared/errors.ts";
+import { withContext } from "./hooks.ts";
 import type { Resolved } from "./llm.ts";
 import { mcp } from "./mcp.ts";
 
@@ -49,6 +50,12 @@ export interface AgentOptions {
   /** Overrides the agent's own system prompt, for a caller that has more to say. */
   systemPrompt?: string;
   prompt: string;
+  /**
+   * What the MCP servers' hooks added for this run, as `<context>` blocks — see `hooks.ts`. It
+   * goes ahead of the prompt the model is sent, and not into what the tool preselector reads:
+   * a recalled memory is not a description of the job, and guessing tools off one guesses wrong.
+   */
+  context?: string;
   signal?: AbortSignal;
   /** Called as the run happens, for whoever is watching it. See `@cubicecho/agent-core`. */
   onEvent?: (event: RunEventInput) => void;
@@ -108,6 +115,7 @@ export async function runAgent({
   config,
   systemPrompt,
   prompt,
+  context = "",
   signal,
   onEvent,
 }: AgentOptions): Promise<AgentResult> {
@@ -184,7 +192,7 @@ export async function runAgent({
 
   const messages: OpenAI.ChatCompletionMessageParam[] = [
     { role: "system", content: systemPromptFor() },
-    { role: "user", content: prompt },
+    { role: "user", content: withContext(prompt, context) },
   ];
 
   const result: AgentResult = {

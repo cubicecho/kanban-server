@@ -1,3 +1,4 @@
+import type { ToolHook } from "@cubicecho/agent-mcp-pool";
 import { defineRelations } from "drizzle-orm";
 import {
   type AnyPgColumn,
@@ -11,6 +12,7 @@ import {
   timestamp,
   unique,
 } from "drizzle-orm/pg-core";
+import type { HookNote } from "../../shared/hooks.ts";
 
 /**
  * The whole domain, in one place. Postgres is the only database; `client.ts` chooses which
@@ -182,6 +184,20 @@ export const mcpServers = pgTable("mcp_servers", {
    * the next call without a reconnect.
    */
   callTimeoutMs: integer(),
+  /**
+   * This server's own tool names that are kept from the model: never offered, and refused if
+   * called. Its hooks can still call them, which is most of what hiding is for — a memory server's
+   * `remember` is for the board to call after a run, not for an agent to reach for mid-card.
+   * Read at call time by the pool, so an edit applies without a reconnect.
+   */
+  hiddenTools: jsonb().$type<string[]>().notNull().default([]),
+  /**
+   * Tool calls this server wants made at points in a card's or a task's life — recall before a
+   * run, remember after one, forget on a delete. The shape and the rules are the pool's; see
+   * `server/runner/hooks.ts` for when each event fires here. Checked with `validateHooks` on
+   * every write, and read at the time they run.
+   */
+  hooks: jsonb().$type<ToolHook[]>().notNull().default([]),
 });
 
 /**
@@ -617,6 +633,13 @@ export const runs = pgTable(
     promptTokens: integer().notNull().default(0),
     completionTokens: integer().notNull().default(0),
     totalTokens: integer().notNull().default(0),
+    /**
+     * What the MCP servers' hooks did around this run: the context each one added, and each
+     * one that failed. A hook that quietly worked leaves nothing. Kept on the row rather than
+     * only said on the event bus, because "what was this agent told that it did not ask for" is
+     * a question asked long after the bus has forgotten the run.
+     */
+    hooks: jsonb().$type<HookNote[]>().notNull().default([]),
   },
   (table) => [
     index("runs_project_idx").on(table.projectId),

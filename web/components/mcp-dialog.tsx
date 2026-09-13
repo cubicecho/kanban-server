@@ -20,8 +20,16 @@ import {
 import { FieldRow } from "@/components/field-row";
 import { FormDialog } from "@/components/form-dialog";
 import { FormField } from "@/components/form-field";
+import {
+  fromHookDrafts,
+  type HookDraft,
+  HooksEditor,
+  toHookDrafts,
+} from "@/components/hook-editor";
 import { ProbeResult } from "@/components/probe-result";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { request } from "@/lib/gql";
 import { parseJson, parseMcpJson } from "@/lib/mcp-config";
@@ -44,6 +52,8 @@ interface Draft {
   cwd: string;
   connectTimeoutMs: number | null;
   callTimeoutMs: number | null;
+  hiddenTools: string[];
+  hooks: HookDraft[];
 }
 
 const json = (value: unknown, fallback: string) =>
@@ -71,10 +81,13 @@ const connectionOf = (draft: Draft) => ({
 
 export function McpDialog({
   server,
+  tools = [],
   onClose,
   onSaved,
 }: {
   server?: McpServer;
+  /** What the pool has from this server, when it is connected. */
+  tools?: readonly { name: string }[];
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -90,6 +103,8 @@ export function McpDialog({
         slug: draft.slug.trim(),
         label: draft.label.trim(),
         enabled: draft.enabled,
+        hiddenTools: draft.hiddenTools,
+        hooks: fromHookDrafts(draft.hooks),
       };
       if (server) await request(UpdateMcpServerDocument, { id: server.id, set: values });
       else await request(CreateMcpServerDocument, { values });
@@ -115,6 +130,8 @@ export function McpDialog({
       cwd: server?.cwd ?? "",
       connectTimeoutMs: (server?.connectTimeoutMs ?? 0) as number | null,
       callTimeoutMs: (server?.callTimeoutMs ?? 0) as number | null,
+      hiddenTools: (server?.hiddenTools as string[] | undefined) ?? [],
+      hooks: toHookDrafts(server?.hooks),
     } satisfies Draft,
     onSubmit: ({ value }) => save.mutateAsync(value).catch(toastError),
   });
@@ -130,6 +147,9 @@ export function McpDialog({
     onSuccess: (result) => setProbe(result),
     onError: toastError,
   });
+
+  // A test answers for the config as typed, which is newer than whatever the pool connected to.
+  const toolNames = (probe?.ok ? probe.tools : tools).map((tool) => tool.name);
 
   const applyPaste = () => {
     try {
@@ -333,6 +353,68 @@ export function McpDialog({
         description="A disabled server stays configured but offers no tools."
         className="rounded-md border p-3"
       />
+
+      <form.AppField name="hiddenTools">
+        {(field) => (
+          <FormField
+            asGroup
+            label="Offered to the model"
+            description={
+              toolNames.length
+                ? "Off leaves a tool to this server's hooks: a memory server's remember is for a hook to call after every run, not for the model to decide on."
+                : "This server's tools are listed here once it has connected — test the connection to see them now."
+            }
+            control={(wiring) => (
+              <div {...wiring} className="flex flex-col gap-2 rounded-md border p-3">
+                {/* A name hidden on a tool the server no longer has stays listed, so it can go. */}
+                {[...new Set([...toolNames, ...field.state.value])].map((name) => {
+                  const hidden = field.state.value.includes(name);
+                  return (
+                    <div key={name} className="flex items-center justify-between gap-3 text-sm">
+                      <Label
+                        htmlFor={`tool-${name}`}
+                        className={cn("font-mono", hidden && "text-muted-foreground line-through")}
+                      >
+                        {name}
+                      </Label>
+                      <Switch
+                        id={`tool-${name}`}
+                        checked={!hidden}
+                        onCheckedChange={(offered) =>
+                          field.handleChange(
+                            offered
+                              ? field.state.value.filter((tool) => tool !== name)
+                              : [...field.state.value, name],
+                          )
+                        }
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          />
+        )}
+      </form.AppField>
+
+      <form.AppField name="hooks">
+        {(field) => (
+          <FormField
+            asGroup
+            label="Hooks"
+            description="This server's tools, called by the board at points in a run rather than by the model. A hook that fails is noted on the run and never stops it."
+            control={(wiring) => (
+              <div {...wiring}>
+                <HooksEditor
+                  value={field.state.value}
+                  tools={toolNames}
+                  onChange={(hooks) => field.handleChange(hooks)}
+                />
+              </div>
+            )}
+          />
+        )}
+      </form.AppField>
 
       {probe ? (
         <ProbeResult

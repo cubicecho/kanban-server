@@ -83,6 +83,8 @@ beforeAll(async () => {
     cwd: null,
     connectTimeoutMs: null,
     callTimeoutMs: null,
+    hiddenTools: [],
+    hooks: [],
   };
   const { mcp } = await import("../server/runner/mcp.ts");
   await mcp.sync([echo]);

@@ -12,6 +12,7 @@ query Runs($projectId: String, $limit: Int!) {
     output
     error
     toolCalls
+    hooks
     promptTokens
     completionTokens
     totalTokens

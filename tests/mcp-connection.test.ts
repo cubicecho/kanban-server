@@ -23,6 +23,8 @@ const row = (over: Partial<McpServerRow> & Pick<McpServerRow, "id" | "slug">): M
   cwd: null,
   connectTimeoutMs: null,
   callTimeoutMs: null,
+  hiddenTools: [],
+  hooks: [],
   ...over,
 });
 

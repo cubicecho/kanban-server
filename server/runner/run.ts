@@ -1,6 +1,8 @@
 import { emit, parseJson } from "@cubicecho/agent-core";
+import type { HookContext } from "@cubicecho/agent-mcp-pool";
 import { and, asc, desc, eq, inArray, isNull, notInArray } from "drizzle-orm";
 import { errorMessage } from "../../shared/errors.ts";
+import type { HookNote } from "../../shared/hooks.ts";
 import { db } from "../db/client.ts";
 import { addNote, lastMoveNote, recordMove, saidAbout } from "../db/history.ts";
 import {
@@ -16,6 +18,7 @@ import {
   tasks,
 } from "../db/schema.ts";
 import { type AgentResult, runAgent } from "./agent.ts";
+import { gather, HOST, notify } from "./hooks.ts";
 import { loadSettings, type Resolved, resolveAgentId, resolveRefineAgent } from "./llm.ts";
 import {
   cardPrompt,
@@ -128,6 +131,44 @@ interface ExecuteOptions {
   systemPrompt?: string;
   /** What to call this in the log and the first event. */
   label: string;
+  /**
+   * What the MCP hooks are told this run was asked, where that is not the prompt. A refinement's
+   * prompt is the whole thread; what a memory server should recall against and file is the one
+   * thing the person just said.
+   */
+  asked?: string;
+  /** What the hooks are told the run answered, where the output is not already that. */
+  answer?: (output: string) => string;
+}
+
+/**
+ * Hook work still running after the run it belongs to has finished — `afterTurn` and
+ * `sessionEnd` are not awaited, a memory server filing a card being no reason to hold the card
+ * `running`. Tests wait on it through `hooksSettled`.
+ */
+const settling = new Set<Promise<unknown>>();
+
+/** Resolves once every run's after-the-fact hooks have run, and their notes are on the row. */
+export const hooksSettled = () => Promise.all([...settling]).then(() => undefined);
+
+/** How many runs this subject has had: the index of its next turn, and zero for its first. */
+const turnsSoFar = (options: ExecuteOptions) =>
+  db.$count(
+    runs,
+    options.kind === "refine"
+      ? and(eq(runs.kind, "refine"), eq(runs.taskId, options.subjectId))
+      : eq(runs.cardId, options.subjectId),
+  );
+
+/** Adds notes to what a run's row already says about its hooks. */
+async function noteHooks(runId: string, notes: HookNote[]) {
+  if (!notes.length) return;
+  const [row] = await db.select({ hooks: runs.hooks }).from(runs).where(eq(runs.id, runId));
+  if (!row) return;
+  await db
+    .update(runs)
+    .set({ hooks: [...row.hooks, ...notes] })
+    .where(eq(runs.id, runId));
 }
 
 /**
@@ -146,6 +187,7 @@ async function execute(
   const { subjectId, agent, label } = options;
   if (inFlight.has(subjectId)) throw new Error(`${label} is already running`);
 
+  const index = await turnsSoFar(options);
   const [run] = await db
     .insert(runs)
     .values({
@@ -165,37 +207,106 @@ async function execute(
   const onEvent = (event: Parameters<typeof emit>[1]) => emit(run.id, event);
   onEvent({ kind: "notice", text: `${agent.name}: ${label}` });
 
+  // What every hook of this run is told. The card or task is the session and this run a turn of
+  // it; `vars` is what lets a server file by project rather than by card.
+  const asked = options.asked ?? options.prompt;
+  const hookContext = {
+    session: { id: subjectId },
+    host: HOST,
+    prompt: asked,
+    turn: { index },
+    vars: Object.fromEntries(
+      Object.entries({
+        kind: options.kind,
+        projectId: options.projectId,
+        cardId: options.cardId,
+        taskId: options.taskId,
+        laneId: options.laneId,
+        agent: agent.name,
+      }).filter(([, value]) => value != null),
+    ),
+  } satisfies HookContext;
+  const hookOptions = { scope: agent.serverIds, onEvent };
+  let notes: HookNote[] = [];
+
+  /**
+   * The hooks that read what happened, once it has. Not awaited by the run: the outcome is on the
+   * row and the card has moved on by the time a slow memory server answers, and what these say —
+   * only ever failures — is added to the row when they do.
+   */
+  const after = (status: "ok" | "stopped" | "error", output = "") => {
+    const reply = output && options.answer ? options.answer(output) : output;
+    const work = (async () => {
+      const told = [
+        ...(status === "ok"
+          ? await notify(
+              "afterTurn",
+              {
+                ...hookContext,
+                reply,
+                turn: {
+                  index,
+                  messages: [
+                    { speaker: "user", text: asked, uuid: `${run.id}:user` },
+                    { speaker: "assistant", text: reply, uuid: `${run.id}:assistant` },
+                  ],
+                },
+              },
+              hookOptions,
+            )
+          : []),
+        ...(await notify("sessionEnd", { ...hookContext, status, reply }, hookOptions)),
+      ];
+      await noteHooks(run.id, told);
+    })()
+      .catch((error) => console.warn(`[hooks] ${label}: ${errorMessage(error)}`))
+      .finally(() => settling.delete(work));
+    settling.add(work);
+  };
+
   try {
+    // Inside the try, on the run's own signal: a person who stops a run while its recall is
+    // still waiting on a slow server has stopped the recall too.
+    const gathered = await gather(
+      index === 0 ? ["sessionStart", "beforeTurn"] : ["beforeTurn"],
+      hookContext,
+      { ...hookOptions, signal: controller.signal },
+    );
+    notes = gathered.notes;
     const result = await runAgent({
       config: agent,
       systemPrompt: options.systemPrompt,
       prompt: options.prompt,
+      context: gathered.context,
       signal: controller.signal,
       onEvent,
     });
     onEvent({ kind: "done", ok: true, text: "finished" });
-    return {
-      run: await finish(run.id, {
-        status: "ok",
-        output: result.output,
-        toolCalls: result.toolCalls,
-        promptTokens: result.promptTokens,
-        completionTokens: result.completionTokens,
-        totalTokens: result.totalTokens,
-      }),
-      result,
-      ok: true,
-    };
+    const finished = await finish(run.id, {
+      status: "ok",
+      output: result.output,
+      toolCalls: result.toolCalls,
+      promptTokens: result.promptTokens,
+      completionTokens: result.completionTokens,
+      totalTokens: result.totalTokens,
+      hooks: notes,
+    });
+    after("ok", result.output);
+    return { run: finished, result, ok: true };
   } catch (error) {
     // A stopped run is not a failed one: it did what was asked of it, which was to stop.
     if (controller.signal.aborted) {
       onEvent({ kind: "done", ok: false, text: "stopped" });
-      return { run: await finish(run.id, { status: "stopped" }), ok: false };
+      const stopped = await finish(run.id, { status: "stopped", hooks: notes });
+      after("stopped");
+      return { run: stopped, ok: false };
     }
     const message = errorMessage(error);
     console.error(`[run] ${label}: ${message}`);
     onEvent({ kind: "done", ok: false, text: message });
-    return { run: await finish(run.id, { status: "error", error: message }), ok: false };
+    const failed = await finish(run.id, { status: "error", error: message, hooks: notes });
+    after("error");
+    return { run: failed, ok: false };
   } finally {
     inFlight.delete(subjectId);
   }
@@ -234,6 +345,9 @@ interface RefineReply {
   title?: string;
   brief?: string;
 }
+
+/** What the person is answered with: the reply asked for, or the prose that came back instead. */
+const replyOf = (output: string, parsed: RefineReply) => parsed.reply?.trim() || output.trim();
 
 /**
  * One turn of refining a task: the person says something, the agent answers, and the brief is
@@ -280,12 +394,14 @@ export async function refineTask(taskId: string, userMessage: string): Promise<R
       role: config.refinePrompt || REFINE_SYSTEM,
     }),
     prompt: `Current brief:\n${task.brief || "(nothing yet)"}\n\nConversation so far:\n\n${transcript}`,
+    asked: userMessage,
+    answer: (output) => replyOf(output, parseJson<RefineReply>(output) ?? {}),
   });
 
   if (run.status !== "ok" || !result) return run;
 
   const parsed = parseJson<RefineReply>(result.output) ?? {};
-  const reply = parsed.reply?.trim() || result.output.trim();
+  const reply = replyOf(result.output, parsed);
   await db.insert(messages).values({ taskId, role: "assistant", content: reply });
   await db
     .update(tasks)

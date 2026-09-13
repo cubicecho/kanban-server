@@ -435,6 +435,20 @@ empty box and a `0` back as null for both timeouts, because the pool reads 0 as 
 no time at all rather than as one given the default — the numeric knobs here that are not the
 agents' `0` sentinel, since the columns themselves are nullable.
 
+**Hooks are the pool's, and what a session is is ours.** `mcp_servers.hooks` and `hiddenTools`
+are agent-mcp-pool rows, the same shape min-agent keeps; `server/runner/hooks.ts` is the half
+that says a card or a task is the session and each run a turn of it. `execute` in `run.ts` fires
+`sessionStart` (a subject's first run, counted from `runs`) and `beforeTurn` inside its try on the
+run's own signal, and hands their `<context>` to `runAgent` as `context`, which goes on the user
+message rather than the system prompt — the system prompt is a lane's, shared by every card, and a
+prompt cache keeps it only while it does not change per card. `afterTurn` and `sessionEnd` are not
+awaited: a memory server filing a card is no reason to hold it `running`, and `hooksSettled()` is
+how a test waits for them. `sessionDelete` is fired from the `cards`, `tasks` and `projects` write
+hooks, the last reading the doomed ids in `before` since the cascade leaves `after` nothing to
+read. A hook never fails a run; what it did lands in `runs.hooks`. `shared/hooks.ts` copies the
+pool's variable table for the web, the pool being a server package, and `tests/hooks.test.ts`
+compares the copy against `hookVars` — edit both together.
+
 **Both packages come from npm, and the two forms before it are worth remembering.** They started
 as `file:../` links to sibling checkouts, which the Docker build cannot see at all — a sibling is
 outside the build context, so `npm ci` could not find it and there was no image. A git URL fixed

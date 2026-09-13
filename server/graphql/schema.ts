@@ -33,6 +33,7 @@ import {
   type TemplateLane,
   tasks,
 } from "../db/schema.ts";
+import { hookProblems, subjectsDeleted } from "../runner/hooks.ts";
 import { listModels, loadSettings } from "../runner/llm.ts";
 import { mcp } from "../runner/mcp.ts";
 import { EXPAND_CONTRACT, VERDICT_CONTRACT, WORK_CONTRACT } from "../runner/prompts.ts";
@@ -100,9 +101,33 @@ const { entities } = buildSchema(db, {
     // would do with a new one is draw the same four. So it comes with them, in the same
     // transaction — a rollback takes the lanes with it.
     projects: {
-      after: async ({ operation, rows, tx }) => {
+      // A project's delete takes its cards and tasks with it by cascade, which no hook of theirs
+      // sees. So their ids are read here, while they exist, and the servers are told once the
+      // delete has gone through — not before, or a refused delete would have forgotten them.
+      before: async ({ operation, args, tx }) => {
+        if (operation !== "delete") return;
+        const projectId = whereId(args);
+        if (!projectId) return;
+        const [doomedCards, doomedTasks] = await Promise.all([
+          (tx as typeof db)
+            .select({ id: cards.id })
+            .from(cards)
+            .where(eq(cards.projectId, projectId)),
+          (tx as typeof db)
+            .select({ id: tasks.id })
+            .from(tasks)
+            .where(eq(tasks.projectId, projectId)),
+        ]);
+        cascades.set(args, { cards: idsOf(doomedCards), tasks: idsOf(doomedTasks) });
+      },
+      after: async ({ operation, args, rows, tx }) => {
         if (operation === "insert" || operation === "upsert") {
           await seedLanes(tx as typeof db, rows as Project[]);
+        }
+        const doomed = operation === "delete" ? cascades.get(args) : undefined;
+        if (doomed) {
+          subjectsDeleted("card", doomed.cards);
+          subjectsDeleted("task", doomed.tasks);
         }
       },
     },
@@ -115,6 +140,9 @@ const { entities } = buildSchema(db, {
             "This task is being refined. Stop it first, then delete it.",
           );
         }
+      },
+      after: ({ operation, args, rows }) => {
+        if (operation === "delete") subjectsDeleted("task", idsOf(rows, args));
       },
     },
     cards: {
@@ -133,7 +161,8 @@ const { entities } = buildSchema(db, {
       // The lane is read back rather than taken off `rows`, which carry only the columns the
       // caller asked for: a client selecting `{ id }` would otherwise write an event saying the
       // card arrived nowhere. On `tx`, like the lane guard above, and for the same reason.
-      after: async ({ operation, rows, tx }) => {
+      after: async ({ operation, args, rows, tx }) => {
+        if (operation === "delete") subjectsDeleted("card", idsOf(rows, args));
         if (operation !== "insert" && operation !== "upsert") return;
         const ids = (rows as Card[]).map((row) => row.id).filter(Boolean);
         if (!ids.length) return;
@@ -186,7 +215,23 @@ const { entities } = buildSchema(db, {
     // Not `sync()`: this hook runs inside the mutation's transaction, so the pool would read
     // the table as it stood before the write it is reacting to. `syncSoon` waits past the
     // commit, and folds a batch of edits into one reconnect rather than one child process each.
-    mcpServers: () => mcp.syncSoon(),
+    mcpServers: {
+      // The pool runs these rows' hooks on every run, and a hook it cannot run — a `{{reply}}` on
+      // `beforeTurn`, where there is no reply yet — is skipped every time with nothing but a log
+      // line to say so. Refused here instead, every problem at once, so fixing one does not
+      // reveal the next on the following save.
+      before: ({ operation, args }) => {
+        if (operation === "delete") return;
+        const written = [args?.values, args?.set, args?.updates].flat().filter(Boolean);
+        const problems = written.flatMap((row) =>
+          hookProblems((row as { set?: unknown }).set ?? row),
+        );
+        if (problems.length) {
+          throw new GraphQLError(problems.join("\n"), { extensions: { code: "BAD_HOOKS" } });
+        }
+      },
+      after: () => mcp.syncSoon(),
+    },
   },
 });
 
@@ -324,6 +369,23 @@ async function wouldCycle(
  * here rolls the mutation back before it writes.
  */
 /** The one id a single-row write names, where it names one. */
+/**
+ * The ids a delete took, for the MCP servers' `sessionDelete` hooks.
+ *
+ * `rows` carry only the columns the caller selected, so a delete that asked for `{ title }` hands
+ * back no ids at all. The `where: { id: { eq } }` the app and every agent send is read as well,
+ * which covers the delete anybody actually makes; a bulk delete that selected no ids goes
+ * unannounced, and a memory server keeps a card nobody can reach — the cheap way to be wrong.
+ */
+function idsOf(rows: readonly unknown[], args?: unknown): string[] {
+  const ids = rows.map((row) => (row as { id?: unknown }).id);
+  const named = args === undefined ? undefined : whereId(args);
+  return [...new Set([...ids, named])].filter((id): id is string => typeof id === "string");
+}
+
+/** A project delete's cards and tasks, from its `before` hook to its `after`. Keyed by `args`. */
+const cascades = new WeakMap<object, { cards: string[]; tasks: string[] }>();
+
 function whereId(args: unknown): string | undefined {
   const where = (args as { where?: { id?: { eq?: unknown } } } | undefined)?.where;
   return typeof where?.id?.eq === "string" ? where.id.eq : undefined;
@@ -405,6 +467,13 @@ const McpToolType = new GraphQLObjectType({
   fields: {
     name: { type: new GraphQLNonNull(GraphQLString) },
     description: { type: new GraphQLNonNull(GraphQLString) },
+    hidden: {
+      type: new GraphQLNonNull(GraphQLBoolean),
+      description:
+        "In the server's `hiddenTools`: callable by its hooks, never offered to an agent's model.",
+      // A probe dials a config with no row behind it, so nothing it lists has been hidden.
+      resolve: (tool: { hidden?: boolean }) => tool.hidden === true,
+    },
   },
 });
 
