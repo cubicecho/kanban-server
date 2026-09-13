@@ -1,3 +1,4 @@
+import type { HookNote } from "@cubicecho/agent-core";
 import type { HookEvent, ToolHook } from "@cubicecho/agent-mcp-pool";
 
 /**
@@ -9,7 +10,11 @@ import type { HookEvent, ToolHook } from "@cubicecho/agent-mcp-pool";
  * `tests/hooks.test.ts` compares the variable lists against `hookVars` itself.
  */
 
-export type { HookEvent, ToolHook };
+/**
+ * What a run says about one hook, kept on the run row: the context it added, as the model read
+ * it, or why it added none. agent-core's, and only a type, so the web can have it too.
+ */
+export type { HookEvent, HookNote, ToolHook };
 
 /**
  * Every event, and when this server fires it. A card or a task is the session; each run is one
@@ -53,20 +58,3 @@ export const KANBAN_HOOK_VARS = [
   "vars.laneId",
   "vars.agent",
 ] as const;
-
-/**
- * What a run says about one hook, kept on the run row.
- *
- * A hook that worked and added nothing says nothing — a remember that succeeded is not news. One
- * that added context keeps the text as the pool cut it, so the run shows exactly what the model
- * was given; one that failed keeps why.
- */
-export interface HookNote {
-  event: HookEvent;
-  /** The server's label, or its slug. */
-  source: string;
-  hookId: string;
-  tokens?: number;
-  text?: string;
-  error?: string;
-}

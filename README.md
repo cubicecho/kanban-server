@@ -410,7 +410,7 @@ same one again.
 The two latch at different levels, and that is the point. One API key reaches every model a
 provider offers, so what the model somebody picked last refused must not be held against the one
 they pick next — a flag on the endpoint would quietly stop sending a `max_tokens` the next model
-takes perfectly well. So `capabilitiesFor(baseUrl)` holds the endpoint's, and what a model refused
+takes perfectly well. So `capabilitiesFor(baseUrl, apiKey)` holds the endpoint's, and what a model refused
 hangs off it under the name that endpoint knows the model by. What the board owns is which fields
 a refusal may take away: a refused temperature is dropped rather than replaced with the one value
 the model would accept, because the agent's own figure is what its page shows and sending a
