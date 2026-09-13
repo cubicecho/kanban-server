@@ -435,6 +435,23 @@ empty box and a `0` back as null for both timeouts, because the pool reads 0 as 
 no time at all rather than as one given the default — the numeric knobs here that are not the
 agents' `0` sentinel, since the columns themselves are nullable.
 
+**Hooks are the pool's, and what a session is is ours.** `mcp_servers.hooks` and `hiddenTools`
+are agent-mcp-pool rows, the same shape min-agent keeps; `server/runner/hooks.ts` is the half
+that says a card or a task is the session and each run a turn of it. Assembling the `<context>`
+blocks, capping them and writing the notes are agent-core's `gather`, `notify` and `withContext`,
+handed `mcp.runHooks` as the runner; what `hooks.ts` adds is the agent's scope, the preface —
+agent-core's speaks of a user's message, and nobody on a board sent one — and the run's events. `execute` in `run.ts` fires
+`sessionStart` (a subject's first run, counted from `runs`) and `beforeTurn` inside its try on the
+run's own signal, and hands their `<context>` to `runAgent` as `context`, which goes on the user
+message rather than the system prompt — the system prompt is a lane's, shared by every card, and a
+prompt cache keeps it only while it does not change per card. `afterTurn` and `sessionEnd` are not
+awaited: a memory server filing a card is no reason to hold it `running`, and `hooksSettled()` is
+how a test waits for them. `sessionDelete` is fired from the `cards`, `tasks` and `projects` write
+hooks, the last reading the doomed ids in `before` since the cascade leaves `after` nothing to
+read. A hook never fails a run; what it did lands in `runs.hooks`. `shared/hooks.ts` copies the
+pool's variable table for the web and re-exports agent-core's `HookNote` as a type, the pool being a server package, and `tests/hooks.test.ts`
+compares the copy against `hookVars` — edit both together.
+
 **Both packages come from npm, and the two forms before it are worth remembering.** They started
 as `file:../` links to sibling checkouts, which the Docker build cannot see at all — a sibling is
 outside the build context, so `npm ci` could not find it and there was no image. A git URL fixed
@@ -453,8 +470,8 @@ owns the retry loop, not the OpenAI SDK, whose own retries are off: once a chunk
 turn is unrepeatable, so a failure after that propagates. `requestTimeoutSeconds` is a silence
 watchdog that rearms on every chunk, not a deadline on the request. `agent.ts` hands it a
 `request(supported, byModel)` builder rather than one request, because the capability negotiation
-is the inner half of that loop — `capabilitiesFor(baseUrl)` latches what an endpoint turned out to
-accept, per endpoint rather than per process, so a second endpoint does not inherit the first
+is the inner half of that loop — `capabilitiesFor(baseUrl, apiKey)` latches what an endpoint turned out to
+accept, per endpoint — the URL and the key together — rather than per process, so a second endpoint does not inherit the first
 one's refusals. What `agent.ts` keeps of the old loop is the `ContextOverflow` it throws when the
 endpoint's own refusal comes back, since the wording that names both numbers is this server's —
 `runTurn` will size a request itself if handed a `contextLimit`, and is deliberately not, because
@@ -501,8 +518,8 @@ a client appends block by block is mostly parts and charging each only its text 
 proportion to how finely the content was split. There is no tokenizer here and no prospect of
 one, so it still runs low on tool schemas, which is the side to be wrong on — guessing high
 refuses a run that would have worked, and guessing low leaves us exactly where we were.
-`isOverflow` recognises the endpoint's own refusal and keeps its words, adding ours; either way
-it is a `ContextOverflow`, which `isTransient` will not retry, because the same request refused
+`runTurn` recognises the endpoint's own refusal and raises it as a `ContextOverflow` in its words,
+and `agent.ts` adds ours with the original as `cause`; either way it is a `ContextOverflow`, which `isTransient` will not retry, because the same request refused
 again is the same refusal.
 
 **Agents inherit from Settings by sentinel.** Every numeric knob treats `0` as "inherit",

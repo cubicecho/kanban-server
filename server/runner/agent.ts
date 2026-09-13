@@ -10,7 +10,6 @@ import {
   expandNames,
   getClient,
   inCatalog,
-  isOverflow,
   LOAD_TOOLS,
   LOAD_TOOLS_DEFINITION,
   loadResult,
@@ -29,9 +28,11 @@ import {
   sanitizeTools,
   timeoutMs,
   tryAsk,
+  withContext,
 } from "@cubicecho/agent-core";
 import type OpenAI from "openai";
 import { errorMessage } from "../../shared/errors.ts";
+import { PREFACE } from "./hooks.ts";
 import type { Resolved } from "./llm.ts";
 import { mcp } from "./mcp.ts";
 
@@ -49,6 +50,12 @@ export interface AgentOptions {
   /** Overrides the agent's own system prompt, for a caller that has more to say. */
   systemPrompt?: string;
   prompt: string;
+  /**
+   * What the MCP servers' hooks added for this run, as `<context>` blocks — see `hooks.ts`. It
+   * goes ahead of the prompt the model is sent, and not into what the tool preselector reads:
+   * a recalled memory is not a description of the job, and guessing tools off one guesses wrong.
+   */
+  context?: string;
   signal?: AbortSignal;
   /** Called as the run happens, for whoever is watching it. See `@cubicecho/agent-core`. */
   onEvent?: (event: RunEventInput) => void;
@@ -108,6 +115,7 @@ export async function runAgent({
   config,
   systemPrompt,
   prompt,
+  context = "",
   signal,
   onEvent,
 }: AgentOptions): Promise<AgentResult> {
@@ -136,7 +144,7 @@ export async function runAgent({
   // not cost a cloud agent its token counts. What one *model* on it refused hangs off this by
   // name — one key reaches every model a provider offers, so a refusal from the model somebody
   // picked last must not speak for the one they pick next.
-  const supports = capabilitiesFor(config.baseUrl);
+  const supports = capabilitiesFor(config.baseUrl, config.apiKey);
   // The window, once anything wants to know it. An agent that names its own is answered from
   // the row; anything else costs a listing, so it is not asked for until a request is big
   // enough for the answer to change what happens — see `SMALLEST_LIKELY_WINDOW`.
@@ -182,10 +190,16 @@ export async function runAgent({
   const systemPromptFor = () =>
     onDemand ? `${system}\n\n${catalogPrompt(catalog, loaded)}`.trim() : system;
 
-  const messages: OpenAI.ChatCompletionMessageParam[] = [
-    { role: "system", content: systemPromptFor() },
-    { role: "user", content: prompt },
-  ];
+  // A fresh array either way, so the loop below may write into it.
+  const messages = withContext(
+    [
+      { role: "system", content: systemPromptFor() },
+      { role: "user", content: prompt },
+    ],
+    1,
+    context,
+    PREFACE,
+  );
 
   const result: AgentResult = {
     output: "",
@@ -279,15 +293,17 @@ export async function runAgent({
           onNotice: notice,
         });
       } catch (error) {
-        const detail = errorMessage(error);
         // The endpoint got there first — its window is smaller than anything we could read.
-        // Kept in its own words, because they are the true ones, with ours added: the whole
-        // difficulty of this failure is that the number in it disagrees with the model's.
-        if (isOverflow(detail)) {
+        // `runTurn` has already told it from any other refusal; kept in its own words, because
+        // they are the true ones, with ours added: the whole difficulty of this failure is that
+        // the number in it disagrees with the model's.
+        if (error instanceof ContextOverflow) {
+          const detail = error.message;
           throw new ContextOverflow(
             contextLimit > 0
               ? `${detail} — this agent was working to ${compact(contextLimit)} tokens (${stated}). ${advice}`
               : `${detail} — ${advice}`,
+            { cause: error },
           );
         }
         throw error;

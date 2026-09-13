@@ -410,11 +410,46 @@ same one again.
 The two latch at different levels, and that is the point. One API key reaches every model a
 provider offers, so what the model somebody picked last refused must not be held against the one
 they pick next — a flag on the endpoint would quietly stop sending a `max_tokens` the next model
-takes perfectly well. So `capabilitiesFor(baseUrl)` holds the endpoint's, and what a model refused
+takes perfectly well. So `capabilitiesFor(baseUrl, apiKey)` holds the endpoint's, and what a model refused
 hangs off it under the name that endpoint knows the model by. What the board owns is which fields
 a refusal may take away: a refused temperature is dropped rather than replaced with the one value
 the model would accept, because the agent's own figure is what its page shows and sending a
 different number back as though it were the operator's setting would make that a lie.
+
+### Hooks
+
+A server row can name its own tools to be called at points in a run rather than by the model —
+which is what a memory server wants: recall before a card is worked, remember what came of it
+afterwards, forget when the card is deleted. They are `@cubicecho/agent-mcp-pool`'s hooks, the same
+rows min-agent keeps, and they are edited under **Hooks** in a server's dialog.
+
+A session here is a card or a task, and every run against it is one turn of that session, so a
+card's Doing run and its Review run are filed under the same id.
+
+| Event | Fires |
+| --- | --- |
+| `sessionStart` | before the first run a card or task has had (counted from `runs`) |
+| `beforeTurn` | before every run |
+| `afterTurn` | after a run that finished `ok`, with `{{prompt}}` and `{{reply}}` |
+| `sessionEnd` | after every run, with `{{status}}` — `ok`, `stopped` or `error` |
+| `sessionDelete` | when a card or task is deleted, a project's cascade included |
+| `beforeCompact` | never — a run starts from nothing, and nothing is compacted |
+
+Every hook also gets `{{session.id}}`, `{{host}}` (`kanban-server`) and `{{now}}`, and
+`{{vars.kind}}`, `{{vars.projectId}}`, `{{vars.cardId}}`, `{{vars.taskId}}`, `{{vars.laneId}}` and
+`{{vars.agent}}`, so a memory can be filed by project rather than by card. Only the first two events
+can inject: what they return goes ahead of the run's prompt as `<context>` blocks, capped at 2000
+tokens between them. A hook runs on the servers the run's agent is linked to, except
+`sessionDelete`, which tells every server — no agent is involved in a delete.
+
+A hook never fails a run. The ones before it are bounded (3s each unless the row says otherwise)
+and ended by stopping the run; the ones after it are not awaited. What each did is kept on the run
+row as `runs.hooks` — the context it added, or why it failed — and drawn on the Runs page.
+
+**Hidden tools** go with them. `hiddenTools` names tools the model is never offered and that only
+a hook may call, so a `remember` meant for after every run is not something the model decides to
+do; switch a tool off under *Offered to the model*. Both columns are checked on write, and a hook
+naming a variable its event does not carry is refused with `BAD_HOOKS`.
 
 ### Where the agent loop lives
 

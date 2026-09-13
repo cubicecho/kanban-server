@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Item, ItemActions, ItemContent, ItemFooter, ItemTitle } from "@/components/ui/item";
 import { request } from "@/lib/gql";
 import { toConnection } from "@/lib/mcp-config";
+import { plural } from "@/lib/text";
 import { toastError } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 
@@ -132,6 +133,11 @@ export function McpRoute() {
                     {toolCount(tools.length)}
                   </span>
                 ) : null}
+                {Array.isArray(server.hooks) && server.hooks.length ? (
+                  <span className="font-normal text-muted-foreground text-xs">
+                    {plural(server.hooks.length, "hook")}
+                  </span>
+                ) : null}
               </ItemTitle>
               <p className="truncate font-mono text-muted-foreground text-xs">
                 {server.transport === "stdio"
@@ -193,7 +199,12 @@ export function McpRoute() {
       {creating ? (
         <McpDialog onClose={() => setCreating(false)} onSaved={refresh} />
       ) : editing ? (
-        <McpDialog server={editing} onClose={() => setEditing(null)} onSaved={refresh} />
+        <McpDialog
+          server={editing}
+          tools={statusOf(editing.id)?.tools}
+          onClose={() => setEditing(null)}
+          onSaved={refresh}
+        />
       ) : null}
     </Page>
   );
