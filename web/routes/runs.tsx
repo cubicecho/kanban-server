@@ -227,7 +227,7 @@ export function RunsRoute() {
                     ) : null}
                     <HookNotes notes={run.hooks} />
                     <ToolChips calls={run.toolCalls} />
-                    <pre className="overflow-x-auto text-sm whitespace-pre-wrap">
+                    <pre className="overflow-x-auto text-sm whitespace-pre-wrap wrap-anywhere">
                       {run.error || run.output || "(no output)"}
                     </pre>
                   </>
