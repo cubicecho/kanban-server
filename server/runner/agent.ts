@@ -32,6 +32,13 @@ import {
 } from "@cubicecho/agent-core";
 import type OpenAI from "openai";
 import { errorMessage } from "../../shared/errors.ts";
+import {
+  type ArtifactDraft,
+  declaredArtifact,
+  detectArtifact,
+  RECORD_ARTIFACT,
+  RECORD_ARTIFACT_DEFINITION,
+} from "./artifacts.ts";
 import { PREFACE } from "./hooks.ts";
 import type { Resolved } from "./llm.ts";
 import { mcp } from "./mcp.ts";
@@ -59,6 +66,13 @@ export interface AgentOptions {
   signal?: AbortSignal;
   /** Called as the run happens, for whoever is watching it. See `@cubicecho/agent-core`. */
   onEvent?: (event: RunEventInput) => void;
+  /**
+   * Where what the run leaves behind goes — see `artifacts.ts`. Given, the model is offered
+   * `record_artifact` and every successful call is read for a write; not given, neither happens,
+   * which is what a refinement is. Awaited, so a record lands before the run can finish, and a
+   * sink that throws costs the run nothing but a notice.
+   */
+  onArtifact?: (draft: ArtifactDraft) => Promise<void>;
 }
 
 /** Long tool arguments and results are for the model; a watcher needs the gist. */
@@ -118,6 +132,7 @@ export async function runAgent({
   context = "",
   signal,
   onEvent,
+  onArtifact,
 }: AgentOptions): Promise<AgentResult> {
   const model = config.model;
   if (!model) {
@@ -166,6 +181,17 @@ export async function runAgent({
   const catalog = mcp.catalog(config.serverIds);
   const onDemand = config.toolDiscovery === "ondemand" && catalog.length > 0;
   const loaded = new Set<string>();
+  // Offered only to an agent that has something to store things with: with no tools at all there
+  // is nothing it could have made, and a lone `record_artifact` would invite it to make one up.
+  const recording = onArtifact && mcp.tools({ servers: config.serverIds }).length > 0;
+  const keep = async (draft: ArtifactDraft | null) => {
+    if (!draft || !onArtifact) return;
+    try {
+      await onArtifact(draft);
+    } catch (error) {
+      notice(`could not record artifact ${draft.location}: ${errorMessage(error)}`);
+    }
+  };
 
   const preselected = onDemand
     ? ((await tryAsk(
@@ -224,13 +250,15 @@ export async function runAgent({
 
     // MCP servers emit JSON Schema shapes a strict backend cannot compile — Gmail's, for one.
     // Normalising them here is cheap and cloud providers accept the result unchanged.
-    const declared = sanitizeTools(
-      routed
+    // `record_artifact` goes last, so the tools a prompt cache has already seen keep their place.
+    const declared = sanitizeTools([
+      ...(routed
         ? mcp.tools({ names: preselected, servers: config.serverIds })
         : onDemand
           ? [LOAD_TOOLS_DEFINITION, ...mcp.tools({ names: [...loaded], servers: config.serverIds })]
-          : mcp.tools({ servers: config.serverIds }),
-    );
+          : mcp.tools({ servers: config.serverIds })),
+      ...(recording ? [RECORD_ARTIFACT_DEFINITION] : []),
+    ]);
 
     // Rebuilt on every attempt rather than held: what `runTurn` negotiates away changes what
     // goes in the body, and `relaxTools` has to apply to the schemas that were just sanitised.
@@ -355,11 +383,19 @@ export async function runAgent({
           for (const loadedName of resolved.matched) loaded.add(loadedName);
           content = loadResult(resolved, catalog);
           ok = resolved.matched.length > 0;
+        } else if (name === RECORD_ARTIFACT && recording) {
+          const draft = declaredArtifact(args);
+          await keep(draft);
+          ok = draft !== null;
+          content = draft
+            ? `Recorded ${draft.location}.`
+            : "Nothing recorded: `location` is required.";
         } else {
           // A model that skips `load_tools` and calls a catalogued tool straight from its name
           // is right about what it wants; load it and run it rather than erroring.
           if (onDemand && !loaded.has(name) && inCatalog(catalog, name)) loaded.add(name);
           content = await mcp.call(name, args, config.serverIds);
+          if (recording) await keep(detectArtifact(name, args, true));
         }
       } catch (error) {
         content = errorMessage(error);

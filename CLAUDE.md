@@ -246,6 +246,25 @@ argument the ledger is read-only on. `author` is stored rather than worked out f
 because `runRetentionDays` empties that and a pruned agent's report must not start reading as
 somebody's own words.
 
+**An artifact is a record, not a copy.** `artifacts` says that a card's work put something
+somewhere — a file through a filesystem server, a page on a wiki, an object on a NAS — and how:
+`serverSlug`, `serverLabel`, `transport` and `tool` are snapshots of the server it went through,
+stored rather than joined for the same reason `card_notes.author` is, since a server row edited or
+deleted must not rewrite how a thing was stored. Nothing here reads the thing back, and nothing
+could promise to: a location on somebody's NAS is not a path this process can open.
+
+There are three ways a row arrives, and `source` says which. `detected` is the runner reading a
+successful MCP call whose tool name starts with a write verb and whose arguments name a location
+(`detectArtifact` in `server/runner/artifacts.ts`, pure); `declared` is the agent calling the
+built-in `record_artifact` tool, offered only on a card run with MCP tools to write with; `client`
+is `recordArtifact` over GraphQL or `/mcp`. `server/db/artifacts.ts` is the one writer, and it
+folds repeats within a run by location, so a write followed by a declaration is one row carrying
+both the size and the title — while a second pass round a rework loop is a second row, each pass
+being something that happened. Rows are written as the calls land rather than when the run
+finishes, so a stopped or crashed run keeps what it had already made, and a sink that fails is a
+notice rather than a failed run. `features` keeps the table out of generated writes, and no one —
+operator included — can edit or delete a row through the API.
+
 **A verdict is not an account of the work.** A station whose role has the `verdict` contract
 writes a `verdict` note rather than another `report` — overwriting the executor's account with
 the word `PASS` would lose the one thing the next agent round the loop has to read. That note is
@@ -344,7 +363,7 @@ worth noticing, being the one where nothing will happen until somebody says so.
 **Hand-written GraphQL fields go in `server/graphql/`**, beside the generated entities:
 `models`, `mcpStatus`, `runEvents`, `blockers`, `spend` on the query side; `refineTask`,
 `makeCard`, `submitCard`, `runCard`, `stopCard`, `stopTask`, `moveCard`, `retryCard`,
-`archiveCard`, `restoreCard`, `setCardDeps`, `addCardNote`, `updateCardNote`, `deleteCardNote`,
+`archiveCard`, `restoreCard`, `setCardDeps`, `recordArtifact`, `addCardNote`, `updateCardNote`, `deleteCardNote`,
 `setAgentServers`,
 `testMcpServer`, `reconnectMcp`, `setApiKey`, `setAgentApiKey` on the mutation side. Give every
 one of them a `description` — it is what an agent on `/mcp` reads to decide whether to call it.
@@ -363,7 +382,7 @@ tests hold that line.
 
 **The `/mcp` surface is curated, not the whole schema — and the curation is a listing, not
 a lock.** What an agent may reach is `permissions.ts`, below. `server/mcp-endpoint.ts` lists the
-thirty-six tools an outside client gets. Nothing that empties a table in one call, nothing that
+thirty-eight tools an outside client gets. Nothing that empties a table in one call, nothing that
 reads or writes the API key, and no editing of agents, roles or MCP servers — a visiting client can
 see which agents and roles exist, because a lane points at each, but which model runs where and on
 whose key is the operator's business. A new tool goes in that list deliberately,
@@ -389,11 +408,14 @@ disarms `prompts/get` alongside `tools/call`.
 recurse between tables, and written out as JSON Schema rather than named as SDL they would make
 the listing enormous — more than a model will read, and it arrives before any call. graphql-mcp
 builds each input type once so the repeats become `$ref`s. `tests/mcp-endpoint.test.ts` holds
-every tool under 100 kB and the listing under 1 MB — ~68 kB and ~835 kB as it stands, down from
+every tool under 100 kB and the listing under 1 MB — ~75 kB and ~935 kB as it stands, down from
 ~88 kB and ~1.1 MB before drizzle-graphql 12, which gives each column type only the operators it
 can use rather than one filter shape for every column. The bounds sit above the real figure on
 purpose: it is the driver's to move, and what the test is for is the order of magnitude.
 Anything added here that grows it needs to answer to that test rather than raise the bound.
+A new query tool costs the better part of 75 kB whatever its own shape, and a `many` relation
+back to a new table from `cards`, `runs` or `projects` costs another 80 kB across every tool that
+reaches them — which is why `artifacts` points at its card and run and nothing points back.
 
 The same test file reaches a tool's `where` through `$ref`s and null branches rather than
 reading its layout, because that layout is the conversion of the week and has changed under us
@@ -582,7 +604,7 @@ query keys it affected.
 **A thing the board has a word for is drawn by one component.** Between `ui/` and the routes sits
 a layer of domain components, built out of the primitives and named after what they say rather
 than how they look: `status-badge.tsx` (a card's status, a run's, a verdict), `live-dot.tsx`,
-`meta-line.tsx`, `disclosure-row.tsx` — the openable row Runs, Tasks and the archive are all
+`meta-line.tsx`, `disclosure-row.tsx` — the openable row Runs, Tasks, Artifacts and the archive are all
 lists of — `probe-result.tsx` and `show-more.tsx`. Every one of them replaced a copy per page,
 and every one of those copies had drifted: a `running` card was green on the board and grey on
 Runs, a card's status in Tasks was grey whatever it said, and the meta line under a title grew a

@@ -51,6 +51,7 @@ type SubjectName =
   | "CardNote"
   | "CardEvent"
   | "CardDep"
+  | "Artifact"
   | "Run"
   | "BoardTemplate"
   | "Agent"
@@ -61,7 +62,16 @@ type SubjectName =
 
 type Subjects = Record<SubjectName, Record<string, unknown>>;
 
-const BOARD = ["Project", "Lane", "Card", "Task", "Message", "CardNote", "CardDep"] as const;
+const BOARD = [
+  "Project",
+  "Lane",
+  "Card",
+  "Task",
+  "Message",
+  "CardNote",
+  "CardDep",
+  "Artifact",
+] as const;
 const CONFIG = ["Agent", "Role", "McpServer", "AgentServer", "Setting"] as const;
 
 /**
@@ -93,6 +103,8 @@ function abilitiesFor(caller: Caller) {
   // station that rewires itself is one nobody can reason about afterwards. No `Setting`, no
   // `Agent`, no `McpServer`, and no deleting a `Project`, which takes a board and its history.
   can([Actions.create, Actions.update], ["Project", "Card", "Task", "CardNote", "CardDep"]);
+  // Saying what it made, and only that: an artifact is an account, so nobody edits one after.
+  can(Actions.create, "Artifact");
   can(Actions.delete, ["Card", "Task", "CardNote", "CardDep"]);
   can([Actions.create, Actions.update], "BoardTemplate");
   return build();
@@ -193,6 +205,8 @@ const MUTATIONS: Record<string, Rule> = {
   addCardNote: canUser(Actions.create, "CardNote"),
   updateCardNote: canUser(Actions.update, "CardNote"),
   deleteCardNote: canUser(Actions.delete, "CardNote"),
+
+  recordArtifact: canUser(Actions.create, "Artifact"),
 
   createCardDep: canUser(Actions.create, "CardDep"),
   updateCardDep: canUser(Actions.update, "CardDep"),

@@ -139,6 +139,7 @@ test("offers the board tools, and only those", async () => {
     "agents",
     "apply_board_template",
     "archive_card",
+    "artifacts",
     "blockers",
     "board_templates",
     "card_events",
@@ -154,6 +155,7 @@ test("offers the board tools, and only those", async () => {
     "make_card",
     "move_card",
     "projects",
+    "record_artifact",
     "refine_task",
     "restore_card",
     "retry_card",
@@ -319,9 +321,12 @@ test("advertises tools small enough for a client to read", async () => {
   // route rather than emitting a `$ref` writes the recursion out at every level. That is a
   // difference of orders of magnitude, and it lands before a single call can be made.
   //
-  // The listing is ~835 kB and the largest tool ~68 kB, down from ~1.1 MB and ~88 kB: drizzle-
-  // graphql 12 gives each column type only the operators it can use, so a timestamp no longer
-  // advertises `ilike` and an enum no longer advertises `startsWith`. The bounds sit above that
+  // The listing is ~935 kB and the largest tool ~75 kB. It was ~1.1 MB and ~88 kB before
+  // drizzle-graphql 12 gave each column type only the operators it can use, so a timestamp no
+  // longer advertises `ilike` and an enum no longer advertises `startsWith`; `artifacts` and
+  // `record_artifact` then added ~100 kB, one more table being one more tool's worth of filter
+  // types — and relations from `cards`, `runs` and `projects` back to it would have added as
+  // much again to theirs, which is why there are none. The bounds sit above that
   // because the exact figure is not ours to hold — it has moved on a zod major before now — and
   // what is being caught is the order of magnitude, which a return to per-route copies trips by
   // thirty times.
@@ -500,6 +505,7 @@ test("marks only the tools that actually destroy something", async () => {
     "delete_task",
     "make_card",
     "move_card",
+    "record_artifact",
     "refine_task",
     "restore_card",
     "retry_card",
@@ -520,6 +526,7 @@ test("marks only the tools that actually destroy something", async () => {
     "delete_card_note",
     "delete_task",
     "move_card",
+    "record_artifact",
     "restore_card",
     "retry_card",
     "save_board_template",
@@ -530,6 +537,7 @@ test("marks only the tools that actually destroy something", async () => {
   // And every read is marked as one, which is what lets a client re-ask without asking anyone.
   expect(flagged("idempotentHint").filter((name) => !writes.has(name))).toEqual([
     "agents",
+    "artifacts",
     "blockers",
     "board_templates",
     "card_events",

@@ -8,6 +8,7 @@ import {
   UpdateCardDocument,
 } from "@/__generated__/graphql";
 import { InputField, TextareaField, useAppForm } from "@/components/app-form";
+import { CardArtifacts } from "@/components/card-artifacts";
 import { CardDepsField, type DepCard } from "@/components/card-deps-field";
 import { CardHistory } from "@/components/card-history";
 import { CardNotes } from "@/components/card-notes";
@@ -52,7 +53,7 @@ export function CardDialog({
    * each of which is a card opened because of something said about it. A card that does not
    * exist yet has neither notes nor a history, so it opens on `details` whatever is asked for.
    */
-  tab?: "details" | "deps" | "notes" | "history";
+  tab?: "details" | "deps" | "notes" | "artifacts" | "history";
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
@@ -179,6 +180,7 @@ export function CardDialog({
           {/* A card that does not exist yet has neither notes nor a history, and asking
               for either would be a query for the id of a row nobody has written. */}
           {card ? <TabsTrigger value="notes">Notes</TabsTrigger> : null}
+          {card ? <TabsTrigger value="artifacts">Artifacts</TabsTrigger> : null}
           {card ? <TabsTrigger value="history">History</TabsTrigger> : null}
         </TabsList>
 
@@ -250,6 +252,12 @@ export function CardDialog({
         {card ? (
           <TabsContent value="notes">
             <CardNotes cardId={card.id} />
+          </TabsContent>
+        ) : null}
+
+        {card ? (
+          <TabsContent value="artifacts">
+            <CardArtifacts cardId={card.id} running={card.status === "running"} />
           </TabsContent>
         ) : null}
 

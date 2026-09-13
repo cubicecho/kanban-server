@@ -4,6 +4,7 @@ import {
   Activity,
   Archive,
   Bot,
+  FileBox,
   FolderOpen,
   History,
   KanbanSquare,
@@ -56,6 +57,7 @@ const PROJECT_NAV = [
   { to: "/board", label: "Board", icon: KanbanSquare },
   { to: "/tasks", label: "Tasks", icon: ListChecks },
   { to: "/runs", label: "Runs", icon: History },
+  { to: "/artifacts", label: "Artifacts", icon: FileBox },
   { to: "/archive", label: "Archive", icon: Archive },
 ] as const;
 
