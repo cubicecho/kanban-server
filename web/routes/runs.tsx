@@ -16,6 +16,7 @@ import { EmptyState, NoProject } from "@/components/empty-state";
 import { HookNotes } from "@/components/hook-line";
 import { MetaLine } from "@/components/meta-line";
 import { QueryState } from "@/components/query-state";
+import { StoredRunPrompt } from "@/components/run-prompt";
 import { RunStream } from "@/components/run-stream";
 import { ShowMore } from "@/components/show-more";
 import { RunStatusBadge } from "@/components/status-badge";
@@ -225,6 +226,7 @@ export function RunsRoute() {
                         className="self-start"
                       />
                     ) : null}
+                    <StoredRunPrompt runId={run.id} />
                     <HookNotes notes={run.hooks} />
                     <ToolChips calls={run.toolCalls} />
                     <pre className="overflow-x-auto text-sm whitespace-pre-wrap wrap-anywhere">

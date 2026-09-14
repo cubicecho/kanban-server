@@ -3,6 +3,7 @@ import type { HookContext } from "@cubicecho/agent-mcp-pool";
 import { and, asc, desc, eq, inArray, isNull, notInArray } from "drizzle-orm";
 import { errorMessage } from "../../shared/errors.ts";
 import type { HookNote } from "../../shared/hooks.ts";
+import { PROMPT_EVENT } from "../../shared/run-prompt.ts";
 import { recordArtifact } from "../db/artifacts.ts";
 import { db } from "../db/client.ts";
 import { addNote, lastMoveNote, recordMove, saidAbout } from "../db/history.ts";
@@ -293,6 +294,12 @@ async function execute(
       signal: controller.signal,
       onEvent,
       onArtifact: options.cardId ? keepArtifact(options.cardId) : undefined,
+      onPrompt: async (prompt) => {
+        // Said before it is stored: a watcher is owed the opening of the run whether or not the
+        // row can be written, and the event is the one a live stream draws first.
+        onEvent({ kind: "notice", name: PROMPT_EVENT, text: JSON.stringify(prompt) });
+        await db.update(runs).set({ prompt }).where(eq(runs.id, run.id));
+      },
     });
     onEvent({ kind: "done", ok: true, text: "finished" });
     const finished = await finish(run.id, {

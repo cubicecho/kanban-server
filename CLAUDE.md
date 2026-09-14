@@ -470,7 +470,10 @@ prompt cache keeps it only while it does not change per card. `afterTurn` and `s
 awaited: a memory server filing a card is no reason to hold it `running`, and `hooksSettled()` is
 how a test waits for them. `sessionDelete` is fired from the `cards`, `tasks` and `projects` write
 hooks, the last reading the doomed ids in `before` since the cascade leaves `after` nothing to
-read. A hook never fails a run; what it did lands in `runs.hooks`. `shared/hooks.ts` copies the
+read. A hook never fails a run; what it did lands in `runs.hooks`. What the model was opened with as a whole — the system message and the first user
+message, `<context>` blocks and all — lands in `runs.prompt` through `runAgent`'s `onPrompt`, taken
+off the first request as it goes rather than rebuilt, and is said live as a `prompt` notice that
+`RunStream` draws above everything else. `shared/hooks.ts` copies the
 pool's variable table for the web and re-exports agent-core's `HookNote` as a type, the pool being a server package, and `tests/hooks.test.ts`
 compares the copy against `hookVars` — edit both together.
 

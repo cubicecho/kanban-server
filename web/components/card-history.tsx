@@ -5,6 +5,7 @@ import { CardRunsDocument, type CardRunsQuery } from "@/__generated__/graphql";
 import { FormField } from "@/components/form-field";
 import { HookNotes } from "@/components/hook-line";
 import { MetaLine } from "@/components/meta-line";
+import { StoredRunPrompt } from "@/components/run-prompt";
 import { RunStream } from "@/components/run-stream";
 import { RunStatusBadge, VerdictBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
@@ -161,6 +162,7 @@ export function CardHistory({ cardId }: { cardId: string }) {
                     <RunStream runId={run.id} />
                   ) : (
                     <>
+                      <StoredRunPrompt runId={run.id} />
                       <HookNotes notes={run.hooks} />
                       <pre className="max-h-48 overflow-auto rounded-md bg-muted/30 p-2 text-xs whitespace-pre-wrap wrap-anywhere">
                         {run.error || run.output || "(no output)"}

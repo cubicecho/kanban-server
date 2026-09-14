@@ -157,7 +157,13 @@ test("a hidden tool is never offered, and is refused to anyone but a hook", asyn
 test("a card's run is handed what the hooks recall, and remembered once it is done", async () => {
   const [agent] = await db
     .insert(tables.agents)
-    .values({ name: "worker", baseUrl, model: "fake", toolDiscovery: "eager" })
+    .values({
+      name: "worker",
+      baseUrl,
+      model: "fake",
+      toolDiscovery: "eager",
+      systemPrompt: "You are the careful one.",
+    })
     .returning();
   await db.insert(tables.agentServers).values({ agentId: agent.id, serverId: SERVER_ID });
   const created = await gql(
@@ -172,6 +178,10 @@ test("a card's run is handed what the hooks recall, and remembered once it is do
     .where(eq(tables.lanes.projectId, projectId))
     .orderBy(tables.lanes.position);
   const doing = board[2];
+  await db
+    .update(tables.lanes)
+    .set({ prompt: "This board keeps a changelog." })
+    .where(eq(tables.lanes.id, doing.id));
   const [card] = await db
     .insert(tables.cards)
     .values({ projectId, laneId: doing.id, title: "indent the file", body: "use the house style" })
@@ -186,6 +196,23 @@ test("a card's run is handed what the hooks recall, and remembered once it is do
   const user = sent[0].messages.find((message) => message.role === "user")?.content ?? "";
   expect(user).toContain(`The owner prefers tabs. (session ${card.id})`);
   expect(user.indexOf("prefers tabs")).toBeLessThan(user.indexOf("indent the file"));
+  // Added to, never instead of: the card's prompt arrives whole after the context, and the system
+  // prompt is every layer it would have been with no hooks at all and not a word of the recall.
+  expect(user.endsWith("Card: indent the file\n\nuse the house style")).toBe(true);
+  const { EXECUTE_SYSTEM } = await import("../server/runner/prompts.ts");
+  for (const request of sent) {
+    const system = request.messages.filter((message) => message.role === "system");
+    expect(system).toHaveLength(1);
+    expect(request.messages[0]).toEqual({
+      role: "system",
+      content: [
+        "Project: hooked",
+        "You are the careful one.",
+        EXECUTE_SYSTEM,
+        "This board keeps a changelog.",
+      ].join("\n\n"),
+    });
+  }
   // `record_artifact` is the runner's own, offered to any card run that has tools to store with.
   expect((sent[0].tools ?? []).map((tool) => tool.function.name)).toEqual([
     "memory__recall",
@@ -217,6 +244,18 @@ test("a card's run is handed what the hooks recall, and remembered once it is do
   expect(calls.map((call) => call.name)).toEqual(["recall", "remember", "remember"]);
   expect(calls[1].args).toEqual({ session: card.id, reply: "done it", project: projectId });
   expect(calls[2].args).toEqual({ status: "ok" });
+
+  // The run keeps what it was opened with, exactly as sent — hook context inside the user message,
+  // the system prompt untouched — and a watcher is shown the same thing live.
+  const [opened] = await db
+    .select({ prompt: tables.runs.prompt })
+    .from(tables.runs)
+    .where(eq(tables.runs.id, run.id));
+  expect(opened.prompt).toEqual({ system: sent[0].messages[0].content, user });
+  const { PROMPT_EVENT, readRunPrompt } = await import("../shared/run-prompt.ts");
+  const promptEvents = history(run.id).filter((event) => event.name === PROMPT_EVENT);
+  expect(promptEvents).toHaveLength(1);
+  expect(readRunPrompt(promptEvents[0].text)).toEqual(opened.prompt);
 
   // A hook that files something and adds nothing is still on the row, so a person can tell a
   // memory server that remembered from one that was never asked.

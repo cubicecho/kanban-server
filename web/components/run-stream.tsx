@@ -2,9 +2,11 @@ import { memo, useEffect, useRef, useState } from "react";
 import { RunEventsDocument, type RunEventsSubscription } from "@/__generated__/graphql";
 import { HookLine } from "@/components/hook-line";
 import { LiveDot } from "@/components/live-dot";
+import { RunPromptView } from "@/components/run-prompt";
 import { TokenStats, type Usage } from "@/components/token-stats";
 import { subscribe } from "@/lib/gql";
 import { cn } from "@/lib/utils";
+import { PROMPT_EVENT, type RunPrompt, readRunPrompt } from "../../shared/run-prompt.ts";
 
 type RunEvent = RunEventsSubscription["runEvents"];
 
@@ -72,6 +74,9 @@ export function RunStream({
   // said, it is what the run has cost, and it belongs in the header where it can be watched
   // rather than in the log where it would scroll away.
   const [usage, setUsage] = useState<Usage | null>(null);
+  // Held apart too, and drawn first: what the run was started with is the top of the story even
+  // though it is only known once the hooks it contains have finished reporting.
+  const [prompt, setPrompt] = useState<RunPrompt | null>(null);
   const [error, setError] = useState("");
   const [ended, setEnded] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
@@ -82,6 +87,7 @@ export function RunStream({
   useEffect(() => {
     setBlocks([]);
     setUsage(null);
+    setPrompt(null);
     setError("");
     setEnded(false);
 
@@ -96,7 +102,9 @@ export function RunStream({
       // turn's, so the last one is the answer and the ones before it are history.
       const counted = batch.filter((event) => event.kind === "usage").pop();
       if (counted?.usage) setUsage(counted.usage);
-      const said = batch.filter((event) => event.kind !== "usage");
+      const opening = batch.find((event) => event.kind === "notice" && event.name === PROMPT_EVENT);
+      if (opening) setPrompt(readRunPrompt(opening.text));
+      const said = batch.filter((event) => event.kind !== "usage" && event !== opening);
       if (said.length === 0) return;
       setBlocks((prev) => {
         const next = prev.slice();
@@ -177,7 +185,12 @@ export function RunStream({
           className,
         )}
       >
-        {blocks.length === 0 ? (
+        {prompt ? (
+          <div className="mb-2">
+            <RunPromptView prompt={prompt} />
+          </div>
+        ) : null}
+        {blocks.length === 0 && !prompt ? (
           <p className="text-sm text-muted-foreground">Waiting for the model…</p>
         ) : null}
         <div className="flex min-w-0 flex-col gap-2">

@@ -13,6 +13,7 @@ import {
   unique,
 } from "drizzle-orm/pg-core";
 import type { HookNote } from "../../shared/hooks.ts";
+import type { RunPrompt } from "../../shared/run-prompt.ts";
 
 /**
  * The whole domain, in one place. Postgres is the only database; `client.ts` chooses which
@@ -640,6 +641,14 @@ export const runs = pgTable(
      * a question asked long after the bus has forgotten the run.
      */
     hooks: jsonb().$type<HookNote[]>().notNull().default([]),
+    /**
+     * What the run was started with: the system message and the first user message as sent,
+     * hook context and all. Null on a run from before this was kept. A column rather than an
+     * event alone for the same reason `hooks` is — "what was this agent actually told" is asked
+     * after the bus has forgotten — and JSON because a `JSONFilter` is one `$ref` in the tool
+     * listing where two text columns are two `StringFilter`s on every tool that reaches runs.
+     */
+    prompt: jsonb().$type<RunPrompt>(),
   },
   (table) => [
     index("runs_project_idx").on(table.projectId),
