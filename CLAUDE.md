@@ -437,6 +437,15 @@ milliseconds apart and the answer must not predate the write. `undefined` scope 
 connected server and an *empty* scope means none of them: an agent with no servers linked to it
 wants the second, so the two must not collapse.
 
+**What goes ahead of the card holds still, because a prompt cache keeps only a prefix.** The
+system prompt is the lane's and the tool array is the agent's, and neither may depend on which card
+is running, when, or on anything a write to another table happens to reorder; the card, its notes
+and hook `<context>` go on the user message behind them. The pool keeps its servers in the order
+`load` hands them over, and that order is the tool array's and an on-demand catalogue's, so `load`
+reads `mcp_servers` by slug — unordered, an edit to one server's timeout moved its tools to the end
+of every request on the board. `tests/prompt-cache.test.ts` holds two cards in a lane to the same
+prefix, each turn of a run to an append, and both through an edited server.
+
 **A connection cost belongs to the server, not to the pool.** `mcp_servers.cwd` and
 `mcp_servers.connectTimeoutMs` are both nullable, and null is the pool's own answer — this
 process's directory, and whatever bound the pool was built with. They are columns rather than
