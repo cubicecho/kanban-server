@@ -19,7 +19,6 @@ import {
 import { useEffect, useRef, useState } from "react";
 import type { BoardQuery } from "@/__generated__/graphql";
 import { ActionButton } from "@/components/app-buttons";
-import { RunStream } from "@/components/run-stream";
 import { CardStatusBadge } from "@/components/status-badge";
 import {
   AlertDialog,
@@ -33,13 +32,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -95,8 +87,6 @@ export function SortableCard({
   waitingOn,
   mark,
   focused,
-  watching,
-  runId,
   busy,
   on,
 }: {
@@ -119,8 +109,6 @@ export function SortableCard({
   mark?: { notes: number; rejection: string };
   /** Arrived at from a link. Ringed and scrolled to, for a few seconds. */
   focused?: boolean;
-  watching: boolean;
-  runId?: string;
   busy: { move: boolean; run: boolean; retry: boolean; archive: boolean; remove: boolean };
   on: {
     edit: (tab?: CardTab) => void;
@@ -335,27 +323,6 @@ export function SortableCard({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-
-      {/* The middle of the run — what the agent is thinking and which tools it is reaching for
-          — without leaving the board for the Runs page. In a dialog rather than in the card:
-          model output is prose and tool calls are paths, and 288px of lane wrapped both to
-          three words a line while shoving every card below it down the column. The stream
-          replays from the start, so opening it late costs nothing. */}
-      <Dialog open={watching} onOpenChange={(open) => !open && on.watch()}>
-        <DialogContent className="sm:max-w-3xl">
-          <DialogHeader>
-            <DialogTitle className="truncate">{card.title}</DialogTitle>
-            <DialogDescription>
-              The run as it happens. Closing this leaves it running.
-            </DialogDescription>
-          </DialogHeader>
-          {runId ? (
-            <RunStream runId={runId} className="max-h-[60vh]" />
-          ) : (
-            <p className="text-sm text-muted-foreground">Looking for the run…</p>
-          )}
-        </DialogContent>
-      </Dialog>
 
       <AlertDialog open={confirming} onOpenChange={setConfirming}>
         <AlertDialogContent>

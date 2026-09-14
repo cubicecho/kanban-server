@@ -42,6 +42,7 @@ query ActiveRuns($projectId: String!) {
     id
     kind
     cardId
+    laneId
     taskId
   }
 }

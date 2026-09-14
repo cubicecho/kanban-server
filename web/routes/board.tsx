@@ -48,6 +48,7 @@ import { SaveTemplateDialog } from "@/components/save-template-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { WatchRunDialog } from "@/components/watch-run-dialog";
 import { landing, laneOrder, placement } from "@/lib/board-order";
 import { BOARD_LIMIT, boardQuery } from "@/lib/board-query";
 import { blockingDeps } from "@/lib/cards";
@@ -176,7 +177,9 @@ export function BoardRoute() {
   } | null>(null);
   const [editingLane, setEditingLane] = useState<{ lane?: Lane } | null>(null);
   const [savingTemplate, setSavingTemplate] = useState(false);
-  const [watching, setWatching] = useState<string | null>(null);
+  // The card being watched, not the run: the run changes as the card moves from station to
+  // station, and the title is kept so the dialog still has a heading once the card has gone.
+  const [watching, setWatching] = useState<{ cardId: string; title: string } | null>(null);
   const [dragging, setDragging] = useState<string | null>(null);
   const [search, setSearch] = useState("");
 
@@ -201,10 +204,12 @@ export function BoardRoute() {
     queryKey: ["active-runs", projectId],
     queryFn: () => request(ActiveRunsDocument, { projectId }),
     enabled: Boolean(projectId),
+    // An open watch keeps it going too: the run it shows ending and the next one starting are
+    // both things only this query can say, and neither leaves a card running in between.
     refetchInterval: () =>
-      board.data?.cards.some((card) => card.status === "running") ? 3000 : false,
+      watching || board.data?.cards.some((card) => card.status === "running") ? 3000 : false,
   });
-  const runFor = (cardId: string) => active.data?.runs.find((run) => run.cardId === cardId)?.id;
+  const runFor = (cardId: string) => active.data?.runs.find((run) => run.cardId === cardId);
 
   const agents = useQuery({ queryKey: ["agents"], queryFn: () => request(AgentsDocument) });
   const agentName = (id?: string | null) =>
@@ -659,8 +664,6 @@ export function BoardRoute() {
                         waitingOn={waitingOn(card)}
                         mark={markFor(card.id)}
                         focused={focused === card.id}
-                        watching={watching === card.id}
-                        runId={runFor(card.id)}
                         // Per card, not per mutation: these are one mutation object shared by
                         // the whole board, so `move.isPending` alone greyed out every card's
                         // controls because one of them was moving.
@@ -679,7 +682,7 @@ export function BoardRoute() {
                           run: () => run.mutate(card.id),
                           stop: () => stop.mutate(card.id),
                           remove: () => removeCard.mutate(card.id),
-                          watch: () => setWatching(watching === card.id ? null : card.id),
+                          watch: () => setWatching({ cardId: card.id, title: card.title }),
                         }}
                       />
                     ))}
@@ -720,6 +723,17 @@ export function BoardRoute() {
           laneId={editingCard.laneId}
           tab={editingCard.tab}
           onClose={() => setEditingCard(null)}
+        />
+      ) : null}
+
+      {watching ? (
+        <WatchRunDialog
+          key={watching.cardId}
+          card={all.find((card) => card.id === watching.cardId)}
+          title={watching.title}
+          lanes={lanes}
+          live={runFor(watching.cardId)}
+          onClose={() => setWatching(null)}
         />
       ) : null}
 
