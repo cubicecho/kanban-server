@@ -230,6 +230,7 @@ enum RunDistinctColumn {
   completionTokens
   totalTokens
   hooks
+  prompt
 }
 
 type AgentAggregate {
@@ -1658,6 +1659,7 @@ type Run {
   completionTokens: Int!
   totalTokens: Int!
   hooks: JSON!
+  prompt: JSON
 
   """
   Opaque cursor of this row's position in the query's ordering. Pass it as `after` to resume from here. Only set on rows returned by a list query.
@@ -1785,6 +1787,7 @@ type RunCountNonNullAggregate {
   completionTokens: Int!
   totalTokens: Int!
   hooks: Int!
+  prompt: Int!
 }
 
 type RunCountDistinctAggregate {
@@ -4338,6 +4341,7 @@ input RunFilters {
   completionTokens: IntFilter
   totalTokens: IntFilter
   hooks: JSONFilter
+  prompt: JSONFilter
 
   """Matches rows whose project matches these filters"""
   project: ProjectFilters
@@ -4470,6 +4474,7 @@ input RunOrderBy {
   completionTokens: InnerOrder
   totalTokens: InnerOrder
   hooks: InnerOrder
+  prompt: InnerOrder
 
   """Order by columns of the related project row"""
   project: ProjectOrderBy
@@ -4542,6 +4547,7 @@ input RunCountNonNullHaving {
   completionTokens: AggregateNumberFilter
   totalTokens: AggregateNumberFilter
   hooks: AggregateNumberFilter
+  prompt: AggregateNumberFilter
 }
 
 input RunCountDistinctHaving {

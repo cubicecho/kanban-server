@@ -116,3 +116,12 @@ query CardRuns($cardId: String!) {
     }
   }
 }
+
+# What one run was started with. Asked for when a run is opened rather than with the list: it is
+# the whole system prompt and the card with its hook context, and the list polls a hundred rows.
+query RunPrompt($runId: String!) {
+  runs(where: { id: { eq: $runId } }, limit: 1) {
+    id
+    prompt
+  }
+}

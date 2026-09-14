@@ -32,6 +32,7 @@ import {
 } from "@cubicecho/agent-core";
 import type OpenAI from "openai";
 import { errorMessage } from "../../shared/errors.ts";
+import type { RunPrompt } from "../../shared/run-prompt.ts";
 import {
   type ArtifactDraft,
   declaredArtifact,
@@ -73,7 +74,19 @@ export interface AgentOptions {
    * sink that throws costs the run nothing but a notice.
    */
   onArtifact?: (draft: ArtifactDraft) => Promise<void>;
+  /**
+   * Handed the opening system and user messages once, as the first request is about to go — so
+   * what is kept is what was sent, catalogue and hook context included, rather than a
+   * reconstruction of it. Awaited; a sink that throws costs the run a notice.
+   */
+  onPrompt?: (prompt: RunPrompt) => Promise<void>;
 }
+
+/** A message's text, whether its content is a string or a list of parts. */
+const textOf = (content: OpenAI.ChatCompletionMessageParam["content"]): string =>
+  typeof content === "string"
+    ? content
+    : (content ?? []).map((part) => ("text" in part ? part.text : "")).join("");
 
 /** Long tool arguments and results are for the model; a watcher needs the gist. */
 const preview = (text: string, limit = 2000) =>
@@ -133,6 +146,7 @@ export async function runAgent({
   signal,
   onEvent,
   onArtifact,
+  onPrompt,
 }: AgentOptions): Promise<AgentResult> {
   const model = config.model;
   if (!model) {
@@ -247,6 +261,14 @@ export async function runAgent({
     // for one step removes the choice, and everything comes back on the step after.
     const routed = preselected.length > 0 && iteration === 0;
     messages[0] = { role: "system", content: routed ? system : systemPromptFor() };
+    if (iteration === 0 && onPrompt) {
+      const [opening, question] = messages;
+      try {
+        await onPrompt({ system: textOf(opening.content), user: textOf(question.content) });
+      } catch (error) {
+        notice(`could not keep the run's prompt: ${errorMessage(error)}`);
+      }
+    }
 
     // MCP servers emit JSON Schema shapes a strict backend cannot compile — Gmail's, for one.
     // Normalising them here is cheap and cloud providers accept the result unchanged.
