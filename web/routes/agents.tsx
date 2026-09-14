@@ -127,7 +127,9 @@ export function AgentsRoute() {
                   {plural(count, "lane")}
                 </span>
                 <span className="font-normal text-muted-foreground text-xs">
-                  {agent.servers.length ? plural(agent.servers.length, "server") : "no tools"}
+                  {agent.servers.length
+                    ? plural(agent.servers.length, "MCP server")
+                    : "no MCP servers"}
                 </span>
               </ItemTitle>
               <p className="truncate font-mono text-muted-foreground text-xs">
