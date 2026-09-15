@@ -1,3 +1,10 @@
+import {
+  HOOK_EVENTS,
+  type HookEvent,
+  hookVars,
+  INJECT_EVENTS,
+  validateHooks,
+} from "@cubicecho/agent-mcp-pool/hooks";
 import { Plus, X } from "lucide-react";
 import { ActionButton } from "@/components/app-buttons";
 import { FormField } from "@/components/form-field";
@@ -7,15 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { parseJson } from "@/lib/mcp-config";
-import {
-  COMMON_HOOK_VARS,
-  HOOK_EVENTS,
-  HOOK_VARS,
-  type HookEvent,
-  INJECT_EVENTS,
-  KANBAN_HOOK_VARS,
-  type ToolHook,
-} from "../../shared/hooks.ts";
+import { HOOK_EVENT_TIMING, KANBAN_HOOK_VARS, type ToolHook } from "../../shared/hooks.ts";
 
 /**
  * A hook as the form holds it: the arguments as text, because text on its way to being valid JSON
@@ -35,18 +34,23 @@ export const toHookDrafts = (hooks: unknown): HookDraft[] =>
   }));
 
 /**
- * The drafts as the column wants them. Throws on arguments that do not parse, naming the hook —
- * the server checks everything else, and says which hook in the same words.
+ * The drafts as the column wants them. Throws on arguments that do not parse, or on anything the
+ * pool's `validateHooks` refuses, naming the hook — the same check, in the same words, the server
+ * makes on write, so a bad hook is caught before the round trip.
  */
-export const fromHookDrafts = (drafts: readonly HookDraft[]): ToolHook[] =>
-  drafts.map(({ key: _key, args, ...hook }) => {
+export const fromHookDrafts = (drafts: readonly HookDraft[]): ToolHook[] => {
+  const hooks = drafts.map(({ key: _key, args, ...hook }) => {
     const parsed = parseJson<unknown>(args, `The arguments of hook "${hook.id}"`, undefined);
     return parsed === undefined ? hook : { ...hook, args: parsed };
   });
+  const problems = validateHooks(hooks);
+  if (problems.length) throw new Error(problems.join("\n"));
+  return hooks;
+};
 
-const EVENT_OPTIONS = (Object.keys(HOOK_EVENTS) as HookEvent[]).map((event) => ({
+const EVENT_OPTIONS = HOOK_EVENTS.map((event) => ({
   value: event,
-  label: `${event} — ${HOOK_EVENTS[event]}`,
+  label: `${event} — ${HOOK_EVENT_TIMING[event]}`,
 }));
 
 /** The next `hook-N` the list has not used, so two new hooks never share an id. */
@@ -75,8 +79,8 @@ function HookRow({
   onRemove: () => void;
 }) {
   const update = (patch: Partial<HookDraft>) => onChange({ ...hook, ...patch });
-  const injects = INJECT_EVENTS.includes(hook.on);
-  const vars = [...COMMON_HOOK_VARS, ...HOOK_VARS[hook.on], ...KANBAN_HOOK_VARS];
+  const injects = INJECT_EVENTS.has(hook.on);
+  const vars = [...hookVars(hook.on), ...KANBAN_HOOK_VARS];
 
   return (
     <div className="flex flex-col gap-3 rounded-md border p-3">
@@ -115,9 +119,7 @@ function HookRow({
               const on = value as HookEvent;
               // Context can only be added ahead of a request, so it goes when the hook moves off one.
               update(
-                INJECT_EVENTS.includes(on)
-                  ? { on }
-                  : { on, inject: undefined, maxTokens: undefined },
+                INJECT_EVENTS.has(on) ? { on } : { on, inject: undefined, maxTokens: undefined },
               );
             }}
           />
