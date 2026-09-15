@@ -1,10 +1,9 @@
 import { Plus, X } from "lucide-react";
-import { useId } from "react";
+import { ActionButton } from "@/components/app-buttons";
 import { FormField } from "@/components/form-field";
-import { Select } from "@/components/select";
+import { OptionSelect } from "@/components/option-select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { parseJson } from "@/lib/mcp-config";
@@ -75,7 +74,6 @@ function HookRow({
   onChange: (hook: HookDraft) => void;
   onRemove: () => void;
 }) {
-  const injectId = useId();
   const update = (patch: Partial<HookDraft>) => onChange({ ...hook, ...patch });
   const injects = INJECT_EVENTS.includes(hook.on);
   const vars = [...COMMON_HOOK_VARS, ...HOOK_VARS[hook.on], ...KANBAN_HOOK_VARS];
@@ -95,21 +93,21 @@ function HookRow({
           // Absent is on, so a hook switched back on is written the way a new one is.
           onCheckedChange={(enabled) => update({ enabled: enabled ? undefined : false })}
         />
-        <Button
-          type="button"
+        <ActionButton
           variant="ghost"
           size="icon"
-          aria-label={`Remove hook ${hook.id}`}
+          label={`Remove hook ${hook.id}`}
+          hint="Remove hook"
           onClick={onRemove}
         >
           <X className="size-4" aria-hidden />
-        </Button>
+        </ActionButton>
       </div>
 
       <FormField
         label="When"
         control={(wiring) => (
-          <Select
+          <OptionSelect
             {...wiring}
             options={EVENT_OPTIONS}
             value={hook.on}
@@ -131,7 +129,7 @@ function HookRow({
         description="The server's own name for it, without the slug."
         control={(wiring) =>
           tools.length ? (
-            <Select
+            <OptionSelect
               {...wiring}
               className="font-mono"
               options={[...new Set([...tools, ...(hook.tool ? [hook.tool] : [])])].map((tool) => ({
@@ -174,16 +172,19 @@ function HookRow({
 
       {injects ? (
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-          <div className="flex flex-1 items-center gap-3">
-            <Switch
-              id={injectId}
-              checked={Boolean(hook.inject)}
-              onCheckedChange={(inject) =>
-                update(inject ? { inject } : { inject: undefined, maxTokens: undefined })
-              }
-            />
-            <Label htmlFor={injectId}>Add what it returns to the run's prompt</Label>
-          </div>
+          <FormField
+            orientation="horizontal"
+            className="flex-1"
+            label="Add what it returns to the run's prompt"
+            control={
+              <Switch
+                checked={Boolean(hook.inject)}
+                onCheckedChange={(inject) =>
+                  update(inject ? { inject } : { inject: undefined, maxTokens: undefined })
+                }
+              />
+            }
+          />
           {hook.inject ? (
             <FormField
               label="At most (tokens)"
