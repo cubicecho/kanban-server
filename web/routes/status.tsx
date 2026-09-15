@@ -14,6 +14,7 @@ import {
 import { ActionButton } from "@/components/app-buttons";
 import { Page, useCurrentProject } from "@/components/app-shell";
 import { CardDialog } from "@/components/card-dialog";
+import { CardLayout } from "@/components/card-layout";
 import { EmptyState, NoProject } from "@/components/empty-state";
 import { LiveDot } from "@/components/live-dot";
 import { MetaLine } from "@/components/meta-line";
@@ -418,22 +419,25 @@ export function StatusRoute() {
               const reason = why(card);
               const kind = health.get(card.id);
               return (
-                <Card key={card.id} className="gap-2 p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <CardStatusBadge status={card.status} />
-                        <span className="truncate font-medium">{card.title || "Untitled"}</span>
-                      </div>
-                      <MetaLine
-                        className="mt-1 block"
-                        parts={[
-                          lane?.name ?? "(lane gone)",
-                          card.attempts ? plural(card.attempts, "failed attempt") : null,
-                          when(card.updatedAt),
-                        ]}
-                      />
-                    </div>
+                <CardLayout
+                  key={card.id}
+                  className="gap-2"
+                  title={
+                    <span className="flex min-w-0 items-center gap-2">
+                      <CardStatusBadge status={card.status} />
+                      <span className="truncate font-medium">{card.title || "Untitled"}</span>
+                    </span>
+                  }
+                  description={
+                    <MetaLine
+                      parts={[
+                        lane?.name ?? "(lane gone)",
+                        card.attempts ? plural(card.attempts, "failed attempt") : null,
+                        when(card.updatedAt),
+                      ]}
+                    />
+                  }
+                  action={
                     <div className="flex shrink-0 items-center gap-1">
                       {kind === "attention" ? (
                         <ActionButton
@@ -463,13 +467,15 @@ export function StatusRoute() {
                         Open
                       </Button>
                     </div>
-                  </div>
-                  {reason ? (
-                    <p className="line-clamp-4 text-sm whitespace-pre-wrap text-muted-foreground">
-                      {reason}
-                    </p>
-                  ) : null}
-                </Card>
+                  }
+                  content={
+                    reason ? (
+                      <p className="line-clamp-4 text-sm whitespace-pre-wrap text-muted-foreground">
+                        {reason}
+                      </p>
+                    ) : null
+                  }
+                />
               );
             })}
           </>
