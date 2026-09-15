@@ -10,7 +10,7 @@ import {
   notify as notifyHooks,
   type RunEventInput,
 } from "@cubicecho/agent-core";
-import { validateHooks } from "@cubicecho/agent-mcp-pool";
+import { validateHooks } from "@cubicecho/agent-mcp-pool/hooks";
 import { hookSummary } from "../../shared/hooks.ts";
 import { mcp } from "./mcp.ts";
 
@@ -179,9 +179,8 @@ export function subjectsDeleted(kind: "card" | "task", ids: readonly string[]) {
 /**
  * What is wrong with a server row's `hiddenTools` and `hooks`, as a write hands them over.
  *
- * `validateHooks` is the pool's and assumes the shape it was typed with. These columns are JSON
- * a client wrote, so the shape is checked first: an entry that is not an object would otherwise
- * be a crash in the validator rather than a sentence about the row.
+ * These columns are JSON a client wrote. The pool's `validateHooks` checks the shape before the
+ * rules, so it reads the hooks as they came; `hiddenTools` is this side's own to check.
  */
 export function hookProblems(row: { hiddenTools?: unknown; hooks?: unknown }): string[] {
   const problems: string[] = [];
@@ -190,11 +189,5 @@ export function hookProblems(row: { hiddenTools?: unknown; hooks?: unknown }): s
     !(Array.isArray(row.hiddenTools) && row.hiddenTools.every((name) => typeof name === "string"))
   )
     problems.push("hiddenTools must be a list of tool names");
-  if (row.hooks == null) return problems;
-  if (!Array.isArray(row.hooks)) return [...problems, "hooks must be a list"];
-  const shapeless = row.hooks.findIndex(
-    (hook) => !hook || typeof hook !== "object" || Array.isArray(hook),
-  );
-  if (shapeless >= 0) return [...problems, `hook ${shapeless + 1}: must be an object`];
   return [...problems, ...validateHooks(row.hooks)];
 }

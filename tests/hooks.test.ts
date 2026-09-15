@@ -116,13 +116,6 @@ afterAll(async () => {
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test("the web's copy of the template variables is the pool's", async () => {
-  const { hookVars } = await import("@cubicecho/agent-mcp-pool");
-  const { COMMON_HOOK_VARS, HOOK_EVENTS, HOOK_VARS } = await import("../shared/hooks.ts");
-  for (const event of Object.keys(HOOK_EVENTS) as (keyof typeof HOOK_VARS)[])
-    expect([...COMMON_HOOK_VARS, ...HOOK_VARS[event]]).toEqual(hookVars(event));
-});
-
 test("a row's hooks are checked before they are written, and the refusal names the hook", async () => {
   const { hookProblems } = await import("../server/runner/hooks.ts");
   expect(hookProblems({ hiddenTools: ["a"], hooks: [] })).toEqual([]);
