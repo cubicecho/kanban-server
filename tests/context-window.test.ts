@@ -42,6 +42,13 @@ beforeAll(async () => {
         response.end(JSON.stringify(LISTING));
         return;
       }
+      // Anything else is the window probe (`/props`, LM Studio's listing), which this endpoint
+      // does not serve — a request there is not the prompt going out.
+      if (!request.url?.endsWith("/chat/completions")) {
+        response.writeHead(404);
+        response.end();
+        return;
+      }
       chatRequests++;
       if (refuse) {
         response.writeHead(400, { "content-type": "application/json" });
